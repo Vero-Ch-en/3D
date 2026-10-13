@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#1a1210">
+<title>Cozy Birthday Simulator</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<!-- archive/PAIR_00491.log -->
+<div id="app">
+  <canvas id="view" aria-label="Game view"></canvas>
+
+  <div id="touch" class="hidden">
+    <div id="stickzone"><div id="stick"><div id="knob"></div></div></div>
+    <button id="btn-together" aria-label="Together">&#9829;</button>
+    <button id="btn-use" aria-label="Use">Use</button>
+    <button id="btn-pause" aria-label="Pause">II</button>
+  </div>
+
+  <div id="prompt" class="hidden" aria-live="polite"></div>
+  <div id="hint"></div>
+
+  <div id="dialogue" class="hidden" role="dialog" aria-live="polite">
+    <div class="who"></div>
+    <div class="text"></div>
+    <div class="more">&#9662;</div>
+  </div>
+  <div id="choices" class="hidden" role="listbox"></div>
+  <div id="together" class="hidden" role="menu"></div>
+  <div id="minigame" class="hidden"></div>
+  <div id="scrapbook" class="hidden"></div>
+  <div id="viewer" class="hidden"></div>
+  <div id="card" class="hide"></div>
+  <div id="ending" class="hidden"></div>
+
+  <div id="title" class="hidden">
+    <div class="title-inner">
+      <h1>Cozy Birthday Simulator</h1>
+      <p id="title-sub"></p>
+      <div id="title-buttons"></div>
+      <p class="controls">WASD / arrows to walk &middot; Shift to run &middot; E or Space to interact &middot; Q to be together &middot; Esc to pause &middot; M to mute</p>
+      <p id="title-foot"></p>
+    </div>
+  </div>
+
+  <div id="pause" class="hidden">
+    <div class="pause-inner">
+      <h2>Paused</h2>
+      <button class="btn primary" id="pause-resume">Resume</button>
+      <button class="btn quiet" id="pause-sound">Sound: on</button>
+      <button class="btn quiet" id="pause-title">Return to title</button>
+      <p class="small">Progress is kept from the start of each chapter.</p>
+    </div>
+  </div>
+
+  <div id="fade"></div>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/core.js"></script>
+<script src="js/render.js"></script>
+<script src="js/draw.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/world.js"></script>
+<script src="js/partner.js"></script>
+<script src="js/story.js"></script>
+<script src="js/story2.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
