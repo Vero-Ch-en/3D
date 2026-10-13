@@ -3,19 +3,17 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Cozy Birthday 3D Demo</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;1,500&family=Inter+Tight:wght@400;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<title>Cozy Birthday Cabin</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;1,500&family=Inter+Tight:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
 <style>
-  /* Layout: full-bleed WebGL viewport with thin cinematic UI floating over it. Single dark look by design. */
+  /* Layout: full-bleed WebGL viewport; thin cinematic UI (subtitles, letterbox) floats over it. Single dark look by design. */
   :root {
     color-scheme: dark;
-    --ink: #f3e7d3;
-    --ink-dim: rgba(243, 231, 211, 0.62);
-    --panel: rgba(18, 13, 11, 0.72);
-    --paper: #f7efe1;
-    --paper-ink: #3a2a22;
-    --amber: #e8a650;
-    --line: rgba(243, 231, 211, 0.18);
+    --ink: #f4e9d8;
+    --ink-dim: rgba(244, 233, 216, 0.62);
+    --panel: rgba(16, 12, 12, 0.6);
+    --amber: #f0b064;
+    --line: rgba(244, 233, 216, 0.18);
     --display: "Cormorant Garamond", "Iowan Old Style", Georgia, serif;
     --ui: "Inter Tight", system-ui, -apple-system, "Segoe UI", sans-serif;
     --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
@@ -25,102 +23,98 @@
   #gl:active { cursor: grabbing; }
   button { font: inherit; color: inherit; }
   button:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
-
-  #loading { position: fixed; inset: 0; display: grid; place-items: center; background: #07080d; font: 500 13px var(--mono); letter-spacing: 0.2em; color: var(--ink-dim); transition: opacity 0.8s; z-index: 30; }
+  #loading { position: fixed; inset: 0; display: grid; place-items: center; background: #07080d; font: 500 12px var(--mono); letter-spacing: 0.24em; color: var(--ink-dim); transition: opacity 1s; z-index: 30; }
   #loading.done { opacity: 0; pointer-events: none; }
 
-  #title { position: fixed; inset: 0; display: flex; align-items: flex-end; padding: 0 16px 9vh; background: linear-gradient(180deg, rgba(4,5,10,0) 30%, rgba(4,5,10,0.85) 100%); z-index: 20; transition: opacity 1.2s; }
+  #title { position: fixed; inset: 0; display: flex; align-items: flex-end; padding: 0 16px 8vh; background: linear-gradient(180deg, rgba(6,5,10,0) 45%, rgba(6,5,10,0.75) 100%); z-index: 20; transition: opacity 1.4s; }
   #title.hide { opacity: 0; pointer-events: none; }
-  .title-inner { max-width: 640px; margin-inline: auto; width: 100%; }
+  .title-inner { max-width: 620px; margin-inline: auto; width: 100%; }
   .eyebrow { font: 500 11px var(--mono); letter-spacing: 0.28em; text-transform: uppercase; color: var(--amber); }
-  h1 { font: 500 clamp(40px, 7vw, 76px)/0.98 var(--display); margin: 12px 0 14px; letter-spacing: -0.01em; text-wrap: balance; }
-  .lede { color: var(--ink-dim); font-size: 15px; line-height: 1.6; max-width: 52ch; margin: 0 0 24px; }
-  .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
-  .btn { border: 1px solid var(--line); background: rgba(243,231,211,0.06); padding: 12px 22px; border-radius: 999px; cursor: pointer; font-weight: 600; letter-spacing: 0.02em; transition: background 0.2s, transform 0.2s; }
-  .btn:hover { background: rgba(243,231,211,0.14); transform: translateY(-1px); }
-  .btn.primary { background: var(--amber); color: #23170e; border-color: transparent; }
+  h1 { font: 500 clamp(40px, 7vw, 78px)/0.98 var(--display); margin: 10px 0 14px; text-wrap: balance; text-shadow: 0 4px 30px rgba(0,0,0,0.5); }
+  .lede { color: var(--ink-dim); font-size: 15px; line-height: 1.6; max-width: 50ch; margin: 0 0 22px; }
+  .btn { border: 1px solid var(--line); background: rgba(244,233,216,0.06); padding: 12px 22px; border-radius: 999px; cursor: pointer; font-weight: 600; letter-spacing: 0.02em; transition: background 0.2s, transform 0.2s; }
+  .btn:hover { background: rgba(244,233,216,0.14); transform: translateY(-1px); }
+  .btn.primary { background: var(--amber); color: #24160c; border-color: transparent; }
   .keys { font: 400 12px var(--mono); color: var(--ink-dim); line-height: 1.8; margin-top: 18px; }
 
-  #hud { position: fixed; top: calc(12px + env(safe-area-inset-top, 0px)); right: 12px; display: flex; gap: 8px; z-index: 25; align-items: center; }
-  #quality { display: flex; background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 3px; backdrop-filter: blur(6px); }
-  #quality span { font: 500 10px var(--mono); letter-spacing: 0.16em; color: var(--ink-dim); padding: 0 8px 0 10px; align-self: center; }
-  #quality button { border: 0; background: transparent; padding: 5px 11px; border-radius: 999px; font: 500 12px var(--mono); cursor: pointer; color: var(--ink-dim); }
-  #quality button.on { background: var(--ink); color: #1a120e; }
-  #statsBtn { background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; font: 500 12px var(--mono); cursor: pointer; color: var(--ink-dim); }
+  #hud { position: fixed; top: calc(12px + env(safe-area-inset-top, 0px)); right: 12px; display: flex; gap: 8px; z-index: 25; flex-wrap: wrap; justify-content: flex-end; }
+  .pill { display: flex; background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 3px; backdrop-filter: blur(6px); }
+  .pill span { font: 500 10px var(--mono); letter-spacing: 0.16em; color: var(--ink-dim); padding: 0 8px 0 10px; align-self: center; }
+  .pill button { border: 0; background: transparent; padding: 5px 11px; border-radius: 999px; font: 500 12px var(--mono); cursor: pointer; color: var(--ink-dim); }
+  .pill button.on { background: var(--ink); color: #1a120e; }
   #stats { position: fixed; top: calc(12px + env(safe-area-inset-top, 0px)); left: 12px; z-index: 25; font: 500 11px/1.6 var(--mono); color: #9fe39a; background: rgba(0,0,0,0.55); padding: 8px 10px; border-radius: 6px; white-space: pre; pointer-events: none; font-variant-numeric: tabular-nums; }
 
-  #hint { position: fixed; left: 50%; top: calc(64px + env(safe-area-inset-top, 0px)); transform: translate(-50%, -6px); max-width: min(92vw, 640px); text-align: center; font-size: 13px; color: var(--ink); background: var(--panel); padding: 8px 14px; border-radius: 10px; opacity: 0; transition: 0.6s; pointer-events: none; z-index: 15; }
+  #hint { position: fixed; left: 50%; top: calc(64px + env(safe-area-inset-top, 0px)); transform: translate(-50%, -6px); max-width: min(92vw, 640px); text-align: center; font-size: 13px; background: var(--panel); padding: 8px 14px; border-radius: 10px; opacity: 0; transition: 0.6s; pointer-events: none; z-index: 15; }
   #hint.show { opacity: 1; transform: translate(-50%, 0); }
   #prompt { position: fixed; left: 50%; bottom: calc(26px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); display: flex; align-items: center; gap: 8px; background: var(--panel); border: 1px solid var(--line); padding: 8px 14px; border-radius: 999px; font-size: 14px; font-weight: 600; white-space: nowrap; pointer-events: none; backdrop-filter: blur(6px); z-index: 12; }
   #prompt.hidden { display: none; }
   #prompt .key { font: 600 11px var(--mono); background: var(--ink); color: #1a120e; border-radius: 5px; padding: 2px 7px; margin-right: 4px; }
   #prompt .sep { width: 1px; height: 14px; background: var(--line); margin: 0 6px; }
 
-  #dialogue { position: fixed; left: 50%; bottom: calc(22px + env(safe-area-inset-bottom, 0px)); transform: translate(-50%, 10px); width: min(760px, calc(100vw - 32px)); background: rgba(247,239,225,0.95); color: var(--paper-ink); border-radius: 14px; padding: 20px 22px 18px; font-size: 18px; line-height: 1.5; opacity: 0; pointer-events: none; transition: opacity 0.2s, transform 0.2s; z-index: 14; box-shadow: 0 20px 50px rgba(0,0,0,0.45); }
-  #dialogue.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; cursor: pointer; }
-  #dialogue #who { position: absolute; top: -12px; left: 18px; background: var(--amber); color: #23170e; font: 700 12px var(--ui); letter-spacing: 0.04em; padding: 4px 12px; border-radius: 999px; }
-  #dialogue.who-player #who { background: #6b8fbf; color: #fff; }
-  #dialogue.narr #who { display: none; }
-  #dialogue.narr #text { font-family: var(--display); font-style: italic; font-size: 21px; color: #4d3a30; }
-  #text { min-height: 1.5em; }
+  /* Cinematic subtitles */
+  #subs { position: fixed; left: 50%; bottom: calc(9vh + env(safe-area-inset-bottom, 0px)); transform: translate(-50%, 8px); width: min(820px, calc(100vw - 32px)); text-align: center; opacity: 0; pointer-events: none; transition: opacity 0.25s, transform 0.25s; z-index: 14; }
+  #subs.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; cursor: pointer; }
+  #who { font: 600 11px var(--mono); letter-spacing: 0.22em; text-transform: uppercase; color: var(--amber); margin-bottom: 6px; text-shadow: 0 1px 8px rgba(0,0,0,0.8); }
+  #subs.who-player #who { color: #a9c4e8; }
+  #line { font: 500 clamp(18px, 2.4vw, 24px)/1.45 var(--ui); text-shadow: 0 2px 4px rgba(0,0,0,0.9), 0 0 24px rgba(0,0,0,0.6); }
+  #subs.narr #line { font-family: var(--display); font-style: italic; font-size: clamp(20px, 2.7vw, 27px); color: #efe2cf; }
+  #subs::after { content: "E \2192"; display: block; margin-top: 8px; font: 500 10px var(--mono); letter-spacing: 0.2em; color: var(--ink-dim); }
+  @media (pointer: coarse) { #subs::after { content: "tap \2192"; } }
 
-  #bubble { position: fixed; transform: translate(-50%, -100%); background: rgba(247,239,225,0.95); color: var(--paper-ink); font-size: 13px; font-weight: 600; padding: 6px 11px; border-radius: 10px; max-width: 220px; text-align: center; opacity: 0; transition: opacity 0.25s; pointer-events: none; z-index: 11; }
+  #bubble { position: fixed; transform: translate(-50%, -100%); background: rgba(16,12,12,0.62); color: var(--ink); font-size: 13px; font-weight: 500; padding: 6px 11px; border-radius: 10px; max-width: 240px; text-align: center; opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 11; backdrop-filter: blur(4px); }
   #bubble.show { opacity: 1; }
-  #bubble::after { content: ""; position: absolute; left: 50%; bottom: -6px; margin-left: -6px; border: 6px solid transparent; border-bottom: 0; border-top-color: rgba(247,239,225,0.95); }
 
-  #endcard { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; padding: 0 16px; background: radial-gradient(ellipse at center, rgba(5,7,14,0.25), rgba(5,7,14,0.8)); opacity: 0; pointer-events: none; transition: opacity 2s; z-index: 18; }
+  #endcard { position: fixed; inset: 0; display: flex; align-items: flex-end; justify-content: center; text-align: center; padding: 0 16px 12vh; background: linear-gradient(180deg, rgba(4,6,14,0) 40%, rgba(4,6,14,0.7)); opacity: 0; pointer-events: none; transition: opacity 2.5s; z-index: 18; }
   #endcard.show { opacity: 1; pointer-events: auto; }
-  #endcard h2 { font: 500 clamp(30px, 5vw, 48px) var(--display); margin: 10px 0 12px; }
-  #endcard p { color: var(--ink-dim); max-width: 46ch; line-height: 1.6; margin: 0 auto 22px; }
+  #endcard h2 { font: 500 clamp(30px, 5vw, 48px) var(--display); margin: 10px 0 10px; }
+  #endcard p { color: var(--ink-dim); max-width: 48ch; line-height: 1.6; margin: 0 auto 20px; }
 
+  #fade { position: fixed; inset: 0; background: #000; opacity: 0; pointer-events: none; transition: opacity 0.6s; z-index: 16; }
+  #fade.on { opacity: 1; }
   #touch { display: none; }
-  @media (pointer: coarse) {
-    #touch { display: block; }
-    .keys { display: none; }
-    #dialogue { bottom: calc(150px + env(safe-area-inset-bottom, 0px)); font-size: 16px; }
-    #prompt { bottom: calc(190px + env(safe-area-inset-bottom, 0px)); }
-  }
+  @media (pointer: coarse) { #touch { display: block; } .keys { display: none; } #prompt { bottom: calc(120px + env(safe-area-inset-bottom, 0px)); } #subs { bottom: calc(130px + env(safe-area-inset-bottom, 0px)); } }
   #stickzone { position: fixed; left: 0; bottom: 0; width: 50%; height: 55%; z-index: 9; touch-action: none; }
-  #stick { position: fixed; width: 110px; height: 110px; border-radius: 50%; border: 1px solid var(--line); background: rgba(243,231,211,0.05); opacity: 0; transition: opacity 0.15s; }
+  #stick { position: fixed; width: 110px; height: 110px; border-radius: 50%; border: 1px solid var(--line); background: rgba(244,233,216,0.05); opacity: 0; transition: opacity 0.15s; }
   #stick.on { opacity: 1; }
-  #knob { position: absolute; left: 32px; top: 32px; width: 46px; height: 46px; border-radius: 50%; background: rgba(243,231,211,0.7); }
+  #knob { position: absolute; left: 32px; top: 32px; width: 46px; height: 46px; border-radius: 50%; background: rgba(244,233,216,0.7); }
   .tbtn { position: fixed; z-index: 10; border-radius: 50%; border: 1px solid var(--line); font-weight: 700; touch-action: none; }
-  #btn-use { right: calc(18px + env(safe-area-inset-right, 0px)); bottom: calc(28px + env(safe-area-inset-bottom, 0px)); width: 74px; height: 74px; background: rgba(247,239,225,0.9); color: var(--paper-ink); }
-  #btn-hug { right: calc(104px + env(safe-area-inset-right, 0px)); bottom: calc(40px + env(safe-area-inset-bottom, 0px)); width: 56px; height: 56px; background: rgba(196,111,87,0.92); color: #fff; font-size: 20px; }
-  @media (prefers-reduced-motion: reduce) { #title, #endcard, #hint, #dialogue { transition: none; } }
+  #btn-use { right: calc(18px + env(safe-area-inset-right, 0px)); bottom: calc(28px + env(safe-area-inset-bottom, 0px)); width: 72px; height: 72px; background: rgba(244,233,216,0.88); color: #2a1c16; }
+  #btn-hug { right: calc(102px + env(safe-area-inset-right, 0px)); bottom: calc(40px + env(safe-area-inset-bottom, 0px)); width: 54px; height: 54px; background: rgba(176,90,70,0.9); color: #fff; font-size: 20px; }
+  @media (prefers-reduced-motion: reduce) { #title, #endcard, #hint, #subs { transition: none; } }
 </style>
 </head>
 <body>
-
 <canvas id="gl" aria-label="3D scene"></canvas>
-<div id="loading">BUILDING THE HOUSE…</div>
+<div id="loading">LIGHTING THE FIRE…</div>
 
 <div id="title">
   <div class="title-inner">
-    <div class="eyebrow">Vertical slice · real-time 3D</div>
+    <div class="eyebrow">A birthday, in the snow</div>
     <h1>Cozy Birthday Simulator</h1>
-    <p class="lede">One evening in the house. Snow outside, the fire going, cake on the table, and someone you know very, very well. Walk around, light things, hug them, blow out the candles. Then look at the photographs by the door.</p>
-    <div class="row"><button class="btn primary" id="begin">Begin the evening</button></div>
-    <div class="keys">WASD walk · Shift run · drag to look · scroll to zoom · Z / C turn · E interact · Q hug · ` stats</div>
+    <p class="lede">A cabin in the pines at the last of the light. Walk home together, blow out the candles, curl up by the fire, and watch the stars come out from the porch.</p>
+    <div><button class="btn primary" id="begin">Walk home</button></div>
+    <div class="keys">WASD walk · Shift run · drag to look · scroll to zoom · E interact · Q hug · N sunset/night · ` stats</div>
   </div>
 </div>
 
 <div id="hud">
-  <div id="quality" role="group" aria-label="Graphics quality"><span>QUALITY</span><button data-q="Low">Low</button><button data-q="High">High</button><button data-q="Epic">Epic</button></div>
-  <button id="statsBtn" type="button">Stats</button>
+  <div class="pill" role="group" aria-label="Graphics quality" id="quality"><span>QUALITY</span><button data-q="Low">Low</button><button data-q="High">High</button><button data-q="Epic">Epic</button></div>
+  <div class="pill"><button id="timeBtn" type="button">Sunset / Night</button></div>
+  <div class="pill"><button id="statsBtn" type="button">Stats</button></div>
 </div>
 <div id="stats" hidden></div>
 <div id="hint"></div>
 <div id="prompt" class="hidden"></div>
 <div id="bubble"></div>
-<div id="dialogue" role="dialog" aria-live="polite"><div id="who"></div><div id="text"></div></div>
+<div id="fade"></div>
+<div id="subs" role="dialog" aria-live="polite"><div id="who"></div><div id="line"></div></div>
 
 <div id="endcard">
   <div>
-    <div class="eyebrow">End of demo</div>
-    <h2>Something has started.</h2>
-    <p>The full game continues from here: the night, the figure that comes back to bed, and the long way home through the snow.</p>
-    <button class="btn" id="reset">Return to the cozy evening (R)</button>
+    <div class="eyebrow">End of the base build</div>
+    <h2>Happy birthday.</h2>
+    <p>This is the foundation for the full game: the cabin, the forest, the two of you, and the camera. The story picks up from here.</p>
+    <button class="btn" id="endClose">Stay a little longer</button>
   </div>
 </div>
 
@@ -132,7 +126,6 @@
 </div>
 
 <script src="lib/three.min.js"></script>
-<script src="lib/RoomEnvironment.js"></script>
 <script src="lib/RoundedBoxGeometry.js"></script>
 <script src="lib/SimplexNoise.js"></script>
 <script src="lib/CopyShader.js"></script>
@@ -140,12 +133,19 @@
 <script src="lib/SSAOShader.js"></script>
 <script src="lib/FXAAShader.js"></script>
 <script src="lib/GammaCorrectionShader.js"></script>
+<script src="lib/BokehShader.js"></script>
 <script src="lib/EffectComposer.js"></script>
 <script src="lib/RenderPass.js"></script>
 <script src="lib/ShaderPass.js"></script>
 <script src="lib/UnrealBloomPass.js"></script>
 <script src="lib/SSAOPass.js"></script>
-<script>document.getElementById('statsBtn').addEventListener('click', () => { const s = document.getElementById('stats'); s.hidden = !s.hidden; });</script>
-<script src="demo.js"></script>
+<script src="lib/BokehPass.js"></script>
+<script src="lib/GLTFLoader.js"></script>
+<script src="js/models.js"></script>
+<script src="js/core.js"></script>
+<script src="js/world.js"></script>
+<script src="js/interior.js"></script>
+<script src="js/people.js"></script>
+<script src="js/game.js"></script>
 </body>
 </html>
