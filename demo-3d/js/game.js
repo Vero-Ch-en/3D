@@ -235,23 +235,126 @@ function collide(c, ox, oz) {
   c.yFloor = G.floorAt(c.x, c.z);
 }
 function moveChar(c, dx, dz) { const ox = c.x, oz = c.z; c.x += dx; c.z += dz; collide(c, ox, oz); }
-// Waypoints between rooms, the door and the porch steps.
-function nextWaypoint(c, tx, tz) {
-  const inC = G.inside(c.x, c.z), inT = G.inside(tx, tz);
-  if (inC !== inT) return inC ? (c.z < 4.05 ? { x: 6.5, z: 4.15 } : { x: 6.5, z: 5.3 }) : (c.z > 6.4 && Math.abs(c.x - 6.5) > 0.4 ? { x: 6.5, z: 7.3 } : c.z > 5.0 ? { x: 6.5, z: 5.0 } : { x: 6.5, z: 4.0 });
-  if (inC && inT && (c.x < 5) !== (tx < 5)) return Math.abs(c.x - 5) > 0.35 ? { x: c.x < 5 ? 4.55 : 5.45, z: 3.5 } : { x: tx, z: tz };
-  const onPorch = (x, z) => z >= 4.6 && z < 6.7 && x > 3.3 && x < 11.5;
-  if (!inC && !inT && onPorch(c.x, c.z) !== onPorch(tx, tz)) return onPorch(c.x, c.z) ? (c.z < 6.3 ? { x: 6.5, z: 6.4 } : { x: 6.5, z: 7.9 }) : (c.z > 8.1 ? { x: 6.5, z: 8.0 } : { x: 6.5, z: 6.3 });
-  return { x: tx, z: tz };
+/* ---------- navigation: grid A* over the real colliders ----------
+ * Cells are 0.15 m. A cell is open when it is inside the walkable clearing and
+ * far enough from every collider for a character to stand there. Moving
+ * between neighbouring cells is refused when the floor height jumps (porch
+ * edge), so routes onto the porch always use the steps.
+ */
+const NAV = { cs: 0.15, x0: -17, z0: -11, nx: 0, nz: 0, open: null, h: null };
+const AGENT_R = 0.21;
+function buildNav() {
+  const N = NAV; N.nx = Math.ceil((30 - N.x0) / N.cs); N.nz = Math.ceil((42 - N.z0) / N.cs);
+  const n = N.nx * N.nz; N.open = new Uint8Array(n); N.h = new Float32Array(n);
+  const boxes = G.COLL.filter((b) => !b.solidExterior);
+  for (let j = 0; j < N.nz; j++) for (let i = 0; i < N.nx; i++) {
+    const x = N.x0 + (i + 0.5) * N.cs, z = N.z0 + (j + 0.5) * N.cs, k = j * N.nx + i;
+    N.h[k] = G.floorAt(x, z);
+    if (!G.walkable(x, z)) continue;
+    let ok = true;
+    for (const b of boxes) { if (x > b.x0 - AGENT_R && x < b.x1 + AGENT_R && z > b.z0 - AGENT_R && z < b.z1 + AGENT_R) { const dx = Math.max(b.x0 - x, 0, x - b.x1), dz = Math.max(b.z0 - z, 0, z - b.z1); if (Math.hypot(dx, dz) < AGENT_R) { ok = false; break; } } }
+    N.open[k] = ok ? 1 : 0;
+  }
 }
+const cellOf = (x, z) => [Math.floor((x - NAV.x0) / NAV.cs), Math.floor((z - NAV.z0) / NAV.cs)];
+const cellPos = (i, j) => ({ x: NAV.x0 + (i + 0.5) * NAV.cs, z: NAV.z0 + (j + 0.5) * NAV.cs });
+const inGrid = (i, j) => i >= 0 && j >= 0 && i < NAV.nx && j < NAV.nz;
+const isOpen = (i, j) => inGrid(i, j) && NAV.open[j * NAV.nx + i] === 1;
+function canStep(i0, j0, i1, j1) { return isOpen(i1, j1) && Math.abs(NAV.h[j1 * NAV.nx + i1] - NAV.h[j0 * NAV.nx + i0]) < 0.13; }
+function nearestOpen(i, j, maxR = 14) {
+  if (isOpen(i, j)) return [i, j];
+  for (let r = 1; r <= maxR; r++) for (let dj = -r; dj <= r; dj++) for (let di = -r; di <= r; di++) {
+    if (Math.max(Math.abs(di), Math.abs(dj)) !== r) continue;
+    if (isOpen(i + di, j + dj)) return [i + di, j + dj];
+  }
+  return null;
+}
+function lineClear(a, b) {
+  // Walk the segment in half-cell steps; every sample must be open and level with the last.
+  const d = Math.hypot(b.x - a.x, b.z - a.z), n = Math.max(1, Math.ceil(d / (NAV.cs * 0.5)));
+  let [pi, pj] = cellOf(a.x, a.z);
+  for (let s = 1; s <= n; s++) {
+    const [i, j] = cellOf(a.x + (b.x - a.x) * s / n, a.z + (b.z - a.z) * s / n);
+    if (i === pi && j === pj) continue;
+    if (!canStep(pi, pj, i, j)) return false;
+    pi = i; pj = j;
+  }
+  return true;
+}
+let heapK, heapF, gScore, came, closed;
+function findPath(sx, sz, tx, tz) {
+  if (!NAV.open) buildNav();
+  const n = NAV.nx * NAV.nz;
+  if (!gScore) { gScore = new Float32Array(n); came = new Int32Array(n); closed = new Uint8Array(n); heapK = new Int32Array(n); heapF = new Float32Array(n); }
+  const s = nearestOpen(...cellOf(sx, sz), 6), t = nearestOpen(...cellOf(tx, tz));
+  if (!s || !t) return null;
+  const goal = t[1] * NAV.nx + t[0], start = s[1] * NAV.nx + s[0];
+  gScore.fill(Infinity); closed.fill(0); came.fill(-1);
+  let hn = 0;
+  const push = (k, f) => { let i = hn++; while (i > 0) { const p = (i - 1) >> 1; if (heapF[p] <= f) break; heapK[i] = heapK[p]; heapF[i] = heapF[p]; i = p; } heapK[i] = k; heapF[i] = f; };
+  const pop = () => { const top = heapK[0]; const k = heapK[--hn], f = heapF[hn]; let i = 0; for (;;) { let c = 2 * i + 1; if (c >= hn) break; if (c + 1 < hn && heapF[c + 1] < heapF[c]) c++; if (heapF[c] >= f) break; heapK[i] = heapK[c]; heapF[i] = heapF[c]; i = c; } heapK[i] = k; heapF[i] = f; return top; };
+  const hEst = (i, j) => { const dx = Math.abs(i - t[0]), dz = Math.abs(j - t[1]); return Math.max(dx, dz) + 0.414 * Math.min(dx, dz); };
+  gScore[start] = 0; push(start, hEst(s[0], s[1]));
+  let found = false, iter = 0;
+  while (hn && iter++ < 60000) {
+    const k = pop();
+    if (closed[k]) continue;
+    if (k === goal) { found = true; break; }
+    closed[k] = 1;
+    const i = k % NAV.nx, j = (k / NAV.nx) | 0;
+    for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
+      if (!di && !dj) continue;
+      const ni = i + di, nj = j + dj;
+      if (!canStep(i, j, ni, nj)) continue;
+      if (di && dj && (!canStep(i, j, ni, j) || !canStep(i, j, i, nj))) continue;   // no corner cutting
+      const nk = nj * NAV.nx + ni, g = gScore[k] + (di && dj ? 1.414 : 1);
+      if (g < gScore[nk]) { gScore[nk] = g; came[nk] = k; push(nk, g + hEst(ni, nj)); }
+    }
+  }
+  if (!found) return null;
+  const cells = [];
+  for (let k = goal; k !== -1 && k !== start; k = came[k]) cells.push(cellPos(k % NAV.nx, (k / NAV.nx) | 0));
+  cells.reverse();
+  // String-pull: keep only the points where the straight line would be blocked.
+  const pts = [], startP = { x: sx, z: sz };
+  let anchor = startP;
+  for (let i = 0; i < cells.length; i++) {
+    const next = cells[i + 1];
+    if (next && lineClear(anchor, next)) continue;
+    pts.push(cells[i]); anchor = cells[i];
+  }
+  const last = isOpen(...cellOf(tx, tz)) ? { x: tx, z: tz } : cells[cells.length - 1] || { x: tx, z: tz };
+  if (!pts.length || Math.hypot(pts[pts.length - 1].x - last.x, pts[pts.length - 1].z - last.z) > 0.01) pts.push(last);
+  return pts;
+}
+G.findPath = findPath; G.NAV = NAV;
+/* Steer along a cached path to (tx, tz). Re-plans when the target moves, every
+ * so often, and when the character stops making progress. Returns true on arrival. */
 function steer(c, tx, tz, speed, dt, stopAt = 0.06) {
-  const w = nextWaypoint(c, tx, tz);
-  const dx = w.x - c.x, dz = w.z - c.z, l = Math.hypot(dx, dz);
-  const final = w.x === tx && w.z === tz;
-  if (final && l < stopAt) { c.speed = damp(c.speed, 0, 10, dt); return true; }
-  c.speed = damp(c.speed, speed, 5, dt);
-  c.yaw = angDamp(c.yaw, Math.atan2(dx, dz), 7, dt);
-  moveChar(c, Math.sin(c.yaw) * c.speed * dt, Math.cos(c.yaw) * c.speed * dt);
+  const nav = c.nav || (c.nav = { path: null, tx: 1e9, tz: 1e9, age: 9, stuckT: 0, lastD: 1e9, fail: 0 });
+  nav.age += dt;
+  const dGoal = Math.hypot(tx - c.x, tz - c.z);
+  if (dGoal < stopAt) { c.speed = damp(c.speed, 0, 10, dt); nav.path = null; return true; }
+  if (!nav.path || Math.hypot(tx - nav.tx, tz - nav.tz) > 0.4 || nav.age > 1.5) {
+    nav.path = findPath(c.x, c.z, tx, tz); nav.tx = tx; nav.tz = tz; nav.age = 0;
+    if (!nav.path) nav.fail += 1; else nav.fail = 0;
+  }
+  let w = { x: tx, z: tz };
+  if (nav.path) {
+    while (nav.path.length > 1 && Math.hypot(nav.path[0].x - c.x, nav.path[0].z - c.z) < 0.18) nav.path.shift();
+    w = nav.path[0];
+  }
+  const dx = w.x - c.x, dz = w.z - c.z, l = Math.hypot(dx, dz) || 1;
+  const slow = nav.path && nav.path.length === 1 ? clamp(l / 0.5, 0.35, 1) : 1;
+  c.speed = damp(c.speed, speed * slow, 5, dt);
+  c.yaw = angDamp(c.yaw, Math.atan2(dx, dz), 9, dt);
+  // Move along the waypoint direction (not the smoothed facing) so corners are taken cleanly.
+  moveChar(c, dx / l * c.speed * dt, dz / l * c.speed * dt);
+  // Stuck: little progress toward the goal for a while -> re-plan now; if it persists, nudge to the next open cell.
+  if (nav.lastD - dGoal < 0.15 * dt && c.speed > 0.2) nav.stuckT += dt; else nav.stuckT = Math.max(0, nav.stuckT - dt * 2);
+  nav.lastD = dGoal;
+  if (nav.stuckT > 0.8) { nav.path = null; nav.stuckT = 0; nav.unstuck = (nav.unstuck || 0) + 1;
+    if (nav.unstuck > 2) { const o = nearestOpen(...cellOf(c.x, c.z), 4); if (o) { const p = cellPos(o[0], o[1]); c.x = p.x; c.z = p.z; c.yFloor = G.floorAt(c.x, c.z); } nav.unstuck = 0; } }
   return false;
 }
 function placeChar(c, x, z, yaw) { c.x = x; c.z = z; c.yaw = yaw; c.yFloor = G.floorAt(x, z); c.y = c.yFloor; c.speed = 0; }
@@ -442,10 +545,13 @@ function partnerAI(dt, t) {
   if (p.mode === 'follow') {
     const side = new THREE.Vector3(Math.cos(PLAYER.yaw), 0, -Math.sin(PLAYER.yaw));
     let tx = PLAYER.x - side.x * 0.75 - Math.sin(PLAYER.yaw) * 0.35, tz = PLAYER.z - side.z * 0.75 - Math.cos(PLAYER.yaw) * 0.35;
-    if (!G.walkable(tx, tz)) { tx = PLAYER.x; tz = PLAYER.z; }
+    if (!NAV.open) buildNav();
+    { const o = nearestOpen(...cellOf(tx, tz), 6); if (o && Math.hypot(cellPos(o[0], o[1]).x - PLAYER.x, cellPos(o[0], o[1]).z - PLAYER.z) < 1.6) { const q = cellPos(o[0], o[1]); tx = q.x; tz = q.z; } else { tx = PLAYER.x; tz = PLAYER.z; } }
     const d = Math.hypot(PLAYER.x - p.x, PLAYER.z - p.z);
     if (d > 1.15 || (p.speed > 0.05 && Math.hypot(tx - p.x, tz - p.z) > 0.25)) steer(p, tx, tz, clamp(d * 1.1, 0.8, PLAYER.speed > 2 ? 3.0 : 1.65), dt, 0.2);
     else { p.speed = damp(p.speed, 0, 8, dt); p.yaw = angDamp(p.yaw, Math.atan2(PLAYER.x - p.x, PLAYER.z - p.z), 2, dt); }
+    // Lost entirely (no route for a few seconds and far behind): catch up quietly behind the player.
+    if (p.nav && p.nav.fail > 3 && d > 6) { const o = nearestOpen(...cellOf(PLAYER.x - Math.sin(PLAYER.yaw) * 1.2, PLAYER.z - Math.cos(PLAYER.yaw) * 1.2), 8); if (o) { const q = cellPos(o[0], o[1]); placeChar(p, q.x, q.z, PLAYER.yaw); p.nav = null; } }
     p.lookAt = head(PLAYER);
   }
 }
@@ -680,6 +786,7 @@ function boot() {
   PLAYER.m = G.makeHuman({ height: 1.84, skin: '#d9ab8e', outfit: 'hoodie', top: '#3f4146', legs: '#25272c', hair: '#1e140f', hairStyle: 'shaggy', socks: '#2f2b28', seed: 11 });
   PARTNER.m = G.makeHuman({ height: 1.6, fem: true, skin: '#e8bfa4', outfit: 'sweater', legs: '#2c2626', hair: '#5e3a26', hairStyle: 'bun', socks: '#e6dccd', eyes: '#4a3020', lips: '#c47a70', seed: 23 });
   placeChar(PLAYER, G.pathX(27) + 0.35, 27, Math.PI); placeChar(PARTNER, G.pathX(27) - 0.45, 26.6, Math.PI);
+  buildNav();
   G.attachBlenderBody(PLAYER.m, 'player'); G.attachBlenderBody(PARTNER.m, 'partner');
   buildPost();
   document.querySelectorAll('#quality button').forEach((b) => b.addEventListener('click', () => { G.qName = b.dataset.q; G.applyQuality(); }));
@@ -696,7 +803,7 @@ function boot() {
     Story.intro();
   });
   requestAnimationFrame(frame);
-  window.DEMO = { G, STATE, PLAYER, PARTNER, CAM, SHOTS, Story, skipIntro() { $('title').classList.add('hide'); STATE.started = true; DLG.q.length = 0; if (DLG.cur) { const r = DLG.cur.res; DLG.cur = null; } STATE.busy = false; STATE.sceneShot = false; PLAYER.script = null; PARTNER.script = null; STATE.watchDoor = false; placeChar(PLAYER, 6.5, 8.5, Math.PI); placeChar(PARTNER, 5.8, 8.8, Math.PI); PARTNER.mode = 'follow'; releaseCamera(); CAM.cut = true; }, setQ(q) { G.qName = q; G.applyQuality(); }, placeChar };
+  window.DEMO = { G, STATE, PLAYER, PARTNER, CAM, SHOTS, Story, skipIntro() { $('title').classList.add('hide'); STATE.started = true; DLG.q.length = 0; if (DLG.cur) { const r = DLG.cur.res; DLG.cur = null; } STATE.busy = false; STATE.sceneShot = false; PLAYER.script = null; PARTNER.script = null; STATE.watchDoor = false; placeChar(PLAYER, 6.5, 8.5, Math.PI); placeChar(PARTNER, 5.8, 8.8, Math.PI); PARTNER.mode = 'follow'; releaseCamera(); CAM.cut = true; }, setQ(q) { G.qName = q; G.applyQuality(); }, placeChar, simPartner(dt, n) { for (let i = 0; i < n; i++) partnerAI(dt, 0); } };
 }
 try { boot(); } catch (e) { console.error(e); $('loading').textContent = 'This demo needs WebGL. ' + e.message; }
 })();
