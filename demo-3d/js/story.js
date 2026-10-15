@@ -43,7 +43,9 @@ if (loadSave()) G.$('continue').hidden = false;
 /* ---------- house state: lamps, fire, cake, breakfast, the bed ---------- */
 const K = () => G.KITCHEN;
 function setLamps(on) { G.LAMPS.forEach((L) => { L.on = on; }); }
-function setCake(show, lit = show) { G.CAKE.g.visible = show; G.CAKE.lit = lit; }
+// Hide the cake's meshes, never its group: the candle light inside it must stay in the scene, or every
+// lit material recompiles for the new light count (a long stall).
+function setCake(show, lit = show) { G.CAKE.shown = show; G.CAKE.g.children.forEach((o) => { if (!o.isLight) o.visible = show; }); G.CAKE.lit = lit; }
 function setBreakfast(o = {}) {
   const k = K();
   k.mugs.forEach((m) => { m.visible = !!o.mugs; });
@@ -145,8 +147,8 @@ const sofa = findInter('sofa');
 sofa.label = () => (ch() === 'evening' ? (STATE.cuddled ? 'Sofa' : 'Curl up together') : 'Sit');
 sofa.act = () => { if (ch() === 'evening') return G.Story.cuddle(); return run(sitSofa); };
 const cake = findInter('cake');
-cake.when = () => G.CAKE.g.visible;
-inter('ctable', [8, 0.5, 1.85], 1.0, 'Coffee table', () => N(cyc('ctable', ['(Two mugs from last night. One has a lipstick mark and the other has a spoon standing up in it.)', '(The coaster is a beer mat from somewhere neither of you has ever been.)'])), () => !G.CAKE.g.visible);
+cake.when = () => G.CAKE.shown !== false;
+inter('ctable', [8, 0.5, 1.85], 1.0, 'Coffee table', () => N(cyc('ctable', ['(Two mugs from last night. One has a lipstick mark and the other has a spoon standing up in it.)', '(The coaster is a beer mat from somewhere neither of you has ever been.)'])), () => G.CAKE.shown === false);
 const scrapShelf = findInter('shelf6.15');
 scrapShelf.label = 'Scrapbook';
 scrapShelf.act = () => run(async () => {
@@ -229,6 +231,7 @@ G.SMART = [
 ];
 
 async function sitSofa() {
+  if (PARTNER.hold) G.setHold(false);
   const S0 = G.SOFA, from = { x: PLAYER.x, z: PLAYER.z, yaw: PLAYER.yaw };
   await G.sitDown(PLAYER, S0.x + 0.45, S0.z - 0.05, Math.PI, S0.seatY);
   PLAYER.freeSit = from;
@@ -400,11 +403,11 @@ Object.assign(Story, {
   },
   async breakfast() {
     const p = PARTNER, k = K();
-    if (p.mode !== 'seated') { p.script = null; const A = k.chairs.A; G.sitAt(p, A.x, A.z, A.yaw, A.seatY); p.mode = 'seated'; }
+    if (p.hold) G.setHold(false);
     const c = await choose(['Sit beside them', 'Sit across from them']);
     const seat = c === 0 ? 'B' : 'C', ch2 = k.chairs[seat];
     STATE.sceneShot = true;
-    await G.cutTo(() => { G.sitAt(PLAYER, ch2.x, ch2.z, ch2.yaw, ch2.seatY); setBreakfast({ mugs: S.flags.teaMade, plates: true, seat, burnt: S.flags.pancakeQuality === 'burnt' }); G.setShot(tableShot(seat)); });
+    await G.cutTo(() => { if (p.mode !== 'seated') { p.script = null; p.slide = null; const A = k.chairs.A; G.sitAt(p, A.x, A.z, A.yaw, A.seatY); p.mode = 'seated'; } G.sitAt(PLAYER, ch2.x, ch2.z, ch2.yaw, ch2.seatY); setBreakfast({ mugs: S.flags.teaMade, plates: true, seat, burnt: S.flags.pancakeQuality === 'burnt' }); G.setShot(tableShot(seat)); });
     if (c === 0) { S.mem.sitBeside++; addBond(0.5); await P('Oh, we’re doing beside today. Scandalous.', { shot: 'keep' }); }
     else { S.mem.sitAcross++; await P('Across. Fancy. Like a business meeting.', { shot: 'keep' }); }
     const q = S.flags.pancakeQuality;
@@ -443,6 +446,7 @@ Object.assign(Story, {
 const CH = {};
 async function go(id) {
   S.chapter = id;
+  S.run = (S.run || 0) + 1;   // background loops belong to one run of a chapter
   try { await CH[id](); } catch (e) { console.error('[story]', id, e); }
 }
 function flipAnim(m, color) {
@@ -454,13 +458,14 @@ function quiet() {
   // Clear anything a previous scene left running.
   for (const c of [PLAYER, PARTNER]) { c.script = null; c.slide = null; c.lie = false; c.sit = c.sitTarget = 0; c.freeSit = null; c.rise = null; c.task = null; c.lead = null; c.speed = 0; c.nav = null; c.lidsClosed = false; c.tilt = c.tiltTarget = 0; }
   G.setHold(false); PARTNER.hidden = false; PARTNER.m.visible = true; PARTNER.mode = 'follow';
-  STATE.busy = false; STATE.sceneShot = false; STATE.noControl = false; STATE.autonomy = false;
+  STATE.busy = false; STATE.sceneShot = false; STATE.noControl = false; STATE.autonomy = false; STATE.bounds = null;
+  Object.assign(S.flags, { noTogether: false, noBarks: false, noInteract: false });
 }
 
 CH.prologue = async () => {
-  STATE.busy = true;
-  S.flags.noTogether = true; S.flags.noBarks = true;
   quiet(); STATE.busy = true;
+  S.flags.noTogether = true; S.flags.noBarks = true; S.flags.noInteract = true;
+  STATE.bounds = { zMin: 15 };   // the fair is behind you; the cabin isn't part of this memory
   G.useKids(true); showFair(true);
   houseFor('evening'); G.setCake(false);
   G.setTime({ day: 0, tod: 1, snow: 0.8 }, true);
@@ -488,7 +493,7 @@ CH.prologue = async () => {
   await N('(You came over. That part, everyone agrees on.)', { shot: 'keep' });
   const f = G.$('fade'); f.style.transition = 'opacity 2.4s'; G.fade(true, '#ffffff');
   await wait(2.6); f.style.transition = '';
-  S.flags.noTogether = false; S.flags.noBarks = false;
+  S.flags.noTogether = false; S.flags.noBarks = false; S.flags.noInteract = false; STATE.bounds = null;
   return go('morning');
 };
 
@@ -554,20 +559,22 @@ CH.morning = async () => {
   STATE.busy = false;
   G.hint(G.MOBILE ? 'Tap Use near things to interact. Tap ♥ near {P} to be together.' : 'E or Space: interact.   Q: be together (hug, hold hands, talk).', 9);
   // She gets up on her own after a while; never in front of you mid-move.
+  const run = S.run, live = () => S.run === run;
   (async () => {
     await wait(30);
-    await until(() => !PARTNER.lie || (!G.busy() && (PLAYER.x > 5.2 || Math.random() < 0.02)));
-    if (S.chapter !== 'morning' || !PARTNER.lie) return;
+    await until(() => !live() || !PARTNER.lie || (!G.busy() && (PLAYER.x > 5.2 || Math.random() < 0.02)));
+    if (!live() || !PARTNER.lie) return;
     if (PLAYER.x < 5.2) await G.cutTo(() => Story.partnerGetsUp(true)); else Story.partnerGetsUp();
   })();
   // Birdsong now and then, and a nudge toward the kitchen if you dawdle.
-  (async () => { while (S.chapter === 'morning') { await wait(7 + Math.random() * 10); if (STATE.day > 0.5 && !STATE.paused) G.Audio.chirp(); } })();
+  (async () => { while (live()) { await wait(7 + Math.random() * 10); if (STATE.day > 0.5 && !STATE.paused) G.Audio.chirp(); } })();
   (async () => {
-    let idle = 0; const lines = ['(Pancakes. They said pancakes.)', '(The kitchen is through the living room, past the fire.)'];
-    let i = 0;
-    while (S.chapter === 'morning' && !S.flags.pancakesMade) { await wait(5); idle = PLAYER.speed < 0.1 && !G.busy() ? idle + 5 : 0; if (idle > 40) { G.hint(lines[i++ % 2], 5); idle = -20; } }
+    let idle = 0, i = 0;
+    const lines = () => (S.flags.pancakesMade ? ['(They’re at the kitchen table. With a fork. Waiting.)'] : ['(Pancakes. They said pancakes.)', '(The kitchen is through the living room, past the fire.)']);
+    while (live() && !S.flags.breakfastDone) { await wait(5); idle = PLAYER.speed < 0.1 && !G.busy() ? idle + 5 : 0; if (idle > 40) { const L = lines(); G.hint(L[i++ % L.length], 5); idle = -20; } }
   })();
   await until(() => S.flags.breakfastDone);
+  G.setHold(false);
   PARTNER.lead = { x: 6.45, z: 7.95, waitLines: ['Boots! Birthday walk!', 'Come ON, slowpoke.', 'The day isn’t getting any younger. Neither are you.'] };
   G.bark('Boots! Birthday walk!', 2.6);
   await until(() => S.flags.leaveHouse || (PLAYER.z > 6.9 && Math.abs(PLAYER.x - 6.5) < 2.2));
@@ -604,5 +611,8 @@ CH.evening = async () => {
 G.setCake = setCake;
 G.CH = CH; G.go = go;
 
+const bench = findInter('bench');
+bench.label = () => (ch() === 'evening' ? (STATE.porchDone ? 'Bench' : 'Watch the stars') : 'Bench');
+bench.act = () => { if (ch() === 'evening') return G.Story.porch(); return run(() => N(cyc('bench', ['(Someone carved two initials into the bench. Not you. Probably.)', '(The bench is cold enough to count as a dare. Later. When there are stars.)']))); };
 G.$('pScrap').addEventListener('click', () => { G.UI.scrapbook(S.scrap); });
 })();

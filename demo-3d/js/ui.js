@@ -104,12 +104,13 @@ UI.together = (acts) => new Promise((res) => {
   const btns = [...box.querySelectorAll('button')];
   let sel = 0;
   const mark = () => btns.forEach((b, i) => b.classList.toggle('sel', i === sel));
-  const done = (v) => { modal = null; box.hidden = true; box.innerHTML = ''; res(v); };
+  let closed = false;
+  const done = (v) => { if (closed) return; closed = true; removeEventListener('pointerdown', away, true); modal = null; box.hidden = true; box.innerHTML = ''; res(v); };
   btns.forEach((b, i) => { b.addEventListener('click', () => done(acts[i].id)); b.addEventListener('pointerenter', () => { sel = i; mark(); }); });
   mark();
   // Walking away, or tapping anywhere else, closes it.
-  const away = (e) => { if (!box.contains(e.target)) { removeEventListener('pointerdown', away, true); if (modal && modal.kind === 'together') done(null); } };
-  setTimeout(() => addEventListener('pointerdown', away, true), 0);
+  function away(e) { if (!box.contains(e.target)) done(null); }
+  setTimeout(() => { if (!closed) addEventListener('pointerdown', away, true); }, 0);
   modal = { kind: 'together', key(e) {
     const n = parseInt(e.key, 10);
     if (n >= 1 && n <= btns.length) { done(acts[n - 1].id); return; }
@@ -146,7 +147,8 @@ function paintSnap(cv, art) {
   c.fillStyle = 'rgba(255,230,190,0.12)'; c.fillRect(0, 0, W, H);
 }
 UI.scrapbook = (pages) => new Promise((res) => {
-  const box = $('scrap');
+  const box = $('scrap'), prev = modal;   // opened from the pause menu it can sit over a choice; give that back after
+  if (prev && prev.kind === 'scrapbook') return res();
   let at = Math.max(0, (pages.length % 2 ? pages.length - 1 : pages.length - 2));
   at -= at % 2;
   const render = () => {
@@ -157,7 +159,7 @@ UI.scrapbook = (pages) => new Promise((res) => {
     box.querySelector('[data-k=next]').onclick = () => { if (at + 2 < pages.length) { at += 2; render(); } };
     box.querySelector('[data-k=close]').onclick = close;
   };
-  const close = () => { modal = null; box.hidden = true; box.innerHTML = ''; res(); };
+  const close = () => { modal = prev; box.hidden = true; box.innerHTML = ''; res(); };
   if (!pages.length) pages = [{ art: 'default', caption: 'An empty scrapbook. It’s waiting for today.' }];
   render(); box.hidden = false;
   modal = { kind: 'scrapbook', key(e) {

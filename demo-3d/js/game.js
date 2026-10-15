@@ -326,7 +326,7 @@ function collide(c, ox, oz) {
       else { const l = c.x - b.x0, r = b.x1 - c.x, t = c.z - b.z0, bb = b.z1 - c.z, m = Math.min(l, r, t, bb); if (m === l) c.x = b.x0 - c.r; else if (m === r) c.x = b.x1 + c.r; else if (m === t) c.z = b.z0 - c.r; else c.z = b.z1 + c.r; }
     }
   }
-  if (!G.walkable(c.x, c.z)) { c.x = ox; c.z = oz; }
+  if (!G.walkable(c.x, c.z) || (STATE.bounds && c.z < STATE.bounds.zMin)) { c.x = ox; c.z = oz; }
   // Can't climb onto the porch except by the steps.
   const fy = G.floorAt(c.x, c.z);
   if (fy - c.yFloor > 0.22 && !(c.x > G.PORCH.stepX0 && c.x < G.PORCH.stepX1)) { c.x = ox; c.z = oz; }
@@ -552,7 +552,7 @@ function updateCamera(dt, t) {
     const dP = Math.hypot(PARTNER.x - PLAYER.x, PARTNER.z - PLAYER.z);
     // Only when she's actually turned toward you; otherwise this framed the back of her head.
     const faces = (Math.sin(PARTNER.yaw) * (PLAYER.x - PARTNER.x) + Math.cos(PARTNER.yaw) * (PLAYER.z - PARTNER.z)) / Math.max(dP, 1e-3);
-    if (c.idle > 2.2 && t - c.lastDrag > 4 && dP < 3.2 && dP > 0.6 && PARTNER.sit < 0.5 && faces > 0.5 && PARTNER.pose !== 'warm') {
+    if (c.idle > 2.2 && t - c.lastDrag > 4 && dP < 3.2 && dP > 0.6 && !(PARTNER.sit > 0.5) && !PARTNER.hidden && !PARTNER.lie && !PLAYER.freeSit && faces > 0.5 && PARTNER.pose !== 'warm') {
       const o = SHOTS.ots(PARTNER, PLAYER, 1), k = G.smooth(2.2, 4.5, c.idle);
       s = { pos: s.pos.clone().lerp(o.pos, k), look: s.look.clone().lerp(o.look, k), fov: lerp(s.fov, o.fov + 8, k), focus: lerp(s.focus, o.focus, k), aperture: lerp(s.aperture, o.aperture * 0.8, k) };
     }
@@ -567,7 +567,9 @@ function updateCamera(dt, t) {
   const hx = (Math.sin(handT * 0.9) * 0.006 + Math.sin(handT * 2.3) * 0.003) * hm, hy = (Math.sin(handT * 1.3 + 1) * 0.005 + Math.sin(handT * 3.1) * 0.002) * hm;
   G.camera.position.copy(c.pos).add(new THREE.Vector3(hx, hy, 0));
   G.camera.lookAt(c.look.x + hx * 0.5, c.look.y + hy * 0.5, c.look.z);
-  const fov = G.camera.aspect < 0.8 ? c.fov * 1.35 : c.fov;
+  // Portrait phones: widen the vertical angle so the frame keeps most of a landscape shot's width.
+  const asp = G.camera.aspect;
+  const fov = asp < 1 ? Math.min(85, 2 * Math.atan(Math.tan(c.fov * Math.PI / 360) * Math.max(1, 0.95 / asp)) * 180 / Math.PI) : c.fov;
   if (Math.abs(G.camera.fov - fov) > 0.01) { G.camera.fov = fov; G.camera.updateProjectionMatrix(); }
   if (bokeh) {
     bokeh.uniforms.focus.value = c.focus; bokeh.uniforms.aperture.value = c.aperture;
@@ -582,6 +584,7 @@ function releaseCamera() { CAM.shot = null; CAM.cut = false; CAM.yaw = PLAYER.ya
 G.setShot = setShot; G.releaseCamera = releaseCamera;
 // Free time-of-day toggle (N / the HUD button): day → sunset → night → day.
 G.cycleTime = () => {
+  if (G.S && G.S.chapter === 'prologue') return;   // the memory keeps its own night
   if (STATE.dayTarget > 0.5) { STATE.dayTarget = 0; STATE.todTarget = 0; }
   else if (STATE.todTarget < 0.5) STATE.todTarget = 1;
   else { STATE.todTarget = 0; STATE.dayTarget = 1; }
@@ -686,6 +689,7 @@ G.fade = (on, color) => { const f = $('fade'); f.style.background = color || '';
  * ===================================================================== */
 function partnerAI(dt, t) {
   const p = PARTNER;
+  p.holdOn = PLAYER.holdOn = false;   // set again below only while she's actually walking hand in hand
   if (p.bark) { p.bark.t -= dt; if (p.bark.t <= 0) p.bark = null; }
   if (p.script) {
     const s = p.script;
@@ -895,6 +899,7 @@ const Story = (G.Story = {
   async porch() {
     if (STATE.porchDone) { STATE.todTarget = STATE.todTarget > 0.5 ? 0 : 1; return; }
     STATE.busy = true; STATE.sceneShot = true;
+    STATE.dayTarget = 0;
     const B = G.BENCH;
     const rear = () => { const pos = new THREE.Vector3(B.x + 0.05, 1.2, B.z - 0.62), look = new THREE.Vector3(B.x - 0.3, 2.4, B.z + 12); return { pos, look, fov: 62, focus: 1.0, aperture: 0.005 }; };
     await cutTo(() => {
@@ -1008,6 +1013,7 @@ function initPauseUI() {
  * Per-frame
  * ===================================================================== */
 function nearest() {
+  if (G.S && G.S.flags.noInteract) return null;
   let best = null, bd = 1e9;
   const fx = Math.sin(PLAYER.yaw), fz = Math.cos(PLAYER.yaw);
   for (const it of G.INTER) {
@@ -1128,7 +1134,8 @@ function step(dt, t) {
   // Interaction prompt
   const it = free ? nearest() : null;
   const together = !!(G.Story && G.Story.together);
-  const nearP = free && !PARTNER.hidden && !PARTNER.lie && !PARTNER.script && Math.hypot(PARTNER.x - PLAYER.x, PARTNER.z - PLAYER.z) < (PARTNER.hold ? 1.8 : 1.4) && (together ? (!G.S || !G.S.flags.noTogether) : PARTNER.sit < 0.2);
+  const sittingFree = !!PLAYER.freeSit && !busy() && !PLAYER.rise;
+  const nearP = (free || (sittingFree && together)) && !PARTNER.hidden && !PARTNER.lie && !PARTNER.script && Math.hypot(PARTNER.x - PLAYER.x, PARTNER.z - PLAYER.z) < (PARTNER.hold ? 1.8 : 1.4) && (together ? (!G.S || !G.S.flags.noTogether) : PARTNER.sit < 0.2);
   let html = '';
   const lab = it ? G.fmt(typeof it.label === 'function' ? it.label() : it.label) : '';
   if (it && lab) html += `<span class="key">${G.MOBILE ? 'Use' : 'E'}</span>${lab}`;
