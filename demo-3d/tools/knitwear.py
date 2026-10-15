@@ -529,7 +529,7 @@ def build_leggings(name, cfg=None):
         if abs(p.x) < 0.2 and p.z > pelvis.z - 0.12:
             return abs(p.x) < 0.19
         return any((p - seg_closest(p, a, k)[0]).length < 0.12 or (p - seg_closest(p, k, f)[0]).length < 0.09 for a, k, f in legs)
-    kill = [f for f in b.faces if not all(ank_z + cfg['ankle'] < v.co.z < top and on_leg(v.co) for v in f.verts)]
+    kill = [f for f in b.faces if not all(v.index in body and ank_z + cfg['ankle'] < v.co.z < top and on_leg(v.co) for v in f.verts)]
     bmesh.ops.delete(b, geom=kill, context='FACES')
     bmesh.ops.delete(b, geom=[v for v in b.verts if not v.link_faces], context='VERTS')
     bmesh.ops.smooth_laplacian_vert(b, verts=list(b.verts), lambda_factor=0.4, lambda_border=0.0, use_x=True, use_y=True, use_z=True,
