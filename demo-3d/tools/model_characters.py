@@ -213,8 +213,9 @@ def build_torso(coll, P):
         (CHEST_Y - 0.08, 0, 0.006, P['chest'], 0.096 + P['bust'], 0.09, 2.5),
         (CHEST_Y - 0.02, 0, 0.002, P['chest'] * 1.01, 0.092, 0.092, 2.6),
         (CHEST_Y + 0.035, 0, -0.004, P['chest'] * 0.98, 0.084, 0.09, 2.6),
-        (CHEST_Y + 0.08, 0, -0.01, P['trap'], 0.068, 0.078, 2.4),
-        (CHEST_Y + 0.115, 0, -0.012, P['trap'] * 0.66, 0.06, 0.066, 2.2),
+        (SH_Y + 0.0, 0, -0.008, P['shX'] * 0.9, 0.074, 0.082, 2.8),     # top of the shoulders, out to the arm caps
+        (SH_Y + 0.03, 0, -0.012, P['trap'], 0.066, 0.074, 2.5),
+        (SH_Y + 0.05, 0, -0.012, P['trap'] * 0.66, 0.058, 0.064, 2.2),
         (NECK_Y - 0.01, 0, -0.008, P['neck'] * 1.12, 0.052, 0.054, 2.0),
         (NECK_Y + 0.04, 0, 0.0, P['neck'], P['neck'] * 0.96, P['neck'], 2.0),
         (NECK_Y + 0.11, 0, 0.008, P['neck'] * 0.95, P['neck'] * 0.92, P['neck'] * 0.95, 2.0),
@@ -234,9 +235,9 @@ def build_torso(coll, P):
                 z -= 0.008 * gauss((x - s * 0.07) ** 2, 0.0025) * gauss((y - (CY - 0.02)) ** 2, 0.006)
             z += 0.006 * gauss(x * x, 0.0004) * smoothstep(H + 0.05, CY, y)
             z += 0.012 * gauss((y - (H - 0.1)) ** 2, 0.0006) * gauss(x * x, 0.0003)
-        # Trapezius slope: lower the outer top so shoulders fall away from the neck.
-        if y > CY + 0.03:
-            y -= 0.035 * smoothstep(0.05, P['trap'], abs(x)) * smoothstep(CY + 0.03, CY + 0.1, y)
+        # Trapezius: a gentle slope from the neck down to the shoulder.
+        if y > SH_Y - 0.01:
+            y -= 0.014 * smoothstep(0.06, P['shX'], abs(x)) * smoothstep(SH_Y - 0.01, SH_Y + 0.04, y)
         return x, y, z
     deform(ob, shape)
     return ob
@@ -249,9 +250,9 @@ def build_arm(coll, P, s):
     o = s * 0.006   # slight outward bias of the muscle mass
     m = P['muscle']
     rings = [
-        (sy + 0.05, x - s * 0.02, -0.004, 0.02, 0.02, 0.02, 2.0),
-        (sy + 0.035, x - s * 0.006, -0.004, 0.044 * m, 0.046, 0.046, 2.0),
-        (sy + 0.0, x + o, -0.002, 0.053 * m, 0.05 * m, 0.05 * m, 2.1),
+        (sy + 0.028, x - s * 0.03, -0.004, 0.016, 0.018, 0.018, 2.0),
+        (sy + 0.02, x - s * 0.012, -0.004, 0.04 * m, 0.042, 0.042, 2.0),
+        (sy - 0.008, x + o, -0.002, 0.052 * m, 0.05 * m, 0.05 * m, 2.1),
         (sy - 0.05, x + o, 0.0, 0.051 * m, 0.048 * m, 0.047 * m, 2.1),
         (sy - 0.11, x + o * 0.5, 0.002, 0.045 * m, 0.046 * m, 0.044 * m, 2.1),
         (sy - 0.19, x, 0.004, 0.041 * m, 0.045 * m, 0.04 * m, 2.1),
@@ -423,13 +424,24 @@ def sweater_shape(P):
 
 def build_cowl(coll, P):
     n = P['neck']
-    return loft('cowl', coll, [
-        (NECK_Y - 0.05, 0, -0.006, 0.098, 0.094, 0.098, 2.0),
-        (NECK_Y - 0.02, 0, -0.002, 0.086, 0.086, 0.088, 2.0),
-        (NECK_Y + 0.025, 0, 0.004, n + 0.026, n + 0.024, n + 0.026, 2.0),
-        (NECK_Y + 0.07, 0, 0.006, n + 0.02, n + 0.018, n + 0.02, 2.0),
-        (NECK_Y + 0.085, 0, 0.006, n + 0.012, n + 0.01, n + 0.012, 2.0),
-    ], seg=32, cap=(False, False), sub=1)
+    cowl = loft('cowl', coll, [
+        (NECK_Y - 0.055, 0, -0.008, 0.105, 0.1, 0.104, 2.0),     # spreads onto the shoulders
+        (NECK_Y - 0.035, 0, -0.004, 0.1, 0.098, 0.1, 2.0),       # outer roll
+        (NECK_Y - 0.012, 0, 0.0, 0.088, 0.088, 0.088, 2.0),
+        (NECK_Y + 0.012, 0, 0.004, n + 0.028, n + 0.026, n + 0.028, 2.0),
+        (NECK_Y + 0.035, 0, 0.006, n + 0.02, n + 0.018, n + 0.02, 2.0),
+        (NECK_Y + 0.045, 0, 0.006, n + 0.012, n + 0.01, n + 0.012, 2.0),
+    ], seg=36, cap=(False, False), sub=1)
+
+    def drape(x, y, z):
+        # Soft folds around the roll, deepest at the front where the knit sags.
+        a = math.atan2(z, x)
+        r = math.hypot(x, z) + 1e-6
+        k = 0.006 * math.sin(a * 7) * smoothstep(NECK_Y + 0.02, NECK_Y - 0.03, y)
+        y -= 0.012 * max(0.0, z / r) * smoothstep(NECK_Y + 0.04, NECK_Y - 0.01, y)
+        return x + x / r * k, y, z + z / r * k
+    deform(cowl, drape)
+    return cowl
 
 
 def build_hood(coll, P):
