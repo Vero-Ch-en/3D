@@ -299,3 +299,224 @@ def build_all():
     orig = ponytail_to_bun(hair)
     loose_strands(hair, orig)
     return out
+
+
+# ---------------------------------------------------------------- hair finishing
+def tint_hair(mat, color, rough=0.5, hsv=None):
+    """Multiply the hair texture by a colour (and optionally shift hue/saturation/value first)."""
+    nt = mat.node_tree
+    bsdf = nt.nodes['Principled BSDF']
+    t = nt.nodes.get('cbs_tint')
+    if not t:
+        link = next(l for l in nt.links if l.to_socket == bsdf.inputs['Base Color'])
+        t = nt.nodes.new('ShaderNodeMix')
+        t.name = 'cbs_tint'
+        t.data_type = 'RGBA'
+        t.blend_type = 'MULTIPLY'
+        src = link.from_socket
+        nt.links.remove(link)
+        nt.links.new(src, t.inputs[6])
+        nt.links.new(t.outputs[2], bsdf.inputs['Base Color'])
+    t.inputs[0].default_value = 1.0
+    t.inputs[7].default_value = (*color, 1)
+    if hsv:
+        hs = nt.nodes.get('cbs_hsv')
+        if not hs:
+            hs = nt.nodes.new('ShaderNodeHueSaturation')
+            hs.name = 'cbs_hsv'
+            l = next(l for l in nt.links if l.to_socket == t.inputs[6])
+            src = l.from_socket
+            nt.links.remove(l)
+            nt.links.new(src, hs.inputs['Color'])
+            nt.links.new(hs.outputs['Color'], t.inputs[6])
+        hs.inputs['Hue'].default_value, hs.inputs['Saturation'].default_value, hs.inputs['Value'].default_value = hsv
+    bsdf.inputs['Roughness'].default_value = rough
+    if 'Specular IOR Level' in bsdf.inputs:
+        bsdf.inputs['Specular IOR Level'].default_value = 0.3
+
+
+def shag(hair_obj, centre=(0, -0.057, 1.79), radii=(0.083, 0.108, 0.1), vol=1.7, fringe=0.02, side=0.032, nape=0.03, mess=0.009, seed=3):
+    """Turn the neat short02 cut into shaggy hair: more volume, longer at the sides and nape, messy clumps."""
+    from mathutils import noise
+    me = hair_obj.data
+    if 'orig_co' not in me.attributes:
+        a = me.attributes.new('orig_co', 'FLOAT_VECTOR', 'POINT')
+        a.data.foreach_set('vector', [c for v in me.vertices for c in v.co])
+    O = [Vector(d.vector) for d in me.attributes['orig_co'].data]
+    C, R = Vector(centre), Vector(radii)
+    off = Vector((seed * 1.7, seed * 2.3, seed * 0.9))
+    new = []
+    for p in O:
+        d = p - C
+        e = math.sqrt((d.x / R.x) ** 2 + (d.y / R.y) ** 2 + (d.z / R.z) ** 2)
+        lift = max(0.0, e - 0.98)
+        q = C + (d / e if e > 1e-6 else Vector((0, 0, 1))) * (0.98 + lift * vol + 0.012)
+        tip = min(1.0, lift / 0.2)
+        fw = max(0.0, -d.y / R.y - 0.45) * max(0.0, 1 - abs(d.x) / 0.075)
+        q.z -= fringe * fw * (0.6 + 0.8 * noise.noise(p * 60 + off)) * (0.4 + tip)
+        q.y -= 0.012 * fw * tip
+        sw = max(0.0, abs(d.x) / R.x - 0.7) * (1 if d.z < 0.04 else 0.3)
+        q.z -= side * sw * (0.5 + tip)
+        nw = max(0.0, d.y / R.y - 0.2) * (1 if d.z < 0.0 else 0.2)
+        q.z -= nape * nw * (0.5 + tip)
+        q.y += 0.008 * nw * tip
+        q += noise.noise_vector(p * 35 + off) * mess * (0.3 + tip)
+        dq = q - C
+        eq = math.sqrt((dq.x / (R.x * 1.01)) ** 2 + (dq.y / (R.y * 1.01)) ** 2 + (dq.z / (R.z * 1.01)) ** 2)
+        if eq < 1 and dq.z > -0.05:
+            q = C + dq / eq
+        new.append(q)
+    me.vertices.foreach_set('co', [c for q in new for c in q])
+    me.update()
+
+
+def forehead_profile(name):
+    """Front surface depth (y) of the head at a few heights and offsets from the midline."""
+    bm = bpy.data.objects['human_' + name]
+    dg = bpy.context.evaluated_depsgraph_get()
+    ev = bm.evaluated_get(dg)
+    me = ev.to_mesh()
+    P = [bm.matrix_world @ v.co for v in me.vertices]
+    ev.to_mesh_clear()
+    prof = {}
+    for z in [1.76 + 0.01 * i for i in range(14)]:
+        for x in (0.0, 0.03, 0.055):
+            band = [p for p in P if abs(p.z - z) < 0.004 and abs(abs(p.x) - x) < 0.006 and p.y < -0.05]
+            if band:
+                prof[(round(z, 2), x)] = min(p.y for p in band)
+    return prof
+
+
+def player_fringe(strand_src, orig, islands, prof, mat, n=26, width=1.25, seed=11):
+    """Strands borrowed from the ponytail asset, laid over his forehead to the brows."""
+    def surf_y(x, z):
+        ax = min(0.055, abs(x))
+
+        def at(zz):
+            zz = max(1.76, min(1.89, round(zz, 2)))
+            vals = []
+            for xx in (0.0, 0.03, 0.055):
+                k = (zz, xx) if (zz, xx) in prof else min((k for k in prof if k[1] == xx), key=lambda k: abs(k[0] - zz))
+                vals.append(prof[k])
+            return vals[0] + (vals[1] - vals[0]) * ax / 0.03 if ax <= 0.03 else vals[1] + (vals[2] - vals[1]) * (ax - 0.03) / 0.025
+        z0 = math.floor(z * 100) / 100
+        f = (z - z0) / 0.01
+        return at(z0) * (1 - f) + at(z0 + 0.01) * f
+
+    def polyline(pts, t):
+        seg = [(pts[i + 1] - pts[i]).length for i in range(len(pts) - 1)]
+        d = t * sum(seg)
+        for i, s in enumerate(seg):
+            if d <= s or i == len(seg) - 1:
+                return pts[i] + (pts[i + 1] - pts[i]) * (d / s if s else 0), (pts[i + 1] - pts[i]).normalized()
+            d -= s
+    src = strand_src
+    uvl = src.data.uv_layers.active
+    loop_uv = {(poly.index, vi): tuple(uvl.data[li].uv) for poly in src.data.polygons for li, vi in zip(poly.loop_indices, poly.vertices)}
+    rng = random.Random(seed)
+    verts, faces, uvs = [], [], []
+    for k in range(n):
+        layer = k % 2
+        x = -0.07 + 0.14 * rng.random()
+        zend = 1.768 + rng.uniform(0, 0.028) + 2.2 * x * x + layer * 0.01
+        lean = rng.uniform(-0.014, 0.014) + x * 0.2
+        pts = []
+        for z, off in ((1.895, 0.02), (1.877, 0.018), (1.852, 0.014), (1.826, 0.012), (1.80, 0.011), (zend, 0.009)):
+            zz = max(z, zend)
+            t = (1.895 - zz) / (1.895 - zend)
+            pts.append(Vector((x + lean * t, surf_y(x + lean * t, zz) - off - 0.003 * layer, zz)))
+        _, fidx, vidx = islands[(k * 5) % len(islands)]
+        zs = [orig[i].z for i in vidx]
+        z0, z1 = max(zs), min(zs)
+        rows = {}
+        for i in vidx:
+            rows.setdefault(round((z0 - orig[i].z) / (z0 - z1) * 18), []).append(i)
+        cen = {r: sum((orig[i] for i in ids), Vector()) / len(ids) for r, ids in rows.items()}
+        widest = max(rows.values(), key=len)
+        wdir = orig[widest[0]] - orig[widest[-1]]
+        wdir.z = 0
+        wdir = wdir.normalized() if wdir.length > 1e-6 else Vector((1, 0, 0))
+        vmap = {}
+        for i in vidx:
+            t = (z0 - orig[i].z) / (z0 - z1)
+            u = (orig[i] - cen[round(t * 18)]).dot(wdir)
+            p, tan = polyline(pts, t)
+            side = tan.cross(Vector((0, -1, 0))).normalized()
+            vmap[i] = len(verts)
+            verts.append(p + side * u * width + Vector((0, -1, 0)) * 0.002 * math.sin(t * 9 + k))
+        for fi in fidx:
+            poly = src.data.polygons[fi]
+            faces.append([vmap[v] for v in poly.vertices])
+            uvs.append([loop_uv[(fi, v)] for v in poly.vertices])
+    me = bpy.data.meshes.new('fringe_player')
+    me.from_pydata(verts, [], faces)
+    uv = me.uv_layers.new(name='UVMap')
+    for poly, fu in zip(me.polygons, uvs):
+        for j, l in enumerate(poly.loop_indices):
+            uv.data[l].uv = fu[j]
+        poly.use_smooth = True
+    me.materials.append(mat)
+    old = bpy.data.objects.get('fringe_player')
+    if old:
+        bpy.data.objects.remove(old, do_unlink=True)
+    ob = bpy.data.objects.new('fringe_player', me)
+    bpy.data.collections['Humans'].objects.link(ob)
+    ob.parent = bpy.data.objects['human_player']
+    ob['cbs_role'] = 'player'
+    ob.modifiers.new('sub', 'SUBSURF').levels = 1
+    return ob
+
+
+def tail_islands(hair_obj, orig):
+    import bmesh
+    b = bmesh.new()
+    b.from_mesh(hair_obj.data)
+    b.faces.ensure_lookup_table()
+    seen, islands = set(), []
+    for f in b.faces:
+        if f.index in seen:
+            continue
+        stack, isl = [f], []
+        seen.add(f.index)
+        while stack:
+            g = stack.pop()
+            isl.append(g.index)
+            for e in g.edges:
+                for h in e.link_faces:
+                    if h.index not in seen:
+                        seen.add(h.index)
+                        stack.append(h)
+        vs = sorted({v.index for fi in isl for v in b.faces[fi].verts})
+        if all(_is_tail(orig[i]) for i in vs):
+            zs = [orig[i].z for i in vs]
+            islands.append((max(zs) - min(zs), isl, vs))
+    b.free()
+    islands.sort(key=lambda t: -t[0])
+    return islands
+
+
+def finish_hair():
+    """After build_all(): chestnut tone for her, shaggy dark hair with a fringe for him."""
+    pony = bpy.data.objects['human_partner.ponytail01']
+    tint_hair(pony.data.materials[0], (0.7, 0.58, 0.5), rough=0.55, hsv=(0.485, 0.72, 0.9))
+    short = bpy.data.objects['human_player.short02']
+    shag(short)
+    tint_hair(short.data.materials[0], (0.28, 0.2, 0.16), rough=0.62)
+    orig = [Vector(d.vector) for d in pony.data.attributes['orig_co'].data]
+    mat = bpy.data.materials.get('fringe_player') or pony.data.materials[0].copy()
+    mat.name = 'fringe_player'
+    tint_hair(mat, (0.16, 0.11, 0.09), rough=0.6, hsv=(0.5, 1.0, 1.0))
+    nt = mat.node_tree
+    bsdf = nt.nodes['Principled BSDF']
+    al = next((l for l in nt.links if l.to_socket == bsdf.inputs['Alpha']), None)
+    if al and 'cbs_alpha' not in nt.nodes:
+        m = nt.nodes.new('ShaderNodeMath')
+        m.name = 'cbs_alpha'
+        m.operation = 'MULTIPLY'
+        m.use_clamp = True
+        m.inputs[1].default_value = 2.2
+        src = al.from_socket
+        nt.links.remove(al)
+        nt.links.new(src, m.inputs[0])
+        nt.links.new(m.outputs[0], bsdf.inputs['Alpha'])
+    player_fringe(pony, orig, tail_islands(pony, orig), forehead_profile('player'), mat)

@@ -567,8 +567,8 @@ def build_leggings(name, cfg=None):
 
     def on_leg(p):
         # Near the hips or a leg bone; hands hanging at hip height are excluded.
-        if abs(p.x) < 0.2 and p.z > pelvis.z - 0.12:
-            return abs(p.x) < 0.19
+        if abs(p.x) < 0.23 and p.z > pelvis.z - 0.12:
+            return abs(p.x) < 0.22
         return any((p - seg_closest(p, a, k)[0]).length < 0.16 or (p - seg_closest(p, k, f)[0]).length < 0.11 for a, k, f in legs)
     inside = [v.index for v in me.vertices if v.index in body and ank_z + cfg['ankle'] < v.co.z < top and on_leg(v.co)]
     hide_covered(name, inside, me)
