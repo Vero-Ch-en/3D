@@ -315,7 +315,7 @@ addEventListener('resize', () => { if (composer) { resize(); G.needsRender = tru
 const PLAYER = (G.PLAYER = { m: null, x: 0, y: 0, z: 0, yaw: Math.PI, speed: 0, phase: 0, r: 0.24, look: 0 });
 const PARTNER = (G.PARTNER = { m: null, x: 0, y: 0, z: 0, yaw: Math.PI, speed: 0, phase: 0, r: 0.2, look: 0, mode: 'follow', script: null });
 const head = (c) => ({ x: c.x, z: c.z, headY: c.y + c.m.userData.H * 0.93 - (c.sit > 0.5 ? 0.45 : 0) });
-G.headPos = (c) => new THREE.Vector3(c.x, c.y + c.m.userData.H * 0.935 - (c.sit || 0) * (c.m.userData.hipY - ((c.seatY || 0.6) - c.y)), c.z);
+G.headPos = (c) => (c.lie ? new THREE.Vector3(c.x, c.lieY + 0.28, c.z - c.m.userData.H * 0.86) : new THREE.Vector3(c.x, c.y + c.m.userData.H * 0.935 - (c.sit || 0) * (c.m.userData.hipY - ((c.seatY || 0.6) - c.y)), c.z));
 function collide(c, ox, oz) {
   for (const b of G.COLL) {
     if (b.solidExterior) continue;
@@ -766,7 +766,7 @@ function partnerTask(p, dt, t) {
 }
 function endTask(p) {
   const T = p.task; if (!T) return;
-  if (p.hidden) { p.hidden = false; p.m.visible = true; if (T.o.exit) placeChar(p, T.o.exit.x, T.o.exit.z, T.o.exit.yaw || 0); bark(['*appears, extremely casual*', 'What? I wasn’t doing anything.', 'Nothing’s in there. Don’t look.'], 2.4); }
+  if (p.hidden) { p.hidden = false; p.m.visible = true; if (T.o.exit) placeChar(p, T.o.exit.x, T.o.exit.z, T.o.exit.yaw || 0); bark(['*reappears, entirely casual*', 'Hm? I wasn’t doing anything.', 'There’s nothing in there. Please don’t look.'], 2.4); }
   if (p.sitTarget) { p.sitTarget = 0; G.slideTo(p, T.o.spot.x, T.o.spot.z, null, 0.55); }
   p.task = null; p.nav = null;
 }
@@ -778,7 +778,7 @@ function partnerLead(p, dt, t) {
   if (L.arrived || d > 6.5) {
     p.speed = damp(p.speed, 0, 6, dt); p.nav = null;
     p.yaw = angDamp(p.yaw, Math.atan2(PLAYER.x - p.x, PLAYER.z - p.z), 3, dt); p.lookAt = head(PLAYER);
-    if (L.waitT <= 0 && d > 3.5) { L.waitT = 8 + Math.random() * 5; bark(L.waitLines || ['Come ON, slowpoke.', 'Old knees! Old knees!', 'I’m waiting. Majestically.', 'Hurry up, {giant}!'], 2.6); }
+    if (L.waitT <= 0 && d > 3.5) { L.waitT = 8 + Math.random() * 5; bark(L.waitLines || ['Do keep up, Partner.', 'I’m waiting. Patiently. Mostly.', 'Your legs are longer than mine, you know.', 'Come along, {giant}.'], 2.6); }
     if (!L.arrived && d > 6.5) return;
     if (L.arrived) return;
   }
@@ -835,7 +835,7 @@ const Story = (G.Story = {
     await wait(1.4);
     await G.say('partner', 'Look. Every window’s still glowing. We left all the lights on.', { shot: 'keep', auto: 4.2 });
     await G.say('player', 'You left all the lights on.', { shot: 'keep', auto: 2.6 });
-    await G.say('partner', 'We did. It’s your birthday, so the cabin’s mine now. Those are the rules.', { shot: 'keep', auto: 4.2 });
+    await G.say('partner', 'We did. And since it’s your birthday, the cabin is mine for the evening. Those are the rules.', { shot: 'keep', auto: 4.2 });
     await until(() => !PLAYER.script);
     STATE.sceneShot = false; STATE.busy = false;
     PARTNER.mode = 'follow';
@@ -856,9 +856,9 @@ const Story = (G.Story = {
     // The snow globe on the mantle doubles as a music box.
     const tune = G.Audio.birthday();
     await G.say(null, '(She winds the snow globe on the mantle. It plays the birthday song, a little slow, and she hums along, off-key and completely sure of herself.)', { shot: cakeShot, auto: Math.max(5, tune + 0.4) });
-    await G.say('partner', 'Wait. Make a wish first. A good one. Not a boring one.');
-    await G.say('player', 'What counts as boring?');
-    await G.say('partner', '“More sleep.” “A new kettle.” Anything you’d actually say out loud.');
+    await G.say('partner', 'Wait. Make a wish first. A proper one. Not a sensible one.');
+    await G.say('player', 'What counts as sensible?');
+    await G.say('partner', '“More sleep.” “A new kettle.” Anything you’d be willing to say out loud.');
     G.Audio.blow(); G.CAKE.lit = false;
     await G.say(null, '(You blow them out. All five, first try.)', { shot: cakeShot });
     await G.say('partner', 'Happy birthday, {giant}.');
@@ -878,9 +878,9 @@ const Story = (G.Story = {
     await wait(1.2);
     PARTNER.tiltTarget = -0.32; PARTNER.leanTarget = 0.12; PARTNER.lidsClosed = true;
     await G.say(null, '(One blanket, two people, and the fire doing all the talking.)', { shot: 'keep' });
-    await G.say('partner', 'Don’t move, {giant}. You’re the perfect height for this.', { shot: 'keep' });
-    await G.say('player', 'I have to move eventually.', { shot: 'keep' });
-    await G.say('partner', 'Eventually is a whole word away.', { shot: 'keep' });
+    await G.say('partner', 'Please don’t move, {giant}. You are exactly the right height for this.', { shot: 'keep' });
+    await G.say('player', 'I shall have to move eventually.', { shot: 'keep' });
+    await G.say('partner', '“Eventually” is a very long way off.', { shot: 'keep' });
     await wait(1.5);
     // Stand up off-screen at either end of the sofa: the gap between sofa and coffee table is
     // too narrow to stand in, so placing people there left them inside the table.
@@ -911,9 +911,9 @@ const Story = (G.Story = {
     await wait(2.5);
     await G.say(null, '(The sun goes, and then all at once there are more stars than sky.)', { shot: 'keep' });
     PARTNER.tiltTarget = -0.25;
-    await G.say('partner', 'Pick one. That one’s yours. Happy birthday.', { shot: 'keep' });
+    await G.say('partner', 'Pick a star. That one is yours. Happy birthday.', { shot: 'keep' });
     await G.say('player', 'Which one, {gremlin}?', { shot: 'keep' });
-    await G.say('partner', 'The bright one. Obviously. I’m not giving you a dim one on your birthday.', { shot: 'keep' });
+    await G.say('partner', 'The bright one, naturally. I wouldn’t give you a dim one on your birthday.', { shot: 'keep' });
     await wait(1.5);
     showEndcard();
     document.body.classList.remove('playing');
@@ -966,7 +966,7 @@ async function hug(kind = 'hug', line) {
   // Mostly side-on, a little to your side of the hug, so her face (turned against you) is the one in frame.
   const pick = [[1, -0.25, 1.25], [-1, -0.25, 1.25], [1, -0.1, 0.9], [-1, -0.1, 0.9]].find((o) => { const c = camAt(o); return !blocked(c.look, c.pos); });
   if (pick) setShot(() => camAt(pick));
-  bark(line || ['Mm. Hi, {giant}.', 'You’re so warm. It’s unfair.', 'Ten out of ten hug.', 'Okay. One more second. Two.']);
+  bark(line || ['Mm. Hello, {giant}.', 'You’re so warm. It hardly seems fair.', 'A very good hug. Ten out of ten.', 'All right. One more second. Two.']);
   await wait(kiss ? 1.7 : 2.6);
   STATE.hugging = false; STATE.hugIn = null; PARTNER.lidsClosed = false; PARTNER.tiltTarget = 0; STATE.busy = false;
   PLAYER.leanTarget = 0; PLAYER.tiltTarget = 0; PLAYER.lidsClosed = false; PARTNER.headDown = 0;
@@ -1046,13 +1046,13 @@ function ambientPoses(dt) {
 /* Partner talks a little on her own, rarely and only when nothing else is happening. */
 const AMBIENT = { cd: 20, used: new Set(), runT: 0 };
 const BARKS = [
-  { id: 'nose', when: (o) => o.out && STATE.tod > 0.6 && o.idle > 5, text: 'Your nose has gone pink. It’s very cute. Don’t fix it.' },
-  { id: 'listen', when: (o) => o.out && o.idle > 9, text: 'Shh. Listen. You can hear the snow landing.' },
-  { id: 'stars', when: (o) => o.out && STATE.tod > 0.8 && o.idle > 6, text: 'There are so many. Somebody really overdid it.' },
-  { id: 'run', when: (o) => o.out && AMBIENT.runT > 2.2, text: 'No running in the snow! …Fine. Wait for me!' },
-  { id: 'fire', when: (o) => o.nearFire && o.idle > 6, text: 'I could stay right here until spring.' },
-  { id: 'cake', when: (o) => STATE.cakeDone && o.inside && o.idle > 10, text: 'Is it too early for a second slice? It’s your birthday. You decide.' },
-  { id: 'cold', when: (o) => o.out && STATE.tod > 0.4 && o.idle > 14, text: 'Okay, my toes have officially resigned. Inside soon?' },
+  { id: 'nose', when: (o) => o.out && STATE.tod > 0.6 && o.idle > 5, text: 'Your nose has gone pink. It suits you. Please don’t fix it.' },
+  { id: 'listen', when: (o) => o.out && o.idle > 9, text: 'Listen. You can hear the snow landing.' },
+  { id: 'stars', when: (o) => o.out && STATE.tod > 0.8 && o.idle > 6, text: 'There are so many. Someone has rather overdone it.' },
+  { id: 'run', when: (o) => o.out && AMBIENT.runT > 2.2, text: 'No running in the snow, Partner! …Very well. Wait for me.' },
+  { id: 'fire', when: (o) => o.nearFire && o.idle > 6, text: 'I could stay here until spring, I think.' },
+  { id: 'cake', when: (o) => STATE.cakeDone && o.inside && o.idle > 10, text: 'Would a second slice be too early? It’s your birthday. You decide.' },
+  { id: 'cold', when: (o) => o.out && STATE.tod > 0.4 && o.idle > 14, text: 'My toes have formally resigned. Shall we go in soon?' },
 ];
 function ambientBarks(dt) {
   const out = !G.inside(PLAYER.x, PLAYER.z) && !G.underRoof(PLAYER.x, PLAYER.z);
@@ -1135,7 +1135,8 @@ function step(dt, t) {
   const it = free ? nearest() : null;
   const together = !!(G.Story && G.Story.together);
   const sittingFree = !!PLAYER.freeSit && !busy() && !PLAYER.rise;
-  const nearP = (free || (sittingFree && together)) && !PARTNER.hidden && !PARTNER.lie && !PARTNER.script && Math.hypot(PARTNER.x - PLAYER.x, PARTNER.z - PLAYER.z) < (PARTNER.hold ? 1.8 : 1.4) && (together ? (!G.S || !G.S.flags.noTogether) : PARTNER.sit < 0.2);
+  const ph = PARTNER.lie ? G.headPos(PARTNER) : PARTNER;   // in bed, talk to her face, not her feet
+  const nearP = (free || (sittingFree && together)) && !PARTNER.hidden && (!PARTNER.lie || together) && !PARTNER.script && Math.hypot(ph.x - PLAYER.x, ph.z - PLAYER.z) < (PARTNER.hold ? 1.8 : PARTNER.lie ? 1.5 : 1.4) && (together ? (!G.S || !G.S.flags.noTogether) : PARTNER.sit < 0.2);
   let html = '';
   const lab = it ? G.fmt(typeof it.label === 'function' ? it.label() : it.label) : '';
   if (it && lab) html += `<span class="key">${G.MOBILE ? 'Use' : 'E'}</span>${lab}`;
@@ -1144,8 +1145,8 @@ function step(dt, t) {
   if (it && lab && hit('KeyE', 'Space', 'Enter')) { pressed.clear(); it.act(); }
   else if (nearP && hit('KeyQ', 'KeyF')) { pressed.clear(); if (together) G.Story.together(); else hug(); }
   if (hit('KeyN')) G.cycleTime();
-  if (STATE.watchDoor && G.inside(PLAYER.x, PLAYER.z)) { STATE.watchDoor = false; bark('Cake first. Then the sofa. Then the stars. I made a schedule.', 4); }
-  if (STATE.watchDoor && PLAYER.z < 8.5 && !STATE.porchBark) { STATE.porchBark = true; bark('Inside, inside. My nose has stopped working.', 3); }
+  if (STATE.watchDoor && G.inside(PLAYER.x, PLAYER.z)) { STATE.watchDoor = false; bark('Cake first. Then the sofa. Then the stars. I’ve made a schedule.', 4); }
+  if (STATE.watchDoor && PLAYER.z < 8.5 && !STATE.porchBark) { STATE.porchBark = true; bark('Inside, please. I can no longer feel my nose.', 3); }
   ambientBarks(dt);
 }
 function bubble(dt) {

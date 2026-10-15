@@ -13,6 +13,9 @@
     partnerLabel: 'Partner',
     nickForPlayer: 'giant',
     nickForPartner: 'gremlin',
+    // What they call each other in the 3D game.
+    callPlayer: 'Partner',
+    callPartner: 'Partner',
     birthday: {
       heading: 'Happy birthday.',
       short: 'Whichever ending you found: happy birthday. I am so glad you exist.',

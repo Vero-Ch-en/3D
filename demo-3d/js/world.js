@@ -458,8 +458,8 @@ function signTex() {
     c.strokeStyle = 'rgba(80,60,40,0.25)'; c.lineWidth = 2; c.strokeRect(6, 6, w - 12, h - 12);
     c.save(); c.translate(w / 2, h * 0.42); c.rotate(-0.05);
     c.fillStyle = '#b8322a'; c.font = 'bold 54px "Comic Sans MS", "Marker Felt", cursive'; c.textAlign = 'center'; c.textBaseline = 'middle';
-    c.fillText('NO', 0, -28); c.fillText('GIANTS', 0, 28); c.restore();
-    c.fillStyle = '#3a3a48'; c.font = '20px "Comic Sans MS", cursive'; c.textAlign = 'center'; c.fillText('(this means you)', w / 2, h - 26);
+    c.font = 'bold 50px "Comic Sans MS", "Marker Felt", cursive'; c.fillText('PRIVATE', 0, 0); c.restore();
+    c.fillStyle = '#3a3a48'; c.font = '19px "Comic Sans MS", cursive'; c.textAlign = 'center'; c.fillText('(this means you, Partner)', w / 2, h - 26);
   } });
 }
 function buildAnnex() {

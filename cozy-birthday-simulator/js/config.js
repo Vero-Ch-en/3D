@@ -14,6 +14,10 @@ window.CBS_CONFIG = {
   nickForPlayer: 'giant',
   nickForPartner: 'gremlin',
 
+  // In the 3D game (demo-3d) they simply call each other this.
+  callPlayer: 'Partner',
+  callPartner: 'Partner',
+
   // The real birthday message — the one thing in the game the Entity cannot counterfeit.
   birthday: {
     heading: 'Happy birthday.',

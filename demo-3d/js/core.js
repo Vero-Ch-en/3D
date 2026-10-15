@@ -13,7 +13,8 @@ G.rand = (a, b) => a + Math.random() * (b - a);
 G.seeded = (s) => () => { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; };
 // Personalisation (names, nicknames, birthday message) from js/config.js / the 2D game's config.
 G.CFG = window.CBS_CONFIG || { playerLabel: 'You', partnerLabel: 'Partner', nickForPlayer: 'you', nickForPartner: 'you', birthday: { heading: 'Happy birthday.', full: [], signature: '' } };
-G.fmt = (t) => String(t).replace(/\{giant\}/g, G.CFG.nickForPlayer).replace(/\{gremlin\}/g, G.CFG.nickForPartner)
+// In the 3D game the two of them call each other “Partner” (callPlayer / callPartner in the config).
+G.fmt = (t) => String(t).replace(/\{giant\}/g, G.CFG.callPlayer || 'Partner').replace(/\{gremlin\}/g, G.CFG.callPartner || 'Partner')
   .replace(/\{P\}/g, G.CFG.partnerLabel).replace(/\{Y\}/g, G.CFG.playerLabel);
 G.MOBILE = (window.matchMedia && matchMedia('(pointer: coarse)').matches) || 'ontouchstart' in window;
 

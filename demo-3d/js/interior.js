@@ -141,7 +141,7 @@ G.buildInterior = () => {
   }
   const fireLight = new THREE.PointLight('#ff8a3a', 0, 10, 2); fireLight.position.set(fx, 0.5, 1.35); W.add(fireLight);
   G.FIRE = { planes: firePlanes, light: fireLight, on: true, power: 9, level: 1 };
-  G.INTER.push({ id: 'fire', pos: [fx, 0.6, 1.25], r: 1.3, label: () => (G.FIRE.on ? 'Fireplace' : 'Light the fire'), act: () => { G.FIRE.on = !G.FIRE.on; if (G.FIRE.on) G.say('partner', 'Fire person. My hero, {giant}.'); } });
+  G.INTER.push({ id: 'fire', pos: [fx, 0.6, 1.25], r: 1.3, label: () => (G.FIRE.on ? 'Fireplace' : 'Light the fire'), act: () => { G.FIRE.on = !G.FIRE.on; if (G.FIRE.on) G.say('partner', 'The fire person, at work. My hero, {giant}.'); } });
   // Mantle: candles, frames, a snow globe, a sprig of pine.
   candle(fx - 0.85, 1.48, 0.6, 0.16, 0.03); candle(fx - 0.72, 1.48, 0.62, 0.11, 0.03); candle(fx + 0.82, 1.48, 0.62, 0.13, 0.03);
   G.MANTLE_LIGHT = new THREE.PointLight('#ffa850', 1.4, 3, 2); G.MANTLE_LIGHT.position.set(fx, 1.75, 0.8); W.add(G.MANTLE_LIGHT);
@@ -344,7 +344,7 @@ function buildKitchen() {
   K.cupboard = { x: 11.42, z: 4.12 };
   box(0.6, 1.9, 0.42, paint, 11.42, 0.95, 4.26, { coll: true, cam: true, r: 0.01 });
   box(0.012, 1.7, 0.01, G.shared({ color: '#55604f', roughness: 0.8 }), 11.42, 0.95, 4.045, { cast: false });
-  const note = new THREE.Mesh(new THREE.PlaneGeometry(0.17, 0.17), G.std({ map: noteTex([{ t: 'property', size: 30 }, { t: 'of me.', size: 30, gap: 44 }, { t: 'NOT THE', size: 34, color: '#b8322a', gap: 56 }, { t: 'GIANT', size: 40, color: '#b8322a', gap: 46 }]), roughness: 0.9 }));
+  const note = new THREE.Mesh(new THREE.PlaneGeometry(0.17, 0.17), G.std({ map: noteTex([{ t: 'Property', size: 30 }, { t: 'of me.', size: 30, gap: 44 }, { t: 'Not', size: 34, color: '#b8322a', gap: 56 }, { t: 'Partner’s.', size: 36, color: '#b8322a', gap: 46 }]), roughness: 0.9 }));
   note.position.set(11.52, 1.3, 4.044); note.rotation.set(0, Math.PI, -0.05); W.add(note);
   // Pendant over the table, a runner rug, herbs on the sill.
   const pend = new THREE.Group(); pend.position.set(13.0, 2.7, 2.95); W.add(pend);
