@@ -137,7 +137,7 @@ G.buildInterior = () => {
   }
   const fireLight = new THREE.PointLight('#ff8a3a', 0, 10, 2); fireLight.position.set(fx, 0.5, 1.35); W.add(fireLight);
   G.FIRE = { planes: firePlanes, light: fireLight, on: true, power: 9, level: 1 };
-  G.INTER.push({ id: 'fire', pos: [fx, 0.6, 1.25], r: 1.3, label: () => (G.FIRE.on ? 'Fireplace' : 'Light the fire'), act: () => { G.FIRE.on = !G.FIRE.on; if (G.FIRE.on) G.say('partner', 'Fire person. My hero.'); } });
+  G.INTER.push({ id: 'fire', pos: [fx, 0.6, 1.25], r: 1.3, label: () => (G.FIRE.on ? 'Fireplace' : 'Light the fire'), act: () => { G.FIRE.on = !G.FIRE.on; if (G.FIRE.on) G.say('partner', 'Fire person. My hero, {giant}.'); } });
   // Mantle: candles, frames, a snow globe, a sprig of pine.
   candle(fx - 0.85, 1.48, 0.6, 0.16, 0.03); candle(fx - 0.72, 1.48, 0.62, 0.11, 0.03); candle(fx + 0.82, 1.48, 0.62, 0.13, 0.03);
   G.MANTLE_LIGHT = new THREE.PointLight('#ffa850', 1.4, 3, 2); G.MANTLE_LIGHT.position.set(fx, 1.75, 0.8); W.add(G.MANTLE_LIGHT);

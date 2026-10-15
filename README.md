@@ -7,7 +7,9 @@ A birthday gift game built from the *Cozy Birthday Simulator* design bible: a co
 | `cozy-birthday-simulator/` | The full game: prologue, four acts, a second Echo cycle and seven endings. Top-down 2D, canvas and Web Audio. | Complete and playable end to end. |
 | `demo-3d/` | The 3D base for the game, art-directed after the reference frames: a snowy log cabin in the pines at sunset that turns to a starry night, a lit interior, and the two characters as rigged meshes built in Blender. It plays one short evening with a shot-based camera (over-the-shoulder cuts, low two-shots, rear tracking, depth of field). | Base build, for approving the look before porting the full game. |
 
-Both are static sites with no build step. Open `cozy-birthday-simulator/index.html` or `demo-3d/index.html`, or serve the folder with `python3 -m http.server`. To personalise names and the birthday message, edit `cozy-birthday-simulator/js/config.js`; details are in that folder's README.
+Both are static sites with no build step. Open `cozy-birthday-simulator/index.html` or `demo-3d/index.html`, or serve the folder with `python3 -m http.server`. To personalise names, nicknames and the birthday message, edit `cozy-birthday-simulator/js/config.js`; details are in that folder's README. The 3D demo reads the same file when the two folders sit side by side, and shows the full message on its closing card. (`demo-3d/js/config.js` holds fallback values for hosting the 3D folder on its own.)
+
+In the 3D demo, Esc (or the II button) pauses, with volume, mute (M) and a reduced camera motion option.
 
 three.js and its example post-processing modules are bundled under `demo-3d/lib/` (MIT licence, see `three.LICENSE`).
 

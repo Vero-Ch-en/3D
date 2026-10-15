@@ -18,6 +18,7 @@
     --ui: "Inter Tight", system-ui, -apple-system, "Segoe UI", sans-serif;
     --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
   }
+  [hidden] { display: none !important; }   /* author display rules (e.g. the pause menu's grid) must not override hidden */
   html, body { height: 100%; margin: 0; overflow: hidden; background: #07080d; color: var(--ink); font-family: var(--ui); -webkit-user-select: none; user-select: none; }
   #gl { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; }
   #gl:active { cursor: grabbing; }
@@ -64,10 +65,30 @@
   #bubble { position: fixed; left: 0; top: 0; transform: translate(-50%, -100%); will-change: transform; background: rgba(16,12,12,0.62); color: var(--ink); font-size: 13px; font-weight: 500; padding: 6px 11px; border-radius: 10px; max-width: 240px; text-align: center; opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 11; backdrop-filter: blur(4px); }
   #bubble.show { opacity: 1; }
 
-  #endcard { position: fixed; inset: 0; display: flex; align-items: flex-end; justify-content: center; text-align: center; padding: 0 16px 12vh; background: linear-gradient(180deg, rgba(4,6,14,0) 40%, rgba(4,6,14,0.7)); opacity: 0; pointer-events: none; transition: opacity 2.5s; z-index: 18; }
+  #endcard { position: fixed; inset: 0; display: flex; flex-direction: column; text-align: center; padding: 16px 16px calc(9vh + env(safe-area-inset-bottom, 0px)); background: linear-gradient(180deg, rgba(4,6,14,0) 22%, rgba(4,6,14,0.55) 48%, rgba(4,6,14,0.82)); opacity: 0; pointer-events: none; transition: opacity 2.5s; z-index: 18; overflow-y: auto; }
   #endcard.show { opacity: 1; pointer-events: auto; }
-  #endcard h2 { font: 500 clamp(30px, 5vw, 48px) var(--display); margin: 10px 0 10px; }
-  #endcard p { color: var(--ink-dim); max-width: 48ch; line-height: 1.6; margin: 0 auto 20px; }
+  .end-inner { max-width: 600px; margin: auto auto 0; }   /* bottom-aligned, but a long message scrolls instead of being cut off at the top */
+  body.ending #hud { opacity: 0; pointer-events: none; transition: opacity 1s; }
+  #endcard h2 { font: 500 clamp(32px, 5.4vw, 52px)/1.05 var(--display); margin: 10px 0 18px; text-wrap: balance; }
+  .end-msg p { font: italic 500 clamp(18px, 2.3vw, 22px)/1.5 var(--display); color: #efe2cf; max-width: 46ch; margin: 0 auto 12px; text-wrap: pretty; opacity: 0; transform: translateY(6px); }
+  #endcard.show .end-msg p { animation: endLine 1.6s ease forwards; }
+  .end-sig { font: 500 12px var(--mono); letter-spacing: 0.14em; color: var(--amber); margin: 18px auto 22px; opacity: 0; }
+  #endcard.show .end-sig { animation: endLine 1.6s ease forwards; }
+  @keyframes endLine { to { opacity: 1; transform: none; } }
+
+  #pause { position: fixed; inset: 0; z-index: 28; display: grid; place-items: center; padding: 16px; background: rgba(6,5,10,0.55); backdrop-filter: blur(3px); }
+  .pause-panel { width: min(420px, 100%); background: rgba(18,14,14,0.92); border: 1px solid var(--line); border-radius: 18px; padding: 22px 22px 18px; display: grid; gap: 14px; }
+  .pause-panel h2 { font: 500 34px/1 var(--display); margin: 0 0 4px; }
+  .prow { display: flex; align-items: center; gap: 12px; font-size: 14px; color: var(--ink-dim); }
+  .prow > label, .prow > span { min-width: 7.5em; }
+  .prow input[type=range] { flex: 1; min-width: 0; accent-color: var(--amber); }
+  .btn.small { padding: 6px 12px; font-size: 13px; }
+  .seg { display: flex; gap: 6px; }
+  .seg .btn.on, .btn[aria-pressed="true"] { background: var(--ink); color: #1a120e; }
+  .pkeys { font: 400 11px/1.7 var(--mono); color: var(--ink-dim); margin: 2px 0 0; }
+  @media (pointer: coarse) { .pkeys { display: none; } }
+  #pausePill { display: none; }
+  body.playing #pausePill { display: flex; }
 
   #fade { position: fixed; inset: 0; background: #000; opacity: 0; pointer-events: none; transition: opacity 0.6s; z-index: 16; }
   #fade.on { opacity: 1; }
@@ -80,7 +101,7 @@
   .tbtn { position: fixed; z-index: 10; border-radius: 50%; border: 1px solid var(--line); font-weight: 700; touch-action: none; }
   #btn-use { right: calc(18px + env(safe-area-inset-right, 0px)); bottom: calc(28px + env(safe-area-inset-bottom, 0px)); width: 72px; height: 72px; background: rgba(244,233,216,0.88); color: #2a1c16; }
   #btn-hug { right: calc(102px + env(safe-area-inset-right, 0px)); bottom: calc(40px + env(safe-area-inset-bottom, 0px)); width: 54px; height: 54px; background: rgba(176,90,70,0.9); color: #fff; font-size: 20px; }
-  @media (prefers-reduced-motion: reduce) { #title, #endcard, #hint, #subs { transition: none; } }
+  @media (prefers-reduced-motion: reduce) { #title, #endcard, #hint, #subs { transition: none; } #endcard.show .end-msg p, #endcard.show .end-sig { animation-duration: 0.01s; animation-delay: 0s !important; } }
 </style>
 </head>
 <body>
@@ -101,6 +122,7 @@
   <div class="pill" role="group" aria-label="Graphics quality" id="quality"><span>QUALITY</span><button data-q="Low">Low</button><button data-q="High">High</button><button data-q="Epic">Epic</button></div>
   <div class="pill"><button id="timeBtn" type="button">Sunset / Night</button></div>
   <div class="pill"><button id="statsBtn" type="button">Stats</button></div>
+  <div class="pill" id="pausePill"><button id="pauseBtn" type="button" aria-label="Pause">II</button></div>
 </div>
 <div id="stats" hidden></div>
 <div id="hint"></div>
@@ -109,12 +131,32 @@
 <div id="fade"></div>
 <div id="subs" role="dialog" aria-live="polite"><div id="who"></div><div id="line"></div></div>
 
-<div id="endcard">
-  <div>
-    <div class="eyebrow">End of the base build</div>
-    <h2>Happy birthday.</h2>
-    <p>This is the foundation for the full game: the cabin, the forest, the two of you, and the camera. The story picks up from here.</p>
+<div id="endcard" role="dialog" aria-labelledby="endHeading">
+  <div class="end-inner">
+    <div class="eyebrow" id="endEyebrow">The bright one is yours</div>
+    <h2 id="endHeading">Happy birthday.</h2>
+    <div class="end-msg" id="endMsg"></div>
+    <p class="end-sig" id="endSig"></p>
     <button class="btn" id="endClose">Stay a little longer</button>
+  </div>
+</div>
+
+<div id="pause" hidden role="dialog" aria-labelledby="pauseTitle">
+  <div class="pause-panel">
+    <h2 id="pauseTitle">Paused</h2>
+    <button class="btn primary" id="pResume">Resume</button>
+    <div class="prow">
+      <label for="pVolume">Volume</label>
+      <input type="range" id="pVolume" min="0" max="100" step="1" value="80">
+      <button class="btn small" id="pMute" aria-pressed="false">Mute</button>
+    </div>
+    <div class="prow">
+      <span>Camera motion</span>
+      <div class="seg" role="group" aria-label="Camera motion">
+        <button class="btn small" data-motion="full">Full</button><button class="btn small" data-motion="reduced">Reduced</button>
+      </div>
+    </div>
+    <p class="pkeys">Esc pause · M mute · WASD walk · Shift run · E interact · Q hug</p>
   </div>
 </div>
 
@@ -125,6 +167,8 @@
   <button class="tbtn" id="btn-use" aria-label="Interact">Use</button>
 </div>
 
+<script src="../cozy-birthday-simulator/js/config.js"></script>
+<script src="js/config.js"></script>
 <script src="lib/three.min.js"></script>
 <script src="lib/RoundedBoxGeometry.js"></script>
 <script src="lib/SimplexNoise.js"></script>

@@ -5,6 +5,11 @@
  * ========================================================================= */
 (() => {
 const { $, clamp, lerp, damp, rand, MAT } = G;
+/* Player settings, remembered per browser. */
+const SETTINGS = (G.SETTINGS = { volume: 0.8, muted: false, motion: (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) ? 'reduced' : 'full' });
+try { Object.assign(SETTINGS, JSON.parse(localStorage.getItem('cbs.base.settings') || '{}')); } catch (e) { /* storage unavailable */ }
+const saveSettings = () => { try { localStorage.setItem('cbs.base.settings', JSON.stringify(SETTINGS)); } catch (e) { /* ignore */ } };
+G.MOTION = SETTINGS.motion === 'reduced' ? 0 : 1;   // scales handheld sway, step bob and the run zoom
 const STATE = (G.STATE = { started: false, tod: 0, todTarget: 0, cuddled: false, cakeDone: false, porchDone: false, busy: false });
 // Wind: a slow gust value (0..1) shared by snowfall, tree sway and the wind sound.
 const WIND = (G.WIND = { gust: 0.3, drift: 0, t: 0 });
@@ -28,10 +33,12 @@ G.Audio = (() => {
   };
   // A slow progression (Cmaj7 · Am9 · Fmaj7 · G6) so the ambience breathes instead of droning.
   const CHORDS = [[130.8, 164.8, 196.0, 246.9], [110.0, 164.8, 196.0, 246.9], [87.3, 174.6, 220.0, 329.6], [98.0, 146.8, 196.0, 329.6]];
+  const level = () => (SETTINGS.muted ? 0 : 0.7 * SETTINGS.volume);
+  let held = false;   // paused: keep the context suspended even if a key or tap would wake it
   function start() {
-    if (ctx) { if (ctx.state === 'suspended') ctx.resume(); return; }
+    if (ctx) { if (ctx.state === 'suspended' && !held) ctx.resume(); return; }
     const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
-    ctx = new AC(); master = ctx.createGain(); master.gain.value = 0.7; master.connect(ctx.destination);
+    ctx = new AC(); master = ctx.createGain(); master.gain.value = level(); master.connect(ctx.destination);
     // Outdoor bus: muffled through the walls when you're inside.
     outF = ctx.createBiquadFilter(); outF.type = 'lowpass'; outF.frequency.value = 9000; outF.connect(master);
     const f = noise(), ff = ctx.createBiquadFilter(); ff.type = 'lowpass'; ff.frequency.value = 220; fireG = ctx.createGain(); fireG.gain.value = 0; f.connect(ff); ff.connect(fireG); fireG.connect(master); f.start();
@@ -46,6 +53,8 @@ G.Audio = (() => {
   const bell = (f, when, v = 0.05) => { tone(f, 1.1, v, when); tone(f * 4.2, 0.12, v * 0.25, when); tone(f * 2, 0.5, v * 0.3, when); };
   return {
     start, tone,
+    applyVolume() { if (ctx) master.gain.setTargetAtTime(level(), ctx.currentTime, 0.05); },
+    hold(on) { held = on; if (!ctx) return; if (on) ctx.suspend(); else ctx.resume(); },
     set(o) {
       if (!ctx) return; const t = ctx.currentTime;
       if (o.fire != null) fireG.gain.setTargetAtTime(o.fire * 0.22, t, 0.6);
@@ -268,7 +277,7 @@ function resize() {
   if (SNOW) SNOW.material.uniforms.uPx.value = H * dpr / 900;
   bokeh.uniforms.aspect.value = W / H;
 }
-addEventListener('resize', () => composer && resize());
+addEventListener('resize', () => { if (composer) { resize(); G.needsRender = true; } });
 
 /* =====================================================================
  * Characters & collision
@@ -440,8 +449,8 @@ const SHOTS = {
   follow(t) {
     const p = PLAYER, inside = G.inside(p.x, p.z) || G.underRoof(p.x, p.z);
     // Running pulls the camera back a little and widens the lens; walking adds a faint step rhythm.
-    const dist = (inside ? 1.75 : 2.9) * CAM.zoom * (1 + CAM.run * (inside ? 0.06 : 0.16)), height = inside ? 1.58 : 1.72;
-    const bob = Math.sin(p.phase * 2) * 0.01 * clamp(p.speed / 1.5, 0, 1.5);
+    const dist = (inside ? 1.75 : 2.9) * CAM.zoom * (1 + CAM.run * G.MOTION * (inside ? 0.06 : 0.16)), height = inside ? 1.58 : 1.72;
+    const bob = Math.sin(p.phase * 2) * 0.01 * clamp(p.speed / 1.5, 0, 1.5) * G.MOTION;
     const tgt = new THREE.Vector3(p.x, p.y + height - (p.sit || 0) * 0.45 + bob, p.z);
     const right = new THREE.Vector3(Math.cos(CAM.yaw), 0, -Math.sin(CAM.yaw));
     tgt.addScaledVector(right, inside ? 0.32 : 0.42);
@@ -451,7 +460,7 @@ const SHOTS = {
     pos.y = Math.max(pos.y, G.floorAt(pos.x, pos.z) + 0.35);
     if (G.inside(pos.x, pos.z)) pos.y = Math.min(pos.y, G.CAB.wallH - 0.15);
     const lookAhead = new THREE.Vector3(Math.sin(p.yaw), 0, Math.cos(p.yaw)).multiplyScalar(p.speed * 0.25);
-    return { pos, look: tgt.clone().add(lookAhead), fov: (inside ? 50 : 46) + CAM.run * 5, focus: pos.distanceTo(tgt) + 0.2, aperture: 0.0025 };
+    return { pos, look: tgt.clone().add(lookAhead), fov: (inside ? 50 : 46) + CAM.run * 5 * G.MOTION, focus: pos.distanceTo(tgt) + 0.2, aperture: 0.0025 };
   },
   ots(subject, fg, side0 = 1) {
     // Over the foreground character's shoulder, framing the subject's face.
@@ -515,7 +524,8 @@ function updateCamera(dt, t) {
   c.fov = lerp(c.fov, s.fov, k); c.focus = lerp(c.focus, s.focus, k); c.aperture = lerp(c.aperture, s.aperture, k);
   // Subtle handheld drift.
   handT += dt;
-  const hx = Math.sin(handT * 0.9) * 0.006 + Math.sin(handT * 2.3) * 0.003, hy = Math.sin(handT * 1.3 + 1) * 0.005 + Math.sin(handT * 3.1) * 0.002;
+  const hm = G.MOTION;
+  const hx = (Math.sin(handT * 0.9) * 0.006 + Math.sin(handT * 2.3) * 0.003) * hm, hy = (Math.sin(handT * 1.3 + 1) * 0.005 + Math.sin(handT * 3.1) * 0.002) * hm;
   G.camera.position.copy(c.pos).add(new THREE.Vector3(hx, hy, 0));
   G.camera.lookAt(c.look.x + hx * 0.5, c.look.y + hy * 0.5, c.look.z);
   const fov = G.camera.aspect < 0.8 ? c.fov * 1.35 : c.fov;
@@ -536,13 +546,21 @@ G.setShot = setShot; G.releaseCamera = releaseCamera;
  * Input
  * ===================================================================== */
 const keys = (G.keys = new Set()), pressed = new Set();
-addEventListener('keydown', (e) => { if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault(); if (!keys.has(e.code)) pressed.add(e.code); keys.add(e.code); G.Audio.start(); if (e.code === 'Backquote') toggleStats(); });
+addEventListener('keydown', (e) => {
+  if (e.code === 'Escape' || e.code === 'KeyP') { setPaused(!STATE.paused); e.preventDefault(); return; }
+  if (e.code === 'KeyM') { setMuted(!SETTINGS.muted); return; }
+  if (STATE.paused) return;
+  if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
+  if (!keys.has(e.code)) pressed.add(e.code);
+  keys.add(e.code); G.Audio.start();
+  if (e.code === 'Backquote') toggleStats();
+});
 addEventListener('keyup', (e) => keys.delete(e.code));
 addEventListener('blur', () => keys.clear());
 const hit = (...c) => c.some((k) => pressed.has(k));
 let drag = null;
 G.canvas.addEventListener('pointerdown', (e) => { drag = { id: e.pointerId, x: e.clientX, y: e.clientY }; try { G.canvas.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ } G.Audio.start(); });
-G.canvas.addEventListener('pointermove', (e) => { if (!drag || drag.id !== e.pointerId || CAM.shot) return; CAM.yaw -= (e.clientX - drag.x) * 0.006; CAM.pitch = clamp(CAM.pitch + (e.clientY - drag.y) * 0.004, -0.2, 0.85); drag.x = e.clientX; drag.y = e.clientY; CAM.lastDrag = G.simT; });
+G.canvas.addEventListener('pointermove', (e) => { if (!drag || drag.id !== e.pointerId || CAM.shot || STATE.paused) return; CAM.yaw -= (e.clientX - drag.x) * 0.006; CAM.pitch = clamp(CAM.pitch + (e.clientY - drag.y) * 0.004, -0.2, 0.85); drag.x = e.clientX; drag.y = e.clientY; CAM.lastDrag = G.simT; });
 G.canvas.addEventListener('pointerup', () => { drag = null; });
 G.canvas.addEventListener('wheel', (e) => { e.preventDefault(); CAM.zoom = clamp(CAM.zoom * (e.deltaY > 0 ? 1.1 : 0.9), 0.6, 1.8); }, { passive: false });
 const stick = { x: 0, y: 0, on: false };
@@ -561,7 +579,7 @@ const stick = { x: 0, y: 0, on: false };
  * Dialogue (cinematic subtitles) with automatic shot selection
  * ===================================================================== */
 const DLG = { q: [], cur: null, shown: 0, t: 0, auto: false };
-G.say = (who, text, o = {}) => new Promise((res) => DLG.q.push({ who, text, res, o }));
+G.say = (who, text, o = {}) => new Promise((res) => DLG.q.push({ who, text: G.fmt(text), res, o }));
 const busy = () => !!DLG.cur || DLG.q.length > 0 || STATE.busy;
 function pickShotFor(who, o) {
   if (o.shot === 'keep') return;
@@ -577,7 +595,7 @@ function updateDialogue(dt) {
   if (!DLG.cur && DLG.q.length) {
     DLG.cur = DLG.q.shift(); DLG.shown = 0; DLG.t = 0;
     box.className = 'show ' + (DLG.cur.who ? 'who-' + DLG.cur.who : 'narr');
-    $('who').textContent = DLG.cur.who === 'partner' ? 'Partner' : DLG.cur.who === 'player' ? 'You' : '';
+    $('who').textContent = DLG.cur.who === 'partner' ? G.CFG.partnerLabel : DLG.cur.who === 'player' ? G.CFG.playerLabel : '';
     pickShotFor(DLG.cur.who, DLG.cur.o);
   }
   if (!DLG.cur) { if (box.className !== '') { box.className = ''; if (!STATE.sceneShot && CAM.shot) releaseCamera(); } return; }
@@ -592,7 +610,7 @@ function updateDialogue(dt) {
   }
 }
 $('subs').addEventListener('pointerdown', (e) => { e.preventDefault(); DLG.click = true; });
-function bark(text, dur = 2.6) { PARTNER.bark = { text, t: dur }; }
+function bark(text, dur = 2.6) { PARTNER.bark = { text: G.fmt(text), t: dur }; }
 function hint(text, dur = 5) { const h = $('hint'); h.textContent = text; h.classList.add('show'); clearTimeout(hint._t); hint._t = setTimeout(() => h.classList.remove('show'), dur * 1000); }
 // Waits run on the game clock, so a scene pauses with the tab instead of racing ahead of the dialogue.
 const TIMERS = [];
@@ -686,7 +704,7 @@ const Story = (G.Story = {
     await G.say('partner', '“More sleep.” “A new kettle.” Anything you’d actually say out loud.');
     G.Audio.blow(); G.CAKE.lit = false;
     await G.say(null, '(You blow them out. All five, first try.)', { shot: cakeShot });
-    await G.say('partner', 'Happy birthday, you.');
+    await G.say('partner', 'Happy birthday, {giant}.');
     STATE.cakeDone = true;
   },
   async cuddle() {
@@ -703,7 +721,7 @@ const Story = (G.Story = {
     await wait(1.2);
     PARTNER.tiltTarget = -0.32; PARTNER.leanTarget = 0.12; PARTNER.lidsClosed = true;
     await G.say(null, '(One blanket, two people, and the fire doing all the talking.)', { shot: 'keep' });
-    await G.say('partner', 'Don’t move. You’re the perfect height for this.', { shot: 'keep' });
+    await G.say('partner', 'Don’t move, {giant}. You’re the perfect height for this.', { shot: 'keep' });
     await G.say('player', 'I have to move eventually.', { shot: 'keep' });
     await G.say('partner', 'Eventually is a whole word away.', { shot: 'keep' });
     await wait(1.5);
@@ -736,15 +754,16 @@ const Story = (G.Story = {
     await G.say(null, '(The sun goes, and then all at once there are more stars than sky.)', { shot: 'keep' });
     PARTNER.tiltTarget = -0.25;
     await G.say('partner', 'Pick one. That one’s yours. Happy birthday.', { shot: 'keep' });
-    await G.say('player', 'Which one?', { shot: 'keep' });
+    await G.say('player', 'Which one, {gremlin}?', { shot: 'keep' });
     await G.say('partner', 'The bright one. Obviously. I’m not giving you a dim one on your birthday.', { shot: 'keep' });
     await wait(1.5);
-    $('endcard').classList.add('show');
+    showEndcard();
     document.body.classList.remove('playing');
     STATE.porchDone = true;
   },
   closeEnd() {
     $('endcard').classList.remove('show');
+    document.body.classList.remove('ending');
     document.body.classList.add('playing');
     cutTo(() => {
       PARTNER.tiltTarget = PARTNER.tilt = 0;
@@ -756,6 +775,20 @@ const Story = (G.Story = {
     }, 0.3);
   },
 });
+function showEndcard() {
+  const B = G.CFG.birthday || {};
+  $('endHeading').textContent = G.fmt(B.heading || 'Happy birthday.');
+  const msg = $('endMsg');
+  msg.textContent = '';
+  const lines = (B.full && B.full.length ? B.full : [B.short || '']).filter(Boolean);
+  lines.forEach((t, i) => { const p = document.createElement('p'); p.textContent = G.fmt(t); p.style.animationDelay = (1.2 + i * 1.6) + 's'; msg.appendChild(p); });
+  const sig = $('endSig');
+  sig.textContent = G.fmt(B.signature || '');
+  sig.style.animationDelay = (1.2 + lines.length * 1.6 + 0.4) + 's';
+  $('endcard').classList.add('show');
+  $('endcard').scrollTop = 0;
+  document.body.classList.add('ending');
+}
 async function hug() {
   if (busy() || Math.hypot(PARTNER.x - PLAYER.x, PARTNER.z - PLAYER.z) > 1.4 || PARTNER.sit > 0.2) return;
   STATE.busy = true;
@@ -770,10 +803,43 @@ async function hug() {
   const camAt = (o) => { const m = G.headPos(PARTNER).add(new THREE.Vector3(0, -0.08, 0)); const pos = m.clone().addScaledVector(side, o[0] * o[2]).addScaledVector(fwd, o[1]); pos.y = m.y - 0.1; return { pos, look: m, fov: 34, focus: pos.distanceTo(m), aperture: 0.016 }; };
   const pick = [[1, 0.55, 1.25], [-1, 0.55, 1.25], [1, 0.35, 0.9], [-1, 0.35, 0.9]].find((o) => { const c = camAt(o); return !blocked(c.look, c.pos); });
   if (pick) setShot(() => camAt(pick));
-  bark(['Mm. Hi.', 'You’re so warm. It’s unfair.', 'Ten out of ten hug.'][Math.floor(Math.random() * 3)]);
+  bark(['Mm. Hi, {giant}.', 'You’re so warm. It’s unfair.', 'Ten out of ten hug.', 'Okay. One more second. Two.'][Math.floor(Math.random() * 4)]);
   await wait(2.6);
   STATE.hugging = false; STATE.hugIn = null; PARTNER.lidsClosed = false; PARTNER.tiltTarget = 0; STATE.busy = false;
   releaseCamera();
+}
+
+/* =====================================================================
+ * Pause menu, volume, mute, camera motion
+ * ===================================================================== */
+function setPaused(on) {
+  if (on === !!STATE.paused) return;
+  if (on && (!STATE.started || $('endcard').classList.contains('show'))) return;
+  STATE.paused = on;
+  $('pause').hidden = !on;
+  keys.clear(); pressed.clear(); drag = null;
+  stick.on = false; stick.x = stick.y = 0;
+  G.Audio.hold(on);
+  if (on) { syncPauseUI(); $('pResume').focus(); } else { G.needsRender = true; }
+}
+function setMuted(m) { SETTINGS.muted = m; saveSettings(); G.Audio.applyVolume(); syncPauseUI(); }
+function syncPauseUI() {
+  $('pVolume').value = Math.round(SETTINGS.volume * 100);
+  $('pMute').setAttribute('aria-pressed', String(SETTINGS.muted));
+  $('pMute').textContent = SETTINGS.muted ? 'Muted' : 'Mute';
+  document.querySelectorAll('[data-motion]').forEach((b) => b.classList.toggle('on', b.dataset.motion === SETTINGS.motion));
+}
+G.setPaused = setPaused;
+function initPauseUI() {
+  $('pauseBtn').addEventListener('click', () => setPaused(true));
+  $('pResume').addEventListener('click', () => setPaused(false));
+  $('pause').addEventListener('pointerdown', (e) => { if (e.target === $('pause')) setPaused(false); });   // tap outside the panel
+  $('pVolume').addEventListener('input', (e) => { SETTINGS.volume = e.target.value / 100; if (SETTINGS.volume > 0 && SETTINGS.muted) SETTINGS.muted = false; saveSettings(); G.Audio.applyVolume(); syncPauseUI(); });
+  $('pMute').addEventListener('click', () => setMuted(!SETTINGS.muted));
+  document.querySelectorAll('[data-motion]').forEach((b) => b.addEventListener('click', () => { SETTINGS.motion = b.dataset.motion; G.MOTION = SETTINGS.motion === 'reduced' ? 0 : 1; saveSettings(); syncPauseUI(); }));
+  // Leaving the tab pauses the game and its sound.
+  document.addEventListener('visibilitychange', () => { if (document.hidden) setPaused(true); });
+  syncPauseUI();
 }
 
 /* =====================================================================
@@ -946,10 +1012,42 @@ function frame(now) {
   requestAnimationFrame(frame);
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
   fpsAcc += dt; fpsN++; if (fpsAcc > 0.5) { fps = fpsN / fpsAcc; fpsAcc = 0; fpsN = 0; stats(); }
+  if (STATE.paused) {
+    // Hold the last frame; only redraw it if the window changed size.
+    if (G.needsRender) { G.needsRender = false; composer.render(0); }
+    return;
+  }
   // Input pressed this frame must survive until simulate() reads it.
   simulate(dt);
   composer.render(dt);
   bubble(dt);
+}
+
+/* ---------- shader warm-up ----------
+ * Compile every material behind the loading screen, including things that are hidden now but
+ * appear later (the cuddle blanket, breath puffs) and the depth-of-field pass used in cutscenes,
+ * so nothing stalls the first time it comes into view. */
+function warmUp() {
+  const t0 = performance.now(), R = G.renderer, before = R.info.programs.length;
+  const inChar = (o) => { for (let p = o; p; p = p.parent) if (p === PLAYER.m || p === PARTNER.m) return true; return false; };
+  const later = [];
+  G.scene.traverse((o) => { if (o.visible === false && (o.isMesh || o.isSprite || o.isPoints) && !inChar(o)) later.push(o); });
+  later.forEach((o) => { o.visible = true; });
+  // One frame drawn with culling off compiles exactly what can appear (renderer.compile() in this
+  // three.js version would also compile materials on hidden objects that never show).
+  const culled = [];
+  G.scene.traverse((o) => { if (o.frustumCulled && (o.isMesh || o.isPoints || o.isSprite)) { culled.push(o); o.frustumCulled = false; } });
+  const bokehWas = bokeh.enabled;
+  bokeh.enabled = G.Q.dof;
+  // A tiny frame: shaders compile the same at any size, and the GPU barely has to draw anything.
+  G.renderer.setPixelRatio(1); G.renderer.setSize(64, 36, false); composer.setPixelRatio(1); composer.setSize(64, 36);
+  composer.render(0);          // scene, shadow, depth-of-field and post-processing shaders
+  resize();
+  bokeh.enabled = bokehWas;
+  culled.forEach((o) => { o.frustumCulled = true; });
+  later.forEach((o) => { o.visible = false; });
+  G.BOOT_MS.warmup = Math.round(performance.now() - t0);
+  G.BOOT_MS.programs = [before, R.info.programs.length];
 }
 
 /* ---------- boot ---------- */
@@ -972,10 +1070,15 @@ function boot() {
   $('timeBtn').addEventListener('click', () => { STATE.todTarget = STATE.todTarget > 0.5 ? 0 : 1; });
   $('statsBtn').addEventListener('click', toggleStats);
   $('endClose').addEventListener('click', () => Story.closeEnd());
+  initPauseUI();
   G.applyQuality();
   CAM.shot = titleShot; CAM.cut = true;
   // Keep the loading screen up until the character bodies are in (with a safety timeout).
-  Promise.race([bodies, new Promise((r) => setTimeout(r, 8000))]).then(() => { G.BOOT_MS.total = Math.round(performance.now()); $('loading').classList.add('done'); });
+  Promise.race([bodies, new Promise((r) => setTimeout(r, 8000))]).then(() => {
+    try { warmUp(); } catch (e) { console.warn('warm-up skipped', e); }
+    G.BOOT_MS.total = Math.round(performance.now());
+    $('loading').classList.add('done');
+  });
   $('begin').addEventListener('click', async () => {
     if (STATE.started || $('begin').disabled) return;
     $('begin').disabled = true;
