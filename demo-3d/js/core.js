@@ -46,8 +46,11 @@ G.simplex = new THREE.SimplexNoise({ random: G.seeded(491) });
 G.fbm = (x, y, o = 4) => { let a = 0, f = 1, w = 0.5; for (let i = 0; i < o; i++) { a += w * G.simplex.noise(x * f, y * f); f *= 2.03; w *= 0.5; } return a; };
 
 /* ---------------- procedural textures ---------------- */
+// Procedural textures are painted per pixel at boot; on Low (phones) paint them at half size, a quarter of the work.
+G.TEX_SCALE = G.qName === 'Low' ? 0.5 : 1;
 function canvasTex(size, fn, o = {}) {
-  const w = o.w || size, h = o.h || size;
+  const k = o.draw ? 1 : G.TEX_SCALE;
+  const w = Math.max(16, Math.round((o.w || size) * k)), h = Math.max(16, Math.round((o.h || size) * k));
   const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
   const ctx = cv.getContext('2d');
   if (o.draw) o.draw(ctx, w, h);
@@ -190,6 +193,32 @@ G.std = (o) => {
   G.MATS.push(m);
   return m;
 };
+// Shared plain materials (no textures, never animated): one material per look instead of one per prop.
+const SHARED = new Map();
+G.shared = (o) => {
+  const key = JSON.stringify(o);
+  if (!SHARED.has(key)) SHARED.set(key, G.std(o));
+  return SHARED.get(key);
+};
+/* three r128 frustum-culls an InstancedMesh with its template geometry's bounds at the mesh origin,
+ * so instances elsewhere can vanish when the origin leaves the view. Give the geometry a sphere that
+ * encloses every instance instead. (Each instanced geometry here is used by one mesh only.) */
+G.fitInstanceBounds = (im) => {
+  const g = im.geometry;
+  if (!g.boundingSphere) g.computeBoundingSphere();
+  const r0 = g.boundingSphere.radius, c0 = g.boundingSphere.center.clone();
+  const m = new THREE.Matrix4(), p = new THREE.Vector3(), q = new THREE.Quaternion(), sc = new THREE.Vector3();
+  const pts = [];
+  let maxS = 0;
+  for (let i = 0; i < im.count; i++) {
+    im.getMatrixAt(i, m); m.decompose(p, q, sc);
+    pts.push(c0.clone().applyMatrix4(m)); maxS = Math.max(maxS, sc.x, sc.y, sc.z);
+  }
+  const box = new THREE.Box3().setFromPoints(pts), sphere = new THREE.Sphere();
+  box.getBoundingSphere(sphere);
+  sphere.radius += r0 * maxS;
+  g.boundingSphere = sphere;
+};
 G.rep = (tex, x, y) => { const t = tex.clone(); t.needsUpdate = true; t.repeat.set(x, y); return t; };
 const MAT = (G.MAT = {});
 G.buildMaterials = () => {
@@ -271,3 +300,65 @@ G.merge = (parts) => {
   return out;
 };
 G.mtx = (x, y, z, sx = 1, sy = 1, sz = 1, ry = 0, rx = 0, rz = 0) => new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(rx, ry, rz)), new THREE.Vector3(sx, sy, sz));
+
+/* ---------------- static batching ----------------
+ * Merge every static, opaque mesh under `root` that shares a material (and shadow flags) into one
+ * mesh, turning hundreds of draw calls into a few dozen. Skipped: instanced/skinned meshes, shader and
+ * transparent materials, vertex-coloured materials, anything flagged userData.dynamic, and anything
+ * in `skip` (or under a skipped object). Merged-away camera blockers are kept detached, with their
+ * world matrices, so the camera can still raycast against them.
+ */
+G.mergeStatic = (root, skip = new Set()) => {
+  root.updateMatrixWorld(true);
+  const buckets = new Map(), victims = [];
+  const nm = new THREE.Matrix3(), v = new THREE.Vector3();
+  const skipped = (o) => { for (let p = o; p; p = p.parent) { if (skip.has(p) || (p.userData && p.userData.dynamic) || p.visible === false) return true; } return false; };
+  root.traverse((o) => {
+    if (!o.isMesh || o.isInstancedMesh || o.isSkinnedMesh || o.renderOrder || skipped(o)) return;
+    const mats = Array.isArray(o.material) ? o.material : [o.material];
+    if (mats.some((m) => !(m.isMeshStandardMaterial || m.isMeshBasicMaterial || m.isMeshLambertMaterial) || m.transparent || m.vertexColors)) return;
+    let g = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry;
+    const pos = g.attributes.position, nor = g.attributes.normal, uv = g.attributes.uv;
+    if (!nor) return;
+    const mw = o.matrixWorld, flip = mw.determinant() < 0;
+    nm.getNormalMatrix(mw);
+    // Batch by area (the cabin interior, and 16 m blocks outside) so culling and shadow cameras still skip what they can't see.
+    if (!o.geometry.boundingSphere) o.geometry.computeBoundingSphere();
+    const wc = o.geometry.boundingSphere.center.clone().applyMatrix4(mw);
+    const zone = G.inside && G.inside(wc.x, wc.z) && wc.y < 2.8 ? 'in' : Math.floor(wc.x / 16) + ',' + Math.floor(wc.z / 16);
+    const groups = Array.isArray(o.material) && g.groups.length ? g.groups : [{ start: 0, count: pos.count, materialIndex: 0 }];
+    for (const gr of groups) {
+      const mat = Array.isArray(o.material) ? o.material[gr.materialIndex] : o.material;
+      if (!mat) continue;
+      const key = mat.uuid + zone + (o.castShadow ? 'c' : '') + (o.receiveShadow ? 'r' : '');
+      let b = buckets.get(key);
+      if (!b) buckets.set(key, (b = { mat, zone, cast: o.castShadow, recv: o.receiveShadow, P: [], N: [], U: [] }));
+      for (let t = gr.start; t < gr.start + gr.count; t += 3) {
+        const order = flip ? [t, t + 2, t + 1] : [t, t + 1, t + 2];
+        for (const i of order) {
+          v.fromBufferAttribute(pos, i).applyMatrix4(mw); b.P.push(v.x, v.y, v.z);
+          v.fromBufferAttribute(nor, i).applyMatrix3(nm).normalize(); b.N.push(v.x, v.y, v.z);
+          if (uv) b.U.push(uv.getX(i), uv.getY(i)); else b.U.push(0, 0);
+        }
+      }
+    }
+    if (g !== o.geometry) g.dispose();
+    victims.push(o);
+  });
+  for (const o of victims) {
+    o.parent.remove(o);
+    if (!G.CAMBLOCK.includes(o)) o.geometry.dispose();   // blockers keep their geometry for raycasts
+  }
+  let made = 0;
+  for (const b of buckets.values()) {
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(b.P, 3));
+    geo.setAttribute('normal', new THREE.Float32BufferAttribute(b.N, 3));
+    geo.setAttribute('uv', new THREE.Float32BufferAttribute(b.U, 2));
+    geo.computeBoundingSphere();
+    const m = new THREE.Mesh(geo, b.mat);
+    m.castShadow = b.cast; m.receiveShadow = b.recv; m.matrixAutoUpdate = false; m.name = 'static';
+    root.add(m); made++;
+  }
+  return { merged: victims.length, meshes: made };
+};

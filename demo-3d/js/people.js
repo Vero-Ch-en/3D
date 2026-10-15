@@ -237,10 +237,32 @@ G.makeHuman = (o) => {
  * copy each rig group's motion: Mbone = Mgroup * Mgroup_rest^-1 * Mbone_rest.
  * The procedural body meshes are hidden; eyes, lids, brows, lips and hair stay.
  */
-G.attachBlenderBody = (root, name) => {
-  const b64 = window.CBS_MODELS && window.CBS_MODELS[name];
-  if (!b64 || !THREE.GLTFLoader) return Promise.resolve(false);
-  const bin = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)).buffer;
+/* Character models: fetched as .glb when served over http(s); opened from disk (file://, where fetch
+ * is blocked) they come from js/models.js, which embeds the same files as base64 and is only loaded then. */
+let embedded = null;
+const loadEmbedded = () => embedded || (embedded = new Promise((res) => {
+  if (window.CBS_MODELS) return res(window.CBS_MODELS);
+  const s = document.createElement('script');
+  s.src = 'js/models.js';
+  s.onload = () => res(window.CBS_MODELS || {});
+  s.onerror = () => res({});
+  document.head.appendChild(s);
+}));
+G.loadModelBuffer = async (name) => {
+  if (location.protocol !== 'file:') {
+    try {
+      const r = await fetch('models/' + name + '.glb');
+      if (r.ok) return await r.arrayBuffer();
+    } catch (e) { /* fall through to the embedded copy */ }
+  }
+  const all = await loadEmbedded();
+  if (!all[name]) return null;
+  return Uint8Array.from(atob(all[name]), (c) => c.charCodeAt(0)).buffer;
+};
+G.attachBlenderBody = async (root, name) => {
+  if (!THREE.GLTFLoader) return false;
+  const bin = await G.loadModelBuffer(name);
+  if (!bin) return false;
   return new Promise((resolve) => {
     new THREE.GLTFLoader().parse(bin, '', (gltf) => {
       const u = root.userData, k = u.k;

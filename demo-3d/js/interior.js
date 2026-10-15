@@ -119,7 +119,7 @@ G.buildInterior = () => {
   plant(0.45, 3.6, 1.0);
   box(0.9, 0.42, 0.5, MAT.wood, 3.6, 0.21, 4.15, { coll: true, r: 0.02 });   // chest at the foot wall
   box(0.6, 0.05, 0.45, MAT.plaid, 3.5, 0.45, 4.15, { r: 0.02 });
-  for (let i = 0; i < 4; i++) box(0.22, 0.05 + i * 0.002, 0.16, G.std({ color: ['#6b3a2e', '#2e4a5a', '#c9b48a', '#3a5a40'][i], roughness: 0.8 }), 3.85, 0.48 + i * 0.05, 4.1);
+  for (let i = 0; i < 4; i++) box(0.22, 0.05 + i * 0.002, 0.16, G.shared({ color: ['#6b3a2e', '#2e4a5a', '#c9b48a', '#3a5a40'][i], roughness: 0.8 }), 3.85, 0.48 + i * 0.05, 4.1);
 
   /* ===== Living room ===== */
   const fx = 8.0;
@@ -173,7 +173,7 @@ G.buildInterior = () => {
   G.CAKE = buildCake(tx - 0.12, 0.46, tz);
   for (const [dx, dz, c] of [[0.36, 0.14, '#efe7da'], [0.42, -0.12, '#8a3a2e']]) {
     cyl(0.045, 0.04, 0.1, G.std({ color: c, roughness: 0.3, env: 0.8 }), tx + dx, 0.51, tz + dz, { seg: 18 });
-    cyl(0.04, 0.04, 0.005, G.std({ color: '#4a2a1a', roughness: 0.2 }), tx + dx, 0.555, tz + dz, { seg: 16 });
+    cyl(0.04, 0.04, 0.005, G.shared({ color: '#4a2a1a', roughness: 0.2 }), tx + dx, 0.555, tz + dz, { seg: 16 });
   }
   candle(tx - 0.45, 0.46, tz - 0.16, 0.09, 0.03);
   G.INTER.push({ id: 'cake', pos: [tx, 0.6, tz], r: 1.1, label: () => (G.CAKE.lit ? 'Make a wish' : 'Cake'), act: () => G.Story.cake() });
@@ -221,10 +221,10 @@ function bookshelf(x, z, w, d, h, ry) {
     let u = -w / 2 + 0.06;
     while (u < w / 2 - 0.1) {
       const kind = r();
-      if (kind < 0.08) { cyl(0.04, 0.045, 0.12, G.std({ color: '#cfd8d0', roughness: 0.05, transparent: true, opacity: 0.55, env: 1.2 }), u + 0.05, y + 0.075, 0, { parent: g }); u += 0.12; continue; }
+      if (kind < 0.08) { cyl(0.04, 0.045, 0.12, G.shared({ color: '#cfd8d0', roughness: 0.05, transparent: true, opacity: 0.55, env: 1.2 }), u + 0.05, y + 0.075, 0, { parent: g }); u += 0.12; continue; }
       if (kind < 0.12) { G.candle(u + 0.04, y + 0.015, 0.0, 0.07, 0.025, g); u += 0.1; continue; }
       const bw = 0.025 + r() * 0.035, bh = 0.2 + r() * 0.13;
-      const b = box(bw, bh, d * 0.75, G.std({ color: cols[Math.floor(r() * cols.length)], roughness: 0.85 }), u + bw / 2, y + 0.015 + bh / 2, 0.02, { parent: g, cast: false });
+      const b = box(bw, bh, d * 0.75, G.shared({ color: cols[Math.floor(r() * cols.length)], roughness: 0.85 }), u + bw / 2, y + 0.015 + bh / 2, 0.02, { parent: g, cast: false });
       if (r() < 0.1) b.rotation.z = 0.22;
       u += bw + 0.004;
     }
@@ -238,11 +238,11 @@ function buildCake(x, y, z) {
   const sponge = G.std({ color: '#f3e3cf', roughness: 0.7 });
   cyl(0.15, 0.15, 0.13, sponge, 0, 0.077, 0, { parent: g, seg: 32 });
   cyl(0.153, 0.153, 0.018, G.std({ color: '#fff6ec', roughness: 0.35, env: 0.6 }), 0, 0.14, 0, { parent: g, seg: 32 });
-  for (let i = 0; i < 9; i++) { const a = i / 9 * Math.PI * 2; sph(0.017, G.std({ color: '#b83a3a', roughness: 0.25, env: 0.9 }), Math.cos(a) * 0.12, 0.16, Math.sin(a) * 0.12, [1, 1, 1], g, 10); }
+  for (let i = 0; i < 9; i++) { const a = i / 9 * Math.PI * 2; sph(0.017, G.shared({ color: '#b83a3a', roughness: 0.25, env: 0.9 }), Math.cos(a) * 0.12, 0.16, Math.sin(a) * 0.12, [1, 1, 1], g, 10); }
   const flames = [];
   for (let i = 0; i < 5; i++) {
     const a = i / 5 * Math.PI * 2, cx = Math.cos(a) * 0.065, cz = Math.sin(a) * 0.065;
-    cyl(0.005, 0.005, 0.07, G.std({ color: '#e8d6c0', roughness: 0.5 }), cx, 0.185, cz, { parent: g, seg: 8 });
+    cyl(0.005, 0.005, 0.07, G.shared({ color: '#e8d6c0', roughness: 0.5 }), cx, 0.185, cz, { parent: g, seg: 8 });
     const f = new THREE.Mesh(new THREE.PlaneGeometry(0.028, 0.05), flameMaterial('#ffb24a'));
     f.position.set(cx, 0.245, cz); g.add(f); flames.push(f); FLAMES.push(f);
   }

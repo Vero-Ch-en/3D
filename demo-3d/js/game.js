@@ -121,6 +121,9 @@ function updateLighting(t, dt, focus) {
   const fl = 0.82 + Math.sin(t * 13) * 0.08 + Math.sin(t * 7.3) * 0.07 + Math.sin(t * 23.1) * 0.03;
   for (const L of G.LAMPS) { L.light.intensity = damp(L.light.intensity, L.on ? L.power * L.flick : 0, 14, dt); L.shade.material.emissiveIntensity = (L.light.intensity / L.power) * 1.2; }
   const F = G.FIRE, fp = F.on ? F.level : 0;
+  const camIn = G.inside(G.camera.position.x, G.camera.position.z);
+  const fireShadow = G.Q.ssao && camIn && fp > 0.02;
+  if (F.light.castShadow !== fireShadow) F.light.castShadow = fireShadow;
   F.light.intensity = damp(F.light.intensity, F.power * fp * fl, 12, dt);
   F.planes.forEach((p, i) => { p.visible = fp > 0.02; p.material.uniforms.uPower.value = fp; p.lookAt(G.camera.position.x, p.getWorldPosition(tmpV).y, G.camera.position.z); });
   G.CAKE.light.intensity = damp(G.CAKE.light.intensity, G.CAKE.lit ? 1.4 * fl : 0, 10, dt);
@@ -219,7 +222,7 @@ const GradeShader = {
       c += (h(vUv * 917.0) - 0.5) * uGrain;
       float bar = step(0.5 - uBars, abs(vUv.y - 0.5));
       c = mix(c, vec3(0.0), bar);
-      gl_FragColor = vec4(c, 1.0);
+      gl_FragColor = LinearTosRGB(vec4(c, 1.0));   // gamma folded in here: one full-screen pass fewer
     }`,
 };
 function buildPost() {
@@ -233,7 +236,6 @@ function buildPost() {
   bloom = new THREE.UnrealBloomPass(new THREE.Vector2(512, 512), 0.5, 0.55, 0.85);
   composer.addPass(bloom);
   grade = new THREE.ShaderPass(GradeShader); composer.addPass(grade);
-  composer.addPass(new THREE.ShaderPass(THREE.GammaCorrectionShader));
   fxaa = new THREE.ShaderPass(THREE.FXAAShader); composer.addPass(fxaa);
   G.post = { composer, bokeh, bloom, ssao, grade, fxaa, key, hemi };
 }
@@ -243,7 +245,14 @@ G.applyQuality = () => {
   G.renderer.shadowMap.enabled = G.Q.shadows;
   key.castShadow = G.Q.shadows; key.shadow.mapSize.set(G.Q.shadowSize, G.Q.shadowSize);
   if (key.shadow.map) { key.shadow.map.dispose(); key.shadow.map = null; }
-  G.FIRE.light.castShadow = G.Q.ssao; G.FIRE.light.shadow.mapSize.set(512, 512); G.FIRE.light.shadow.bias = -0.004;
+  G.FIRE.light.shadow.mapSize.set(512, 512); G.FIRE.light.shadow.bias = -0.004;
+  if (G.Q.ssao) {
+    // The fireplace's cube shadow redraws everything around it six times, so it runs only while the
+    // camera is in the cabin. Compile both lighting states now so switching never stutters.
+    for (const on of [true, false]) { G.FIRE.light.castShadow = on; G.renderer.compile(G.scene, G.camera); }
+  }
+  G.FIRE.light.castShadow = false;
+  G.FIRE.light.shadow.camera.near = 0.1; G.FIRE.light.shadow.camera.far = 7;   // the room, not the whole valley
   ssao.enabled = G.Q.ssao; bokeh.enabled = G.Q.dof; bloom.strength = G.Q.bloom;
   G.MATS.forEach((m) => { m.needsUpdate = true; });
   if (SNOW) SNOW.geometry.setDrawRange(0, G.Q.snow);
@@ -511,7 +520,11 @@ function updateCamera(dt, t) {
   G.camera.lookAt(c.look.x + hx * 0.5, c.look.y + hy * 0.5, c.look.z);
   const fov = G.camera.aspect < 0.8 ? c.fov * 1.35 : c.fov;
   if (Math.abs(G.camera.fov - fov) > 0.01) { G.camera.fov = fov; G.camera.updateProjectionMatrix(); }
-  if (bokeh) { bokeh.uniforms.focus.value = c.focus; bokeh.uniforms.aperture.value = c.aperture; }
+  if (bokeh) {
+    bokeh.uniforms.focus.value = c.focus; bokeh.uniforms.aperture.value = c.aperture;
+    // Depth of field re-renders the whole scene for depth; only pay for it in shots where the blur shows.
+    bokeh.enabled = G.Q.dof && c.aperture > 0.006;
+  }
   c.bars = damp(c.bars, c.shot && !G.MOBILE ? 0.06 : 0, 4, dt);
   grade.uniforms.uBars.value = c.bars;
 }
@@ -536,7 +549,7 @@ const stick = { x: 0, y: 0, on: false };
 (() => {
   const zone = $('stickzone'), knob = $('knob'), base = $('stick');
   let id = null, ox = 0, oy = 0;
-  zone.addEventListener('pointerdown', (e) => { id = e.pointerId; ox = e.clientX; oy = e.clientY; base.style.left = (ox - 55) + 'px'; base.style.top = (oy - 55) + 'px'; base.classList.add('on'); zone.setPointerCapture(id); stick.on = true; G.Audio.start(); e.preventDefault(); });
+  zone.addEventListener('pointerdown', (e) => { id = e.pointerId; ox = e.clientX; oy = e.clientY; base.style.left = (ox - 55) + 'px'; base.style.top = (oy - 55) + 'px'; base.classList.add('on'); try { zone.setPointerCapture(id); } catch (err) { /* capture is a nicety */ } stick.on = true; G.Audio.start(); e.preventDefault(); });
   zone.addEventListener('pointermove', (e) => { if (e.pointerId !== id) return; let dx = e.clientX - ox, dy = e.clientY - oy; const l = Math.hypot(dx, dy); if (l > 45) { dx *= 45 / l; dy *= 45 / l; } knob.style.transform = `translate(${dx}px,${dy}px)`; stick.x = dx / 45; stick.y = dy / 45; });
   const end = (e) => { if (e.pointerId !== id) return; id = null; stick.on = false; stick.x = stick.y = 0; knob.style.transform = ''; base.classList.remove('on'); };
   zone.addEventListener('pointerup', end); zone.addEventListener('pointercancel', end);
@@ -727,10 +740,12 @@ const Story = (G.Story = {
     await G.say('partner', 'The bright one. Obviously. I’m not giving you a dim one on your birthday.', { shot: 'keep' });
     await wait(1.5);
     $('endcard').classList.add('show');
+    document.body.classList.remove('playing');
     STATE.porchDone = true;
   },
   closeEnd() {
     $('endcard').classList.remove('show');
+    document.body.classList.add('playing');
     cutTo(() => {
       PARTNER.tiltTarget = PARTNER.tilt = 0;
       const B = G.BENCH;
@@ -939,15 +954,19 @@ function frame(now) {
 
 /* ---------- boot ---------- */
 function boot() {
-  G.buildTextures(); G.buildMaterials();
-  G.buildSky(); G.buildTerrain(); G.buildMountains(); G.buildForest(); G.buildPath(); G.buildCabin(); G.buildInterior(); G.buildFX();
+  const tTex = performance.now(); G.buildTextures(); G.buildMaterials(); const texMs = Math.round(performance.now() - tTex);
+  const T = (G.BOOT_MS = {}), mark = (k, f) => { const t0 = performance.now(); f(); T[k] = Math.round(performance.now() - t0); };
+  mark('sky', G.buildSky); mark('terrain', G.buildTerrain); mark('mountains', G.buildMountains); mark('forest', G.buildForest);
+  mark('path', G.buildPath); mark('cabin', G.buildCabin); mark('interior', G.buildInterior); mark('fx', G.buildFX);
+  mark('batch', () => { G.BATCH = G.mergeStatic(G.world); });
+  T.textures = texMs;
   SNOW = snowSystem(4500); smokeSystem();
   PLAYER.m = G.makeHuman({ height: 1.84, skin: '#d9ab8e', outfit: 'hoodie', top: '#3f4146', legs: '#25272c', hair: '#1e140f', hairStyle: 'shaggy', socks: '#2f2b28', seed: 11 });
   PARTNER.m = G.makeHuman({ height: 1.6, fem: true, skin: '#e8bfa4', outfit: 'sweater', legs: '#2c2626', hair: '#5e3a26', hairStyle: 'bun', socks: '#e6dccd', eyes: '#4a3020', lips: '#c47a70', seed: 23 });
   placeChar(PLAYER, G.pathX(27) + 0.35, 27, Math.PI); placeChar(PARTNER, G.pathX(27) - 0.45, 26.6, Math.PI);
   PLAYER.hugPose = [-0.95, 0.25, -1.3, -0.7];   // he's taller: arms around her back rather than over her head
   buildNav();
-  G.attachBlenderBody(PLAYER.m, 'player'); G.attachBlenderBody(PARTNER.m, 'partner');
+  const bodies = Promise.all([G.attachBlenderBody(PLAYER.m, 'player'), G.attachBlenderBody(PARTNER.m, 'partner')]);
   buildPost();
   document.querySelectorAll('#quality button').forEach((b) => b.addEventListener('click', () => { G.qName = b.dataset.q; G.applyQuality(); }));
   $('timeBtn').addEventListener('click', () => { STATE.todTarget = STATE.todTarget > 0.5 ? 0 : 1; });
@@ -955,7 +974,8 @@ function boot() {
   $('endClose').addEventListener('click', () => Story.closeEnd());
   G.applyQuality();
   CAM.shot = titleShot; CAM.cut = true;
-  $('loading').classList.add('done');
+  // Keep the loading screen up until the character bodies are in (with a safety timeout).
+  Promise.race([bodies, new Promise((r) => setTimeout(r, 8000))]).then(() => { G.BOOT_MS.total = Math.round(performance.now()); $('loading').classList.add('done'); });
   $('begin').addEventListener('click', async () => {
     if (STATE.started || $('begin').disabled) return;
     $('begin').disabled = true;
@@ -965,12 +985,13 @@ function boot() {
     await wait(0.7);
     $('title').classList.add('hide');
     STATE.started = true;
+    document.body.classList.add('playing');
     Story.intro();
     await wait(0.9);
     $('fade').classList.remove('on');
   });
   requestAnimationFrame(frame);
-  window.DEMO = { G, STATE, PLAYER, PARTNER, CAM, SHOTS, Story, skipIntro() { $('title').classList.add('hide'); STATE.started = true; DLG.q.length = 0; if (DLG.cur) { const r = DLG.cur.res; DLG.cur = null; } STATE.busy = false; STATE.sceneShot = false; PLAYER.script = null; PARTNER.script = null; STATE.watchDoor = false; placeChar(PLAYER, 6.5, 8.5, Math.PI); placeChar(PARTNER, 5.8, 8.8, Math.PI); PARTNER.mode = 'follow'; releaseCamera(); CAM.cut = true; }, setQ(q) { G.qName = q; G.applyQuality(); }, placeChar, simPartner(dt, n) { for (let i = 0; i < n; i++) partnerAI(dt, 0); },
+  window.DEMO = { G, STATE, PLAYER, PARTNER, CAM, SHOTS, Story, skipIntro() { $('title').classList.add('hide'); STATE.started = true; document.body.classList.add('playing'); DLG.q.length = 0; if (DLG.cur) { const r = DLG.cur.res; DLG.cur = null; } STATE.busy = false; STATE.sceneShot = false; PLAYER.script = null; PARTNER.script = null; STATE.watchDoor = false; placeChar(PLAYER, 6.5, 8.5, Math.PI); placeChar(PARTNER, 5.8, 8.8, Math.PI); PARTNER.mode = 'follow'; releaseCamera(); CAM.cut = true; }, setQ(q) { G.qName = q; G.applyQuality(); }, placeChar, simPartner(dt, n) { for (let i = 0; i < n; i++) partnerAI(dt, 0); },
     // Testing aid: run the game for `sec` seconds of game time without rendering.
     async advance(sec, dt = 1 / 30) { for (let k = 0; k < sec / dt; k++) { simulate(dt); await new Promise((r) => setTimeout(r, 0)); } }, keys, press(code) { pressed.add(code); keys.add(code); }, release(code) { keys.delete(code); }, STATE_DLG: DLG };
 }

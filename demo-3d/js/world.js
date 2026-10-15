@@ -217,17 +217,20 @@ G.buildMountains = () => {
 };
 
 /* ---------------- forest ---------------- */
-function pineGeometry(seed) {
+function pineGeometry(seed, lod = 0) {
+  // lod 0: full detail for trees near the clearing; lod 1: a low-poly stand-in for distant trees.
   const r = G.seeded(seed), parts = [];
+  const radial = lod ? 7 : 18, hseg = lod ? 1 : 3;
   const H = 1;   // unit height; instances scale it
   const green = (t) => new THREE.Color().setHSL(0.39 + r() * 0.03, 0.32, 0.1 + t * 0.06);
   const snow = new THREE.Color('#eef3f8');
-  parts.push({ geo: new THREE.CylinderGeometry(0.012, 0.028, 0.25, 6), mat: G.mtx(0, 0.12, 0), color: new THREE.Color('#3a2a20') });
-  const tiers = 11 + Math.floor(r() * 4);
+  parts.push({ geo: new THREE.CylinderGeometry(0.012, 0.028, 0.25, lod ? 4 : 6, 1, !!lod), mat: G.mtx(0, 0.12, 0), color: new THREE.Color('#3a2a20') });
+  const tiers0 = 11 + Math.floor(r() * 4);
+  const tiers = lod ? 6 : tiers0;
   for (let i = 0; i < tiers; i++) {
     const t = i / (tiers - 1);
     const y = 0.1 + t * 0.84, rad = lerp(0.26, 0.035, Math.pow(t, 0.8)) * (0.9 + r() * 0.2), h = lerp(0.17, 0.1, t);
-    const cone = new THREE.ConeGeometry(rad, h, 18, 3, true);
+    const cone = new THREE.ConeGeometry(lod ? rad * 1.04 : rad, lod ? h * 1.5 : h, radial, hseg, true);
     const p = cone.attributes.position;
     for (let k = 0; k < p.count; k++) {
       const yy = p.getY(k);
@@ -237,6 +240,11 @@ function pineGeometry(seed) {
     const snowy = r() < 0.85;
     const base = green(t);
     const ph = r() * 10;
+    if (lod) {   // two rings per tier: green skirt, snow-dusted tip
+      const tipC = base.clone().lerp(snow, snowy ? 0.55 : 0.15);
+      parts.push({ geo: cone, mat: G.mtx(0, y, 0, 1, 1, 1, r() * 6), color: (v) => (v.y > y + h * 0.2 ? tipC : base) });
+      continue;
+    }
     parts.push({ geo: cone, mat: G.mtx(0, y, 0, 1, 1, 1, r() * 6), color: (v, n) => { const patch = Math.sin(Math.atan2(v.z, v.x) * 4 + ph) * 0.5 + 0.5; const up = (v.y - (y - h * 0.5)) / h; return snowy && n.y > 0.25 && up > 0.25 + patch * 0.45 ? snow : base.clone().offsetHSL(0, 0, (up - 0.5) * 0.05); } });
   }
   return G.merge(parts);
@@ -257,11 +265,16 @@ G.buildForest = () => {
       #endif`);
   };
   mat.customProgramCacheKey = () => 'pine-sway';
+  // Trees within NEAR_R of the clearing get full detail and cast shadows; the rest are low-poly and shadowless.
+  const NEAR_R = 34;
   const variants = [pineGeometry(3), pineGeometry(17), pineGeometry(42)];
-  const lists = [[], [], []];
+  const farVariants = [pineGeometry(3, 1), pineGeometry(17, 1), pineGeometry(42, 1)];
+  const lists = [[], [], []], farLists = [[], [], []];
+  const near = (m) => { const e = m.elements; return Math.hypot(e[12] - CLEAR.x, e[14] - CLEAR.z) < NEAR_R; };
   const want = Math.round(520 * G.Q.trees);
   let tries = 0;
-  while (lists[0].length + lists[1].length + lists[2].length < want && tries++ < 20000) {
+  const total = () => lists.concat(farLists).reduce((n, l) => n + l.length, 0);
+  while (total() < want && tries++ < 20000) {
     const a = r() * Math.PI * 2, d = 13 + Math.pow(r(), 0.7) * 95;
     const x = CLEAR.x + Math.cos(a) * d * 1.1, z = CLEAR.z + Math.sin(a) * d;
     if (rectDist(x, z, -5, -6, 16, 10) < 1) continue;
@@ -272,20 +285,25 @@ G.buildForest = () => {
     if (z > 8 && Math.abs(x - pathX(Math.min(z, PATH_END))) < 7 + (z - 8) * 0.25 && z < LAKE.z + 6) continue;
     const s = 7 + r() * 9;
     const m = G.mtx(x, terrainH(x, z) - 0.15, z, s * (0.85 + r() * 0.3), s, s * (0.85 + r() * 0.3), r() * 6);
-    lists[Math.floor(r() * 3)].push(m);
+    const vi = Math.floor(r() * 3);
+    (near(m) ? lists : farLists)[vi].push(m);
   }
   // A few big framing pines close to the cabin, as in the reference shots.
   for (const [x, z, s] of [[-3.6, 9, 15], [15, 8.5, 14], [-4.5, -2, 17], [16, -1, 16], [-0.5, 23, 12], [13.5, 24, 13], [-3, 16, 11]]) lists[0].push(G.mtx(x, terrainH(x, z) - 0.15, z, s, s, s, r() * 6));
-  variants.forEach((g, i) => {
-    const im = new THREE.InstancedMesh(g, mat, lists[i].length);
-    lists[i].forEach((m, k) => im.setMatrixAt(k, m));
-    im.castShadow = true; im.receiveShadow = true;
+  const place = (geos, ls, shadows) => geos.forEach((g, i) => {
+    if (!ls[i].length) return;
+    const im = new THREE.InstancedMesh(g, mat, ls[i].length);
+    ls[i].forEach((m, k) => im.setMatrixAt(k, m));
+    im.castShadow = shadows; im.receiveShadow = true;
+    G.fitInstanceBounds(im);
     world.add(im);
   });
+  place(variants, lists, true);
+  place(farVariants, farLists, false);
   // Snow-covered shrubs and drifts.
   // Indexed sphere so vertex normals are shared and the drifts read as soft, rounded snow
   // (an icosahedron is non-indexed, which gave every face its own normal: faceted "rocks").
-  const shrubG = new THREE.SphereGeometry(1, 22, 14);
+  const shrubG = new THREE.SphereGeometry(1, 14, 9);
   const sp = shrubG.attributes.position;
   for (let i = 0; i < sp.count; i++) { const x = sp.getX(i), y = sp.getY(i), z = sp.getZ(i); const k = 1 + G.simplex.noise(x * 1.6, z * 1.6 + y) * 0.14; sp.setXYZ(i, x * k, y < 0 ? y * 0.3 : y * k, z * k); }
   shrubG.computeVertexNormals();
@@ -301,6 +319,7 @@ G.buildForest = () => {
   const dm = new THREE.InstancedMesh(shrubG, MAT.snow, drifts.length);
   drifts.forEach((m, k) => dm.setMatrixAt(k, m));
   dm.castShadow = true; dm.receiveShadow = true;
+  G.fitInstanceBounds(dm);
   world.add(dm);
 };
 
@@ -476,6 +495,7 @@ G.buildCabin = () => {
     const r = G.seeded(s > 0 ? 5 : 6), icM = G.std({ color: '#dcebf7', roughness: 0.08, transparent: true, opacity: 0.85, env: 1.4 });
     const cnt = 46, im = new THREE.InstancedMesh(ic, icM, cnt);
     for (let i = 0; i < cnt; i++) { const l = 0.08 + Math.pow(r(), 2.2) * 0.45; im.setMatrixAt(i, G.mtx(RX0 + 0.2 + r() * (rw - 0.4), ey - l / 2 + 0.02, ez + (r() - 0.5) * 0.06, 1, l, 1, 0, Math.PI)); }
+    G.fitInstanceBounds(im);
     world.add(im);
   }
   // Ridge cap snow.

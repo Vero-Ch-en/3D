@@ -72,7 +72,7 @@
   #fade { position: fixed; inset: 0; background: #000; opacity: 0; pointer-events: none; transition: opacity 0.6s; z-index: 16; }
   #fade.on { opacity: 1; }
   #touch { display: none; }
-  @media (pointer: coarse) { #touch { display: block; } .keys { display: none; } #prompt { bottom: calc(120px + env(safe-area-inset-bottom, 0px)); } #subs { bottom: calc(130px + env(safe-area-inset-bottom, 0px)); } }
+  @media (pointer: coarse) { body.playing #touch { display: block; } .keys { display: none; } #prompt { bottom: calc(120px + env(safe-area-inset-bottom, 0px)); } #subs { bottom: calc(130px + env(safe-area-inset-bottom, 0px)); } }
   #stickzone { position: fixed; left: 0; bottom: 0; width: 50%; height: 55%; z-index: 9; touch-action: none; }
   #stick { position: fixed; width: 110px; height: 110px; border-radius: 50%; border: 1px solid var(--line); background: rgba(244,233,216,0.05); opacity: 0; transition: opacity 0.15s; }
   #stick.on { opacity: 1; }
@@ -132,7 +132,6 @@
 <script src="lib/LuminosityHighPassShader.js"></script>
 <script src="lib/SSAOShader.js"></script>
 <script src="lib/FXAAShader.js"></script>
-<script src="lib/GammaCorrectionShader.js"></script>
 <script src="lib/BokehShader.js"></script>
 <script src="lib/EffectComposer.js"></script>
 <script src="lib/RenderPass.js"></script>
@@ -141,7 +140,6 @@
 <script src="lib/SSAOPass.js"></script>
 <script src="lib/BokehPass.js"></script>
 <script src="lib/GLTFLoader.js"></script>
-<script src="js/models.js"></script>
 <script src="js/core.js"></script>
 <script src="js/world.js"></script>
 <script src="js/interior.js"></script>
