@@ -1,6 +1,7 @@
 'use strict';
 /* =========================================================================
- * Interior: bedroom (x 0–5) and living room (x 5–11). Lamps, fire, cake.
+ * Interior: bedroom (x 0–5), living room (x 5–11) and kitchen (x 11–15).
+ * Lamps, fire, cake, breakfast. Story-aware interactions live in story.js.
  * ========================================================================= */
 (() => {
 const { MAT, TX, box, cyl, sph, lerp } = G;
@@ -91,11 +92,14 @@ G.buildInterior = () => {
   box(1.7, 0.22, 2.0, MAT.linen, bx, 0.41, 1.22, { r: 0.09, seg: 4 });
   const p1 = box(0.66, 0.16, 0.42, MAT.linen, bx - 0.44, 0.6, 0.48, { r: 0.08, seg: 4 }); p1.rotation.x = -0.25;
   const p2 = box(0.66, 0.16, 0.42, MAT.linen, bx + 0.44, 0.6, 0.48, { r: 0.08, seg: 4 }); p2.rotation.x = -0.2;
-  box(0.5, 0.2, 0.18, MAT.knitCream, bx + 0.25, 0.62, 0.72, { r: 0.08, seg: 4 }).rotation.set(-0.4, 0.2, 0);
-  const duvet = box(1.76, 0.12, 1.5, MAT.knitCream, bx, 0.56, 1.5, { r: 0.06, seg: 4 }); duvet.scale.y = 1;
-  box(1.84, 0.06, 0.6, MAT.plaid, bx, 0.64, 1.95, { r: 0.03 }).rotation.z = 0.01;
-  // Plush bunny.
-  const bun = new THREE.Group(); bun.position.set(bx + 0.62, 0.6, 0.8); bun.rotation.y = -0.4; W.add(bun);
+  const bolster = box(0.5, 0.2, 0.18, MAT.knitCream, bx + 0.25, 0.62, 0.72, { r: 0.08, seg: 4 }); bolster.rotation.set(-0.4, 0.2, 0);
+  const duvet = box(1.76, 0.12, 1.5, MAT.knitCream, bx, 0.56, 1.5, { r: 0.06, seg: 4 });
+  const throwB = box(1.84, 0.06, 0.6, MAT.plaid, bx, 0.64, 1.95, { r: 0.03 }); throwB.rotation.z = 0.01;
+  // Made bed vs slept-in bed: the tidy duvet swaps for a rumpled one draped over whoever is in it.
+  for (const m of [duvet, throwB, bolster]) m.userData.dynamic = true;
+  G.BED = { x: bx, z: 1.2, top: 0.52, made: [duvet, throwB, bolster], cover: bedCover(bx), L: bx - 0.38, R: bx + 0.4 };
+  // Plush bunny, keeping watch from the pillow corner.
+  const bun = new THREE.Group(); bun.position.set(bx + 0.8, 0.6, 0.52); bun.rotation.y = -0.5; W.add(bun);
   const fluff = G.std({ color: '#f2ece4', roughness: 1, map: TX.knitCream, bumpMap: TX.knitB, bumpScale: 0.002 });
   sph(0.075, fluff, 0, 0.06, 0, [1, 1.05, 0.9], bun); sph(0.06, fluff, 0, 0.17, 0.02, [1, 0.95, 0.95], bun);
   for (const s of [-1, 1]) { sph(0.022, fluff, s * 0.025, 0.27, 0.0, [0.8, 2.4, 0.5], bun); sph(0.008, MAT.darkMetal, s * 0.022, 0.18, 0.07, [1, 1, 1], bun, 8); }
@@ -189,13 +193,169 @@ G.buildInterior = () => {
   bookshelf(10.72, 3.95, 0.34, 1.05, 2.1, Math.PI / 2);
   floorLamp(10.35, 0.55);
   floorLamp(6.15, 3.55);
-  plant(10.4, 4.2, 1.2);
+  plant(10.4, 4.2, 1.2);   // Basil (not basil)
   const rug2 = G.add(new THREE.Mesh(new THREE.PlaneGeometry(2.9, 2.0), MAT.rug), W, false, true); rug2.rotation.x = -Math.PI / 2; rug2.position.set(8, 0.006, 2.2);
   // Coats by the door.
   box(0.6, 0.05, 0.08, MAT.darkWood, 5.5, 1.75, 4.45);
   const coat = G.std({ map: TX.jersey, color: '#5c5f63', roughness: 1 });
   box(0.3, 0.75, 0.12, coat, 5.38, 1.35, 4.38, { r: 0.05 }); box(0.28, 0.7, 0.12, G.std({ map: TX.knitCream, roughness: 1 }), 5.65, 1.38, 4.38, { r: 0.05 });
+  buildKitchen();
 };
+
+/* ===== Bed cover: a draped blanket shaped over whoever is lying in the bed ===== */
+function bedCover(bx) {
+  const g = new THREE.PlaneGeometry(2.1, 1.76, 44, 36); g.rotateX(-Math.PI / 2);
+  const mat = MAT.knitCream.clone(); mat.side = THREE.DoubleSide; mat.map = G.rep(TX.knitCream, 3.2, 2.6); mat.bumpMap = G.rep(TX.knitB, 3.2, 2.6); G.MATS.push(mat);
+  const m = new THREE.Mesh(g, mat); m.position.set(bx, 0, 1.42); m.castShadow = m.receiveShadow = true;
+  m.visible = false; m.userData.dynamic = true; G.world.add(m);
+  m.userData.base = Float32Array.from(g.attributes.position.array);
+  return m;
+}
+/* who: { L: true, R: true } for the bodies under it; shift moves the whole blanket toward one side (−1 left, +1 right). */
+G.shapeBed = (who, shift = 0) => {
+  const B = G.BED, m = B.cover, p = m.geometry.attributes.position, base = m.userData.base;
+  const bumps = [];
+  if (who.L) bumps.push(B.L - B.x); if (who.R) bumps.push(B.R - B.x);
+  for (let i = 0; i < p.count; i++) {
+    const x0 = base[i * 3] + shift * 0.32, z = base[i * 3 + 2], wz = z + 1.42;   // world z
+    let y = 0.6;
+    // Over each body: highest at the chest (z ≈ 1), lower over the legs, as the bodies lie head-up.
+    for (const b of bumps) { const dx = x0 - b; const along = G.smooth(0.62, 0.95, wz) * (1 - G.smooth(1.3, 2.3, wz) * 0.55); y += Math.exp(-dx * dx / 0.055) * (0.12 + 0.2 * along); }
+    y += Math.sin(x0 * 9 + z * 5) * 0.008 + Math.cos(z * 11 - x0 * 3) * 0.006;
+    // Off the mattress the blanket hangs down the sides and the foot.
+    const ex = Math.abs(x0) - 0.9, ez = wz - 2.26;
+    if (ex > 0) y -= Math.min(0.38, ex * 2.6);
+    if (ez > 0) y -= Math.min(0.38, ez * 2.6);
+    if (wz < 0.74) y -= (0.74 - wz) * 0.8;   // turned down at the top
+    p.setXYZ(i, x0, y, z);
+  }
+  p.needsUpdate = true; m.geometry.computeVertexNormals(); m.geometry.computeBoundingSphere();
+};
+G.bedMade = (made) => { G.BED.made.forEach((o) => { o.visible = made; }); G.BED.cover.visible = !made; };
+
+/* ===== Kitchen ===== */
+function tileTex() {
+  return G.canvasTex(0, null, { w: 256, h: 128, draw: (c, w, h) => {
+    c.fillStyle = '#cfc8bc'; c.fillRect(0, 0, w, h);
+    const tw = w / 4, th = h / 4;
+    for (let j = 0; j < 4; j++) for (let i = -1; i < 5; i++) {
+      const x = i * tw + (j % 2 ? tw / 2 : 0), y = j * th;
+      const l = 236 + ((i * 7 + j * 3) % 5) * 3;
+      c.fillStyle = `rgb(${l},${l - 4},${l - 12})`; c.fillRect(x + 2, y + 2, tw - 4, th - 4);
+    }
+  } });
+}
+function noteTex(lines, o = {}) {
+  return G.canvasTex(0, null, { w: 256, h: 256, draw: (c, w, h) => {
+    c.fillStyle = o.bg || '#fff6c8'; c.fillRect(0, 0, w, h);
+    c.fillStyle = o.ink || '#3a3550'; c.textAlign = 'center';
+    lines.forEach((l, i) => { c.font = `${l.size || 34}px "Comic Sans MS", "Marker Felt", cursive`; c.fillStyle = l.color || o.ink || '#3a3550'; c.fillText(l.t, w / 2, 70 + i * (l.gap || 52)); });
+  } });
+}
+G.noteTex = noteTex;
+function buildKitchen() {
+  const W = G.world, K = (G.KITCHEN = {});
+  const paint = G.std({ map: TX.boards, color: '#8fa08a', roughness: 0.6, env: 0.3 });
+  const block = G.std({ map: TX.floor, color: '#d8b48a', roughness: 0.5, env: 0.4 });
+  const enamel = (c) => G.shared({ color: c, roughness: 0.25, env: 0.9 });
+  // Base cabinets along the north wall with a butcher-block top and a tiled splash.
+  const cx0 = 11.18, cx1 = 13.72, ccx = (cx0 + cx1) / 2, cw = cx1 - cx0;
+  box(cw, 0.84, 0.58, paint, ccx, 0.42, 0.4, { coll: true, r: 0.01 });
+  box(cw + 0.04, 0.12, 0.5, G.shared({ color: '#2e2620', roughness: 0.9 }), ccx, 0.05, 0.37, { cast: false });   // toe kick
+  for (let x = cx0 + 0.62; x < cx1 - 0.1; x += 0.63) box(0.012, 0.66, 0.01, G.shared({ color: '#55604f', roughness: 0.8 }), x, 0.5, 0.695, { cast: false });
+  for (let x = cx0 + 0.31; x < cx1; x += 0.63) box(0.1, 0.018, 0.02, MAT.metal, x, 0.74, 0.705);
+  box(cw + 0.06, 0.05, 0.64, block, ccx, 0.865, 0.41, { r: 0.01 });
+  const splash = new THREE.Mesh(new THREE.PlaneGeometry(cw, 0.56), G.std({ map: G.rep(tileTex(), cw / 0.6, 1), roughness: 0.3, env: 0.7 }));
+  splash.position.set(ccx, 1.17, 0.113); W.add(splash); splash.receiveShadow = true;
+  // Open shelf with jars, mugs and a sprig of something green.
+  box(cw - 0.1, 0.04, 0.24, MAT.darkWood, ccx, 1.78, 0.24);
+  const r = G.seeded(61);
+  for (let x = cx0 + 0.15; x < cx1 - 0.1; x += 0.16 + r() * 0.08) {
+    if (r() < 0.55) { const h = 0.12 + r() * 0.1; cyl(0.045, 0.045, h, G.shared({ color: '#dfe6e0', roughness: 0.05, transparent: true, opacity: 0.5, env: 1.2 }), x, 1.8 + h / 2, 0.24); cyl(0.047, 0.047, 0.02, MAT.darkWood, x, 1.8 + h + 0.01, 0.24); }
+    else { cyl(0.04, 0.035, 0.09, enamel(['#c96a4a', '#efe7da', '#5d7a8c'][Math.floor(r() * 3)]), x, 1.845, 0.24, { seg: 14 }); }
+  }
+  // Kettle (enamel red), hob with a pan, sink and tap, toaster.
+  K.kettle = { x: 11.55, z: 0.36 };
+  const kg = new THREE.Group(); kg.position.set(11.55, 0.89, 0.36); W.add(kg);
+  cyl(0.075, 0.095, 0.17, enamel('#b9473a'), 0, 0.085, 0, { parent: kg, seg: 20 });
+  cyl(0.03, 0.06, 0.03, enamel('#b9473a'), 0, 0.185, 0, { parent: kg, seg: 16 });
+  sph(0.018, MAT.darkMetal, 0, 0.21, 0, [1, 1, 1], kg, 10);
+  const spout = cyl(0.012, 0.02, 0.12, enamel('#b9473a'), 0.1, 0.11, 0, { parent: kg, seg: 8 }); spout.rotation.z = -0.9;
+  const hdl = new THREE.Mesh(new THREE.TorusGeometry(0.06, 0.012, 6, 16, Math.PI), MAT.darkMetal); hdl.position.set(0, 0.2, 0); kg.add(hdl);
+  K.kettleG = kg;
+  K.stove = { x: 12.35, z: 0.38 };
+  box(0.62, 0.02, 0.5, G.shared({ color: '#1e1c1c', roughness: 0.3, metalness: 0.4, env: 0.8 }), 12.35, 0.895, 0.39, { cast: false });
+  for (const [dx, dz, rr] of [[-0.15, -0.1, 0.08], [0.15, -0.1, 0.06], [-0.15, 0.12, 0.06], [0.15, 0.12, 0.09]]) cyl(rr, rr, 0.008, G.shared({ color: '#3a3330', roughness: 0.6, metalness: 0.5 }), 12.35 + dx, 0.905, 0.39 + dz, { seg: 20, cast: false });
+  K.burner = new THREE.Mesh(new THREE.RingGeometry(0.05, 0.075, 24), new THREE.MeshBasicMaterial({ color: '#ff6a2a', transparent: true, opacity: 0 }));
+  K.burner.rotation.x = -Math.PI / 2; K.burner.position.set(12.5, 0.911, 0.51); W.add(K.burner); K.burner.userData.dynamic = true;
+  const pan = new THREE.Group(); pan.position.set(12.5, 0.91, 0.51); W.add(pan); pan.userData.dynamic = true;
+  cyl(0.13, 0.12, 0.035, G.shared({ color: '#2a2725', roughness: 0.35, metalness: 0.7, env: 0.8 }), 0, 0.02, 0, { parent: pan, seg: 24 });
+  box(0.2, 0.018, 0.035, MAT.darkWood, 0.22, 0.03, 0.06, { parent: pan }).rotation.y = -0.3;
+  K.pancakeInPan = cyl(0.09, 0.09, 0.012, G.shared({ color: '#e0b070', roughness: 0.7 }), 0, 0.04, 0, { parent: pan, seg: 20 });
+  K.pancakeInPan.visible = false; K.pan = pan;
+  for (let i = 0; i < 4; i++) cyl(0.022, 0.022, 0.03, MAT.darkMetal, 12.12 + i * 0.15, 0.62, 0.7, { seg: 10 }).rotation.x = Math.PI / 2;   // oven knobs
+  box(0.52, 0.26, 0.012, G.shared({ color: '#141210', roughness: 0.1, env: 1 }), 12.35, 0.4, 0.697, { cast: false });   // oven window
+  K.sink = { x: 13.05, z: 0.38 };
+  box(0.5, 0.012, 0.38, G.shared({ color: '#9aa0a4', roughness: 0.2, metalness: 0.9, env: 1 }), 13.05, 0.892, 0.4, { cast: false });
+  const tap = cyl(0.014, 0.014, 0.3, MAT.metal, 13.05, 1.04, 0.2, { seg: 8 });
+  const tapA = cyl(0.012, 0.012, 0.16, MAT.metal, 13.05, 1.18, 0.27, { seg: 8 }); tapA.rotation.x = Math.PI / 2;
+  K.toaster = { x: 13.48, z: 0.36 };
+  box(0.26, 0.17, 0.15, enamel('#e9e1d2'), 13.48, 0.975, 0.36, { r: 0.04, seg: 3 });
+  for (const dz of [-0.03, 0.03]) box(0.18, 0.01, 0.018, G.shared({ color: '#141210', roughness: 0.6 }), 13.48, 1.062, 0.36 + dz, { cast: false });
+  // Fridge in the corner, covered in magnets and one very important drawing.
+  K.fridge = { x: 14.55, z: 0.45 };
+  box(0.74, 1.82, 0.68, enamel('#ece6da'), 14.55, 0.91, 0.43, { coll: true, cam: true, r: 0.05, seg: 3 });
+  box(0.025, 0.4, 0.03, MAT.metal, 14.25, 1.2, 0.785); box(0.025, 0.3, 0.03, MAT.metal, 14.25, 0.55, 0.785);
+  box(0.7, 0.01, 0.01, G.shared({ color: '#b8b0a2', roughness: 0.6 }), 14.55, 0.92, 0.772, { cast: false });
+  const drawing = new THREE.Mesh(new THREE.PlaneGeometry(0.22, 0.22), G.std({ map: noteTex([{ t: '☃', size: 110 }, { t: 'us', size: 30, gap: 90 }], { bg: '#fdfbf4' }), roughness: 0.9 }));
+  drawing.position.set(14.62, 1.35, 0.776); drawing.rotation.z = 0.06; W.add(drawing);
+  for (const [x, y, c] of [[14.4, 1.6, '#c94a3a'], [14.75, 1.1, '#4a7ac9'], [14.48, 0.75, '#e0b040']]) sph(0.018, enamel(c), x, y, 0.785, [1, 1, 0.5], W, 10);
+  // Table and three chairs: two side by side facing the window wall, one across.
+  K.table = { x: 13.0, z: 2.95, top: 0.76 };
+  box(1.25, 0.05, 0.8, MAT.wood, 13.0, 0.74, 2.95, { r: 0.015 });
+  for (const [a, b] of [[-0.56, -0.34], [0.56, -0.34], [-0.56, 0.34], [0.56, 0.34]]) box(0.05, 0.72, 0.05, MAT.wood, 13.0 + a, 0.36, 2.95 + b);
+  G.COLL.push({ x0: 12.36, z0: 2.53, x1: 13.64, z1: 3.37 });
+  const chair = (x, z, ry) => {
+    const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = ry; W.add(g);
+    box(0.42, 0.04, 0.4, MAT.darkWood, 0, 0.45, 0, { parent: g, r: 0.01 });
+    for (const [a, b] of [[-0.18, -0.17], [0.18, -0.17], [-0.18, 0.17], [0.18, 0.17]]) box(0.035, 0.45, 0.035, MAT.darkWood, a, 0.225, b, { parent: g });
+    for (const a of [-0.18, 0.18]) box(0.035, 0.5, 0.035, MAT.darkWood, a, 0.72, -0.18, { parent: g });
+    box(0.4, 0.12, 0.03, MAT.darkWood, 0, 0.9, -0.18, { parent: g });
+    box(0.36, 0.035, 0.34, MAT.plaid, 0, 0.485, 0.01, { parent: g, r: 0.012 });
+    return g;
+  };
+  // ry = π: the seat faces −z (toward the table from the window side).
+  K.chairs = { A: { x: 12.72, z: 3.58, yaw: Math.PI }, B: { x: 13.3, z: 3.58, yaw: Math.PI }, C: { x: 13.0, z: 2.3, yaw: 0 } };
+  for (const c of Object.values(K.chairs)) { chair(c.x, c.z, c.yaw === 0 ? 0 : Math.PI); G.COLL.push({ x0: c.x - 0.2, z0: c.z - 0.19, x1: c.x + 0.2, z1: c.z + 0.19 }); c.seatY = 0.49; }
+  // Breakfast things, shown as they're made.
+  const plateM = enamel('#f3efe6'), cake = G.shared({ color: '#d9a35e', roughness: 0.7 }), burnt = G.shared({ color: '#5a3a22', roughness: 0.9 });
+  K.plates = [];
+  for (const c of [K.chairs.A, K.chairs.B, K.chairs.C]) {
+    const g = new THREE.Group(); g.position.set(c.x, 0.765, c.z + (c.yaw === 0 ? 0.33 : -0.33)); g.visible = false; W.add(g);
+    cyl(0.12, 0.1, 0.014, plateM, 0, 0.007, 0, { parent: g, seg: 24 });
+    const stack = [];
+    for (let i = 0; i < 3; i++) stack.push(cyl(0.085 - i * 0.004, 0.085, 0.014, cake, (i - 1) * 0.004, 0.021 + i * 0.015, 0, { parent: g, seg: 20 }));
+    const fork = box(0.012, 0.006, 0.16, MAT.metal, 0.15, 0.01, 0, { parent: g });
+    K.plates.push({ g, stack, chair: c, fork, cakeMat: cake, burntMat: burnt });
+  }
+  K.mugs = [];
+  for (const [x, z] of [[12.55, 2.98], [13.45, 3.0]]) { const g = new THREE.Group(); g.position.set(x, 0.765, z); g.visible = false; W.add(g); cyl(0.04, 0.036, 0.09, enamel('#efe7da'), 0, 0.045, 0, { parent: g, seg: 16 }); cyl(0.036, 0.036, 0.004, G.shared({ color: '#7a4a2a', roughness: 0.2 }), 0, 0.082, 0, { parent: g, seg: 14 }); K.mugs.push(g); }
+  // Snack cupboard by the doorway, with its sign.
+  K.cupboard = { x: 11.42, z: 4.12 };
+  box(0.6, 1.9, 0.42, paint, 11.42, 0.95, 4.26, { coll: true, cam: true, r: 0.01 });
+  box(0.012, 1.7, 0.01, G.shared({ color: '#55604f', roughness: 0.8 }), 11.42, 0.95, 4.045, { cast: false });
+  const note = new THREE.Mesh(new THREE.PlaneGeometry(0.17, 0.17), G.std({ map: noteTex([{ t: 'property', size: 30 }, { t: 'of me.', size: 30, gap: 44 }, { t: 'NOT THE', size: 34, color: '#b8322a', gap: 56 }, { t: 'GIANT', size: 40, color: '#b8322a', gap: 46 }]), roughness: 0.9 }));
+  note.position.set(11.52, 1.3, 4.044); note.rotation.set(0, Math.PI, -0.05); W.add(note);
+  // Pendant over the table, a runner rug, herbs on the sill.
+  const pend = new THREE.Group(); pend.position.set(13.0, 2.7, 2.95); W.add(pend);
+  cyl(0.006, 0.006, 0.7, MAT.darkMetal, 0, -0.35, 0, { parent: pend, seg: 6 });
+  const shadeMat = G.std({ color: '#2c3a34', roughness: 0.5, metalness: 0.3, emissive: '#ffb060', emissiveIntensity: 0, side: THREE.DoubleSide });
+  const shade = cyl(0.05, 0.22, 0.18, shadeMat, 0, -0.78, 0, { parent: pend, open: true, cast: false });
+  const pl = new THREE.PointLight('#ffb062', 0, 6, 2); pl.position.set(0, -0.85, 0); pend.add(pl);
+  LAMPS.push({ g: pend, light: pl, shade, on: true, power: 6, flick: 1 }); K.pendant = LAMPS[LAMPS.length - 1];
+  const runner = G.add(new THREE.Mesh(new THREE.PlaneGeometry(2.3, 0.7), MAT.rug), W, false, true); runner.rotation.x = -Math.PI / 2; runner.position.set(12.45, 0.006, 1.2);
+  for (let i = 0; i < 3; i++) { const x = 12.5 + i * 0.32; cyl(0.06, 0.05, 0.1, MAT.pot, x, 0.9, 4.47, { seg: 14 }); for (let k = 0; k < 6; k++) { const lf = sph(0.03, MAT.leaf, x + Math.sin(k * 2.1) * 0.03, 0.97 + (k % 3) * 0.025, 4.47 + Math.cos(k * 2.1) * 0.02, [0.5, 1.2, 0.3], W, 8); lf.rotation.z = Math.sin(k) * 0.6; } }
+}
 
 function plant(x, z, s = 1) {
   cyl(0.15 * s, 0.12 * s, 0.32 * s, MAT.pot, x, 0.16 * s, z, { seg: 18 });
@@ -233,7 +393,7 @@ function bookshelf(x, z, w, d, h, ry) {
   G.INTER.push({ id: 'shelf' + x, pos: [x, 1, z], r: 1.2, label: 'Bookshelf', act: () => G.say(null, '(Paperbacks with cracked spines, a jar of sea glass, and a candle that smells like pine.)') });
 }
 function buildCake(x, y, z) {
-  const g = new THREE.Group(); g.position.set(x, y, z); G.world.add(g);
+  const g = new THREE.Group(); g.position.set(x, y, z); G.world.add(g); g.userData.dynamic = true;   // hidden until the evening
   cyl(0.19, 0.19, 0.012, MAT.ceramic, 0, 0.006, 0, { parent: g, seg: 32 });
   const sponge = G.std({ color: '#f3e3cf', roughness: 0.7 });
   cyl(0.15, 0.15, 0.13, sponge, 0, 0.077, 0, { parent: g, seg: 32 });

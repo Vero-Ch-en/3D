@@ -170,7 +170,7 @@ function buildWindowLight() {
   WINPOOL = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0.3, polygonOffset: true, polygonOffsetFactor: -3 });
   // [window centre along the wall, wall coordinate, direction out (+1/−1), axis of the wall, width, length]
   // The porch window's patch stops at the deck edge so it doesn't hang in the air over the snow.
-  const W = [[2.4, 4.6, 1, 'x', 1.6, 2.6], [9.4, 4.6, 1, 'x', 1.6, 1.7], [2.25, 0, -1, 'z', 1.5, 2.6], [2.3, 11, 1, 'z', 1.8, 2.6]];
+  const W = [[2.4, 4.6, 1, 'x', 1.6, 2.6], [9.4, 4.6, 1, 'x', 1.6, 1.7], [2.25, 0, -1, 'z', 1.5, 2.6], [2.1, 15, 1, 'z', 1.4, 2.6], [13, 4.6, 1, 'x', 1.6, 2.6]];
   for (const [a, c, out, axis, wdt, len] of W) {
     const m = new THREE.Mesh(new THREE.PlaneGeometry(wdt * 1.15, len), WINPOOL);
     m.rotation.x = -Math.PI / 2;
@@ -194,6 +194,6 @@ G.updateFX = (dt, t) => {
     DUST.material.uniforms.uTime.value = t; DUST.material.uniforms.uPx.value = px / 900;
     DUST.material.uniforms.uVis.value = G.damp(DUST.material.uniforms.uVis.value, camIn ? 1 : 0, 2, dt);
   }
-  if (WINPOOL) WINPOOL.opacity = lerp(0.18, 0.65, G.STATE.tod);
+  if (WINPOOL) WINPOOL.opacity = lerp(0.18, 0.65, G.STATE.tod) * (1 - (G.STATE.day || 0));
 };
 })();

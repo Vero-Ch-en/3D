@@ -10,7 +10,7 @@ const SETTINGS = (G.SETTINGS = { volume: 0.8, muted: false, motion: (window.matc
 try { Object.assign(SETTINGS, JSON.parse(localStorage.getItem('cbs.base.settings') || '{}')); } catch (e) { /* storage unavailable */ }
 const saveSettings = () => { try { localStorage.setItem('cbs.base.settings', JSON.stringify(SETTINGS)); } catch (e) { /* ignore */ } };
 G.MOTION = SETTINGS.motion === 'reduced' ? 0 : 1;   // scales handheld sway, step bob and the run zoom
-const STATE = (G.STATE = { started: false, tod: 0, todTarget: 0, cuddled: false, cakeDone: false, porchDone: false, busy: false });
+const STATE = (G.STATE = { started: false, tod: 0, todTarget: 0, day: 0, dayTarget: 0, snow: 1, snowTarget: 1, cuddled: false, cakeDone: false, porchDone: false, busy: false });
 // Wind: a slow gust value (0..1) shared by snowfall, tree sway and the wind sound.
 const WIND = (G.WIND = { gust: 0.3, drift: 0, t: 0 });
 function updateWind(dt) {
@@ -86,6 +86,18 @@ G.Audio = (() => {
       return at;
     },
     chime() { bell(1046.5, 0, 0.03); bell(1568, 0.09, 0.025); },
+    // A winter bird somewhere outside: two or three quick falling notes, muffled by the walls when you're in.
+    chirp() {
+      if (!ctx) return; const n = 2 + Math.floor(Math.random() * 2), f0 = 3200 + Math.random() * 1400;
+      for (let i = 0; i < n; i++) { const t = ctx.currentTime + i * 0.13, o = ctx.createOscillator(), g = ctx.createGain(); o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f0 * 0.7, t + 0.08); g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.012, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.1); o.connect(g); g.connect(outF); o.start(t); o.stop(t + 0.12); }
+    },
+    // Batter in a hot pan.
+    sizzle(on) {
+      if (!ctx) return;
+      if (on && !this._sz) { const s = noise(), bf = ctx.createBiquadFilter(); bf.type = 'highpass'; bf.frequency.value = 2500; const g = ctx.createGain(); g.gain.value = 0; g.gain.setTargetAtTime(0.03, ctx.currentTime, 0.3); s.connect(bf); bf.connect(g); g.connect(master); s.start(); this._sz = { s, g }; }
+      if (!on && this._sz) { const z = this._sz; this._sz = null; z.g.gain.setTargetAtTime(0, ctx.currentTime, 0.3); z.s.stop(ctx.currentTime + 1.5); }
+    },
+    flip() { burst(0.08, 900, 0.05, 'bandpass', 1.5); tone(220, 0.05, 0.02, 0.05); },
   };
 })();
 
@@ -102,30 +114,43 @@ const pathLights = [new THREE.PointLight('#ffa860', 0, 6, 2), new THREE.PointLig
 pathLights.forEach((l) => G.scene.add(l));
 const MOON_DIR = new THREE.Vector3(-0.25, 0.62, 0.74).normalize();
 const C = (h) => new THREE.Color(h);
+// [sunset, night]; DAY holds the daylight values each is blended toward by STATE.day.
 const PAL = {
   keyCol: [C('#ffac6a'), C('#8ea6e8')], keyI: [3.2, 0.7],
   sky: [C('#9a94c8'), C('#22325a')], gnd: [C('#f0d2d0'), C('#1a2238')], hemiI: [1.7, 0.75],
   fog: [C('#c08e9c'), C('#0c1324')], exposure: [0.92, 1.3],
 };
-const tmpC = new THREE.Color();
+const DAY = { keyCol: C('#fff0dc'), keyI: 3.3, sky: C('#b4c8e6'), gnd: C('#e8edf4'), hemiI: 1.3, hemiIn: 1.0, fog: C('#c6d3e4'), exposure: 0.74, glass: C('#a8b8c8'), skyIn: C('#f2e2c8'), gndIn: C('#c49a74') };
+const GLASS_WARM = C('#ffb46a'), tmpC = new THREE.Color();
 function updateLighting(t, dt, focus) {
   STATE.tod = damp(STATE.tod, STATE.todTarget, 0.5, dt);
-  const n = STATE.tod;
-  G.SKY_UNI.uTod.value = n; G.SKY_UNI.uTime.value = t;
+  STATE.day = damp(STATE.day, STATE.dayTarget, STATE.dayRate || 0.5, dt);
+  STATE.snow = damp(STATE.snow, STATE.snowTarget, 0.4, dt);
+  const n = STATE.tod, d = STATE.day, inside = G.inside(focus.x, focus.z);
+  STATE.inK = damp(STATE.inK || 0, inside ? 1 : 0, 3, dt);   // eases the indoor/outdoor exposure change at the door
+  const ik = STATE.inK * d;
+  G.SKY_UNI.uTod.value = n; G.SKY_UNI.uDay.value = d; G.SKY_UNI.uTime.value = t;
   G.sky.position.copy(G.camera.position);
-  const dir = G.SUN_SET.clone().lerp(MOON_DIR, n).normalize();
+  const dir = G.SUN_SET.clone().lerp(MOON_DIR, n).normalize().lerp(G.SUN_DAY, d).normalize();
+  G.SKY_UNI.uSun.value.copy(G.SUN_SET).lerp(G.SUN_DAY, d).normalize();
   key.position.copy(focus).addScaledVector(dir, 40);
   key.target.position.copy(focus);
-  key.color.copy(PAL.keyCol[0]).lerp(PAL.keyCol[1], n);
-  key.intensity = lerp(PAL.keyI[0], PAL.keyI[1], n);
-  hemi.color.copy(PAL.sky[0]).lerp(PAL.sky[1], n);
-  hemi.groundColor.copy(PAL.gnd[0]).lerp(PAL.gnd[1], n);
-  hemi.intensity = lerp(PAL.hemiI[0], PAL.hemiI[1], n) * (G.inside(focus.x, focus.z) ? 0.55 : 1);
-  G.scene.fog.color.copy(PAL.fog[0]).lerp(PAL.fog[1], n);
-  G.scene.fog.near = lerp(30, 20, n); G.scene.fog.far = lerp(230, 170, n);
-  G.renderer.toneMappingExposure = lerp(PAL.exposure[0], PAL.exposure[1], n);
-  const env = n > 0.5 ? G.envNight : G.envSunset; if (G.scene.environment !== env) G.scene.environment = env;
-  MAT.glassOut.emissiveIntensity = lerp(0.5, 1.0, n);
+  key.color.copy(PAL.keyCol[0]).lerp(PAL.keyCol[1], n).lerp(DAY.keyCol, d);
+  key.intensity = lerp(lerp(PAL.keyI[0], PAL.keyI[1], n), DAY.keyI, d);
+  // By day, indoors the fill is the warm light bouncing off pine boards rather than the blue sky.
+  hemi.color.copy(PAL.sky[0]).lerp(PAL.sky[1], n).lerp(DAY.sky, d).lerp(DAY.skyIn, ik * 0.8);
+  hemi.groundColor.copy(PAL.gnd[0]).lerp(PAL.gnd[1], n).lerp(DAY.gnd, d).lerp(DAY.gndIn, ik * 0.8);
+  // Indoors the sky fill drops (the room is lit by its lamps and fire), less so by day: light bounces in off the snow.
+  hemi.intensity = lerp(lerp(PAL.hemiI[0], PAL.hemiI[1], n), DAY.hemiI, d) * (inside ? lerp(0.55, DAY.hemiIn, d) : 1);
+  G.scene.fog.color.copy(PAL.fog[0]).lerp(PAL.fog[1], n).lerp(DAY.fog, d);
+  G.scene.fog.near = lerp(lerp(30, 20, n), 40, d); G.scene.fog.far = lerp(lerp(230, 170, n), 270, d);
+  if (STATE.fog) { G.scene.fog.near = STATE.fog.near; G.scene.fog.far = STATE.fog.far; }   // a scene's own fog (the prologue's)
+  G.renderer.toneMappingExposure = lerp(lerp(PAL.exposure[0], PAL.exposure[1], n), DAY.exposure, d) * (1 + ik * 0.3) * (STATE.exposureMul || 1);
+  const camIn0 = G.inside(G.camera.position.x, G.camera.position.z);
+  const env = d > 0.5 ? (camIn0 ? G.envRoom : G.envDay) : n > 0.5 ? G.envNight : G.envSunset; if (G.scene.environment !== env) G.scene.environment = env;
+  MAT.glassOut.emissiveIntensity = lerp(0.5, 1.0, n) * (1 - d);
+  MAT.glassOut.color.copy(GLASS_WARM).lerp(DAY.glass, d);
+  const dark = 1 - d;   // outdoor lanterns and the porch lamp are off by day
   // Interior lights
   const fl = 0.82 + Math.sin(t * 13) * 0.08 + Math.sin(t * 7.3) * 0.07 + Math.sin(t * 23.1) * 0.03;
   for (const L of G.LAMPS) { L.light.intensity = damp(L.light.intensity, L.on ? L.power * L.flick : 0, 14, dt); L.shade.material.emissiveIntensity = (L.light.intensity / L.power) * 1.2; }
@@ -139,12 +164,15 @@ function updateLighting(t, dt, focus) {
   G.CAKE.flames.forEach((f) => { f.visible = G.CAKE.lit; });
   G.MANTLE_LIGHT.intensity = 1.3 * fl;
   G.FLAMES.forEach((f, i) => { f.material.uniforms.uTime.value = t * 1.3 + i * 2.1; if (!F.planes.includes(f)) f.lookAt(G.camera.position); });
-  G.PORCH_LAMP.intensity = lerp(4, 7, n) * (0.95 + Math.sin(t * 9) * 0.03);
-  G.BENCH_LAMP.intensity = lerp(1.5, 3, n) * fl;
+  G.PORCH_LAMP.intensity = lerp(4, 7, n) * (0.95 + Math.sin(t * 9) * 0.03) * dark;
+  G.BENCH_LAMP.intensity = lerp(1.5, 3, n) * fl * dark;
   // Path lanterns: two real lights on the nearest, glow pools on the rest.
   const near = G.PATH_LIGHTS.slice().sort((a, b) => Math.hypot(a.x - focus.x, a.z - focus.z) - Math.hypot(b.x - focus.x, b.z - focus.z));
-  pathLights.forEach((l, i) => { const p = near[i]; if (!p) { l.intensity = 0; return; } l.position.set(p.x, p.y, p.z); l.intensity = lerp(2.5, 4, n); });
-  G.poolMat.opacity = lerp(0.5, 0.9, n);
+  // A scene can borrow the two lantern lights (the prologue's fair) instead of the path's nearest pair.
+  const spots = STATE.lightSpots || near;
+  pathLights.forEach((l, i) => { const p = spots[i]; if (!p) { l.intensity = 0; return; } l.position.set(p.x, p.y, p.z); l.intensity = STATE.lightSpots ? (p.i || 4) : lerp(2.5, 4, n) * dark; if (p.color) l.color.set(p.color); else l.color.set('#ffa860'); });
+  G.poolMat.opacity = lerp(0.5, 0.9, n) * dark;
+  if (G.updateLanterns) G.updateLanterns(t, dt);
   Audio_ambience(focus, dt, fp);
 }
 const tmpV = new THREE.Vector3();
@@ -158,8 +186,8 @@ function Audio_ambience(focus, dt, fp) {
 
 /* ---------- snow ---------- */
 let SNOW;
-const SNOW_DAY = new THREE.Color('#ffe2d0'), SNOW_NIGHT = new THREE.Color('#c8d4ff');
-const SMOKE_DAY = new THREE.Color('#c4a8b0'), SMOKE_NIGHT = new THREE.Color('#3a4058');
+const SNOW_DAY = new THREE.Color('#ffe2d0'), SNOW_NIGHT = new THREE.Color('#c8d4ff'), SNOW_NOON = new THREE.Color('#f6f8fc');
+const SMOKE_DAY = new THREE.Color('#c4a8b0'), SMOKE_NIGHT = new THREE.Color('#3a4058'), SMOKE_NOON = new THREE.Color('#d4d8e0');
 function snowSystem(n) {
   const pos = new Float32Array(n * 3), spd = new Float32Array(n);
   for (let i = 0; i < n; i++) { pos[i * 3] = rand(-18, 18); pos[i * 3 + 1] = rand(0, 12); pos[i * 3 + 2] = rand(-18, 18); spd[i] = rand(0.3, 0.8); }
@@ -178,7 +206,7 @@ function snowSystem(n) {
         p.x = mod(p.x - uCenter.x + 18.0, 36.0) - 18.0 + uCenter.x;
         p.z = mod(p.z - uCenter.z + 18.0, 36.0) - 18.0 + uCenter.z;
         p.y += uCenter.y - 3.0;
-        bool roof = (p.x > -0.6 && p.x < 11.6 && p.z > -0.6 && p.z < 5.1) || (p.x > 3.3 && p.x < 11.5 && p.z > 4.5 && p.z < 7.0 && p.y < 2.6);
+        bool roof = (p.x > -0.6 && p.x < 15.6 && p.z > -0.6 && p.z < 5.1) || (p.x > 3.3 && p.x < 11.5 && p.z > 4.5 && p.z < 7.0 && p.y < 2.6) || (p.x > 15.0 && p.x < 17.3 && p.z > 2.5 && p.z < 5.1 && p.y < 2.7);
         vA = roof ? 0.0 : 1.0;
         vec4 mv = modelViewMatrix * vec4(p, 1.0);
         gl_PointSize = vA * 14.0 * uPx / -mv.z;
@@ -206,7 +234,7 @@ function updateSmoke(dt) {
     p.s.position.set(G.CHIMNEY.x + k * blow + Math.sin(p.age * 0.7 + p.age) * 0.5, G.CHIMNEY.y + k * (5.5 - WIND.gust * 1.5), G.CHIMNEY.z - k * 1.2);
     p.s.scale.setScalar(0.5 + k * 2.6);
     p.s.material.opacity = Math.sin(k * Math.PI) * 0.07 * (G.FIRE.on ? 1 : 0.15);
-    p.s.material.color.copy(SMOKE_DAY).lerp(SMOKE_NIGHT, STATE.tod);
+    p.s.material.color.copy(SMOKE_DAY).lerp(SMOKE_NIGHT, STATE.tod).lerp(SMOKE_NOON, STATE.day);
   }
 }
 
@@ -215,10 +243,10 @@ function updateSmoke(dt) {
  * ===================================================================== */
 let composer, bokeh, bloom, ssao, grade, fxaa;
 const GradeShader = {
-  uniforms: { tDiffuse: { value: null }, uTime: { value: 0 }, uVig: { value: 0.42 }, uGrain: { value: 0.022 }, uCA: { value: 0.0012 }, uBars: { value: 0 } },
+  uniforms: { tDiffuse: { value: null }, uTime: { value: 0 }, uVig: { value: 0.42 }, uGrain: { value: 0.022 }, uCA: { value: 0.0012 }, uBars: { value: 0 }, uMem: { value: 0 } },
   vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
   fragmentShader: `
-    uniform sampler2D tDiffuse; uniform float uTime, uVig, uGrain, uCA, uBars; varying vec2 vUv;
+    uniform sampler2D tDiffuse; uniform float uTime, uVig, uGrain, uCA, uBars, uMem; varying vec2 vUv;
     float h(vec2 p){ return fract(sin(dot(p, vec2(12.9898,78.233)) + uTime*7.0) * 43758.5453); }
     void main(){
       vec2 d = vUv - 0.5;
@@ -227,7 +255,9 @@ const GradeShader = {
       // Split-tone: cool shadows, warm highlights.
       c *= mix(vec3(0.9, 0.97, 1.08), vec3(1.07, 1.0, 0.9), smoothstep(0.05, 0.7, l));
       c = mix(vec3(l), c, 1.08);
-      c *= 1.0 - uVig * smoothstep(0.3, 0.9, length(d * vec2(1.3, 1.0)));
+      // Memory: faded, cooler, softer at the edges.
+      c = mix(c, vec3(l) * vec3(0.94, 0.98, 1.07) + 0.015, uMem * 0.6);
+      c *= 1.0 - (uVig + uMem * 0.25) * smoothstep(0.3 - uMem * 0.12, 0.9, length(d * vec2(1.3, 1.0)));
       c += (h(vUv * 917.0) - 0.5) * uGrain;
       float bar = step(0.5 - uBars, abs(vUv.y - 0.5));
       c = mix(c, vec3(0.0), bar);
@@ -264,7 +294,7 @@ G.applyQuality = () => {
   G.FIRE.light.shadow.camera.near = 0.1; G.FIRE.light.shadow.camera.far = 7;   // the room, not the whole valley
   ssao.enabled = G.Q.ssao; bokeh.enabled = G.Q.dof; bloom.strength = G.Q.bloom;
   G.MATS.forEach((m) => { m.needsUpdate = true; });
-  if (SNOW) SNOW.geometry.setDrawRange(0, G.Q.snow);
+  if (SNOW) SNOW.geometry.setDrawRange(0, Math.round(G.Q.snow * clamp(STATE.snow, 0, 1)));
   resize();
   document.querySelectorAll('#quality button').forEach((b) => b.classList.toggle('on', b.dataset.q === G.qName));
 };
@@ -425,7 +455,15 @@ function steer(c, tx, tz, speed, dt, stopAt = 0.06) {
     if (nav.unstuck > 2) { const o = nearestOpen(...cellOf(c.x, c.z), 4); if (o) { const p = cellPos(o[0], o[1]); c.x = p.x; c.z = p.z; c.yFloor = G.floorAt(c.x, c.z); } nav.unstuck = 0; } }
   return false;
 }
-function placeChar(c, x, z, yaw) { c.x = x; c.z = z; c.yaw = yaw; c.yFloor = G.floorAt(x, z); c.y = c.yFloor; c.speed = 0; }
+function placeChar(c, x, z, yaw) { c.x = x; c.z = z; c.yaw = yaw; c.yFloor = G.floorAt(x, z); c.y = c.yFloor; c.speed = 0; c.nav = null; c._prevYaw = yaw; }
+G.placeChar = placeChar;
+G.slideTo = (c, x, z, yaw, dur = 0.55) => new Promise((res) => { c.script = null; c.nav = null; c.slide = { from: { x: c.x, z: c.z }, x, z, yaw, dur, t: 0, res }; });
+// Sit down from where you stand: slide into the seat while the legs fold.
+G.sitDown = (c, x, z, yaw, seatY, dur = 0.6) => { c.seatY = seatY; c.sitTarget = 1; return G.slideTo(c, x, z, yaw, dur); };
+G.sitAt = (c, x, z, yaw, seatY) => { c.script = null; c.lie = false; placeChar(c, x, z, yaw); c.seatY = seatY; c.sitTarget = 1; c.sit = 1; };
+G.standAt = (c, x, z, yaw) => { c.script = null; c.lie = false; c.sitTarget = 0; c.sit = 0; c.freeSit = null; c.rise = null; placeChar(c, x, z, yaw); };
+// In bed: feet at (x, zFeet), head toward the headboard; roll turns onto one side, look turns the head.
+G.lieDown = (c, x, zFeet, roll = 0, look = 0) => { c.script = null; c.sitTarget = 0; c.sit = 0; c.speed = 0; c.lie = true; c.x = x; c.z = zFeet; c.lieY = G.BED.top + 0.13; c.y = c.lieY; c.lieRoll = roll; c.lieLook = look; c.yaw = 0; };
 
 /* =====================================================================
  * Camera director
@@ -448,8 +486,9 @@ function clampToWalls(target, desired) {
 const SHOTS = {
   follow(t) {
     const p = PLAYER, inside = G.inside(p.x, p.z) || G.underRoof(p.x, p.z);
+    const ks = clamp(p.m.userData.H / 1.84, 0.62, 1);   // smaller people (the prologue) get a lower, closer camera
     // Running pulls the camera back a little and widens the lens; walking adds a faint step rhythm.
-    const dist = (inside ? 1.75 : 2.9) * CAM.zoom * (1 + CAM.run * G.MOTION * (inside ? 0.06 : 0.16)), height = inside ? 1.58 : 1.72;
+    const dist = (inside ? 1.75 : 2.9) * CAM.zoom * (1 + CAM.run * G.MOTION * (inside ? 0.06 : 0.16)) * lerp(0.75, 1, ks), height = (inside ? 1.58 : 1.72) * ks;
     const bob = Math.sin(p.phase * 2) * 0.01 * clamp(p.speed / 1.5, 0, 1.5) * G.MOTION;
     const tgt = new THREE.Vector3(p.x, p.y + height - (p.sit || 0) * 0.45 + bob, p.z);
     const right = new THREE.Vector3(Math.cos(CAM.yaw), 0, -Math.sin(CAM.yaw));
@@ -541,6 +580,18 @@ function updateCamera(dt, t) {
 function setShot(fn, cut = true) { CAM.shot = fn; CAM.cut = cut; }
 function releaseCamera() { CAM.shot = null; CAM.cut = false; CAM.yaw = PLAYER.yaw + Math.PI; CAM.lastDrag = -99; }
 G.setShot = setShot; G.releaseCamera = releaseCamera;
+// Free time-of-day toggle (N / the HUD button): day → sunset → night → day.
+G.cycleTime = () => {
+  if (STATE.dayTarget > 0.5) { STATE.dayTarget = 0; STATE.todTarget = 0; }
+  else if (STATE.todTarget < 0.5) STATE.todTarget = 1;
+  else { STATE.todTarget = 0; STATE.dayTarget = 1; }
+};
+G.setTime = (o, now) => {
+  if (o.day != null) { STATE.dayTarget = o.day; if (now) STATE.day = o.day; }
+  if (o.tod != null) { STATE.todTarget = o.tod; if (now) STATE.tod = o.tod; }
+  if (o.snow != null) { STATE.snowTarget = o.snow; if (now) STATE.snow = o.snow; }
+  STATE.dayRate = o.rate || 0.5;
+};
 
 /* =====================================================================
  * Input
@@ -580,7 +631,8 @@ const stick = { x: 0, y: 0, on: false };
  * ===================================================================== */
 const DLG = { q: [], cur: null, shown: 0, t: 0, auto: false };
 G.say = (who, text, o = {}) => new Promise((res) => DLG.q.push({ who, text: G.fmt(text), res, o }));
-const busy = () => !!DLG.cur || DLG.q.length > 0 || STATE.busy;
+const busy = () => !!DLG.cur || DLG.q.length > 0 || STATE.busy || !!(G.UI && G.UI.blocking());
+G.busy = busy; G.DLG = DLG;
 function pickShotFor(who, o) {
   if (o.shot === 'keep') return;
   if (o.shot) { setShot(o.shot, o.cut !== false); return; }
@@ -610,16 +662,24 @@ function updateDialogue(dt) {
   }
 }
 $('subs').addEventListener('pointerdown', (e) => { e.preventDefault(); DLG.click = true; });
-function bark(text, dur = 2.6) { PARTNER.bark = { text: G.fmt(text), t: dur }; }
+function bark(text, dur = 2.6) { PARTNER.bark = { text: G.fmt(Array.isArray(text) ? text[Math.floor(Math.random() * text.length)] : text), t: dur }; }
+G.bark = (t, d) => bark(t, d); G.hint = (t, d) => hint(G.fmt(t), d);
 function hint(text, dur = 5) { const h = $('hint'); h.textContent = text; h.classList.add('show'); clearTimeout(hint._t); hint._t = setTimeout(() => h.classList.remove('show'), dur * 1000); }
 // Waits run on the game clock, so a scene pauses with the tab instead of racing ahead of the dialogue.
 const TIMERS = [];
 const wait = (s) => new Promise((r) => TIMERS.push({ t: s, r }));
 const until = async (fn) => { while (!fn()) await wait(0.1); };
+G.until = until;
 function tickTimers(dt) { for (let i = TIMERS.length - 1; i >= 0; i--) if ((TIMERS[i].t -= dt) <= 0) { const r = TIMERS[i].r; TIMERS.splice(i, 1); r(); } }
 // Fade to black, run the setup, fade back in: a cinematic cut that also skips fiddly walking.
-async function cutTo(setup, hold = 0.15) { $('fade').classList.add('on'); await wait(0.65); setup(); CAM.cut = true; await wait(hold); $('fade').classList.remove('on'); }
+async function cutTo(setup, hold = 0.15, color) {
+  const f = $('fade');
+  if (color) f.style.background = color;
+  f.classList.add('on'); await wait(0.65); await setup(); CAM.cut = true; await wait(hold); f.classList.remove('on');
+  if (color) wait(0.7).then(() => { if (!f.classList.contains('on')) f.style.background = ''; });
+}
 G.cutTo = cutTo; G.wait = wait;
+G.fade = (on, color) => { const f = $('fade'); f.style.background = color || ''; f.classList.toggle('on', on); return wait(0.65); };
 
 /* =====================================================================
  * Partner
@@ -630,16 +690,29 @@ function partnerAI(dt, t) {
   if (p.script) {
     const s = p.script;
     s.t = (s.t || 0) + dt;
-    if (steer(p, s.x, s.z, s.speed || 1.2, dt, 0.08) || s.t > 12) { p.script = null; p.speed = 0; s.res && s.res(); }
+    if (steer(p, s.x, s.z, s.speed || 1.2, dt, 0.08) || s.t > 12) { p.script = null; p.speed = 0; if (s.yaw != null) p.yaw = s.yaw; s.res && s.res(); }
     p.lookAt = null;
     return;
   }
-  if (p.mode === 'seated') { p.speed = 0; p.lookAt = head(PLAYER); return; }
+  if (p.slide) return;
+  if (p.mode === 'still') { p.speed = damp(p.speed, 0, 8, dt); p.lookAt = p.stillLook || null; return; }
+  if (p.mode === 'seated' || p.mode === 'lying') { p.speed = 0; p.lookAt = p.mode === 'seated' ? head(PLAYER) : null; return; }
+  if (p.mode === 'stay') { p.speed = damp(p.speed, 0, 8, dt); p.yaw = angDamp(p.yaw, Math.atan2(PLAYER.x - p.x, PLAYER.z - p.z), 2, dt); p.lookAt = head(PLAYER); return; }
+  if (p.task) { if (partnerTask(p, dt, t)) return; }
+  if (p.lead) { partnerLead(p, dt, t); return; }
+  if (p.hold) { partnerHold(p, dt, t); return; }
   if (p.mode === 'follow') {
     const side = new THREE.Vector3(Math.cos(PLAYER.yaw), 0, -Math.sin(PLAYER.yaw));
-    let tx = PLAYER.x - side.x * 0.75 - Math.sin(PLAYER.yaw) * 0.35, tz = PLAYER.z - side.z * 0.75 - Math.cos(PLAYER.yaw) * 0.35;
     if (!NAV.open) buildNav();
-    { const o = nearestOpen(...cellOf(tx, tz), 6); if (o && Math.hypot(cellPos(o[0], o[1]).x - PLAYER.x, cellPos(o[0], o[1]).z - PLAYER.z) < 1.6) { const q = cellPos(o[0], o[1]); tx = q.x; tz = q.z; } else { tx = PLAYER.x; tz = PLAYER.z; } }
+    // Stand at your shoulder (her usual side, else the other one) — never on the far side of a wall.
+    let tx = PLAYER.x, tz = PLAYER.z;
+    const pin = G.inside(PLAYER.x, PLAYER.z);
+    for (const sg of [-1, 1]) {
+      const o = nearestOpen(...cellOf(PLAYER.x + sg * side.x * 0.75 - Math.sin(PLAYER.yaw) * 0.35, PLAYER.z + sg * side.z * 0.75 - Math.cos(PLAYER.yaw) * 0.35), 6);
+      if (!o) continue;
+      const q = cellPos(o[0], o[1]);
+      if (Math.hypot(q.x - PLAYER.x, q.z - PLAYER.z) < 1.6 && G.inside(q.x, q.z) === pin && lineClear({ x: PLAYER.x, z: PLAYER.z }, q)) { tx = q.x; tz = q.z; break; }
+    }
     const d = Math.hypot(PLAYER.x - p.x, PLAYER.z - p.z);
     if (d > 1.15 || (p.speed > 0.05 && Math.hypot(tx - p.x, tz - p.z) > 0.25)) steer(p, tx, tz, clamp(d * 1.1, 0.8, PLAYER.speed > 2 ? 3.0 : 1.65), dt, 0.2);
     else {
@@ -650,10 +723,90 @@ function partnerAI(dt, t) {
       if (fire) { p.lookAt = Math.sin(t * 0.4) > 0.6 ? head(PLAYER) : null; return; }
     }
     // Lost entirely (no route for a few seconds and far behind): catch up quietly behind the player.
-    if (p.nav && p.nav.fail > 3 && d > 6) { const o = nearestOpen(...cellOf(PLAYER.x - Math.sin(PLAYER.yaw) * 1.2, PLAYER.z - Math.cos(PLAYER.yaw) * 1.2), 8); if (o) { const q = cellPos(o[0], o[1]); placeChar(p, q.x, q.z, PLAYER.yaw); p.nav = null; } }
+    if (p.nav && p.nav.fail > 3 && d > 6) { const o = nearestOpen(...cellOf(PLAYER.x - Math.sin(PLAYER.yaw) * 1.2, PLAYER.z - Math.cos(PLAYER.yaw) * 1.2), 8); if (o) { const q = cellPos(o[0], o[1]); if (G.inside(q.x, q.z) === G.inside(PLAYER.x, PLAYER.z) && lineClear({ x: PLAYER.x, z: PLAYER.z }, q)) { placeChar(p, q.x, q.z, PLAYER.yaw); p.nav = null; } } }
     p.lookAt = head(PLAYER);
+    // At home she has a life of her own: every so often she wanders off to something she likes.
+    if (STATE.autonomy && G.SMART && !busy() && !p.hold) {
+      p.curious = (p.curious || 0) + dt * (PLAYER.speed < 0.2 ? 1.4 : 1);
+      if (p.curious > (p.curiousAt || (p.curiousAt = 18 + Math.random() * 16))) {
+        p.curious = 0; p.curiousAt = 22 + Math.random() * 22;
+        const opts = G.SMART.filter((o) => o !== p.lastSmart && (!o.cond || o.cond()) && Math.hypot(o.spot.x - PLAYER.x, o.spot.z - PLAYER.z) < 11);
+        if (opts.length) { const o = opts[Math.floor(Math.random() * opts.length)]; p.lastSmart = o; p.task = { o, phase: 'go', t: 0 }; }
+      }
+    }
   }
 }
+/* A smart-object task: walk to it, do the thing for a while, come back. Returns true while it owns her. */
+function partnerTask(p, dt, t) {
+  const T = p.task, o = T.o, dP = Math.hypot(PLAYER.x - p.x, PLAYER.z - p.z);
+  T.t += dt;
+  if (T.phase === 'go') {
+    if (dP > 11 || T.t > 14) { p.task = null; return false; }
+    if (steer(p, o.spot.x, o.spot.z, 1.2, dt, 0.1)) {
+      T.phase = 'do'; T.t = 0; T.dur = o.dur[0] + Math.random() * (o.dur[1] - o.dur[0]);
+      p.speed = 0; p.nav = null;
+      if (o.hide) { p.m.visible = false; p.hidden = true; if (o.line) bark(o.line, 2.6); }
+      else if (o.seatAt) G.sitDown(p, o.seatAt.x, o.seatAt.z, o.seatAt.yaw, o.seatAt.y);
+      if (o.lines && Math.random() < 0.8 && !o.hide) bark(o.lines, 3);
+      if (o.onArrive) o.onArrive(p);
+    }
+    p.lookAt = null;
+    return true;
+  }
+  // doing it
+  if (o.yaw != null && !o.seatAt) p.yaw = angDamp(p.yaw, o.yaw, 4, dt);
+  p.lookAt = o.look ? { x: o.look.x, z: o.look.z, headY: o.look.y } : (Math.sin(t * 0.5) > 0.7 ? head(PLAYER) : null);
+  const done = T.t > T.dur || (dP > 9 && !p.hidden) || T.abort;
+  if (done) endTask(p);
+  return true;
+}
+function endTask(p) {
+  const T = p.task; if (!T) return;
+  if (p.hidden) { p.hidden = false; p.m.visible = true; if (T.o.exit) placeChar(p, T.o.exit.x, T.o.exit.z, T.o.exit.yaw || 0); bark(['*appears, extremely casual*', 'What? I wasn’t doing anything.', 'Nothing’s in there. Don’t look.'], 2.4); }
+  if (p.sitTarget) { p.sitTarget = 0; G.slideTo(p, T.o.spot.x, T.o.spot.z, null, 0.55); }
+  p.task = null; p.nav = null;
+}
+G.endPartnerTask = () => endTask(PARTNER);
+/* Lead: she walks ahead to a place, waiting (and complaining) if you fall behind. */
+function partnerLead(p, dt, t) {
+  const L = p.lead, d = Math.hypot(PLAYER.x - p.x, PLAYER.z - p.z);
+  L.waitT = (L.waitT || 0) - dt;
+  if (L.arrived || d > 6.5) {
+    p.speed = damp(p.speed, 0, 6, dt); p.nav = null;
+    p.yaw = angDamp(p.yaw, Math.atan2(PLAYER.x - p.x, PLAYER.z - p.z), 3, dt); p.lookAt = head(PLAYER);
+    if (L.waitT <= 0 && d > 3.5) { L.waitT = 8 + Math.random() * 5; bark(L.waitLines || ['Come ON, slowpoke.', 'Old knees! Old knees!', 'I’m waiting. Majestically.', 'Hurry up, {giant}!'], 2.6); }
+    if (!L.arrived && d > 6.5) return;
+    if (L.arrived) return;
+  }
+  if (steer(p, L.x, L.z, d < 3 ? 1.55 : 1.25, dt, 0.15)) { L.arrived = true; if (L.cb) L.cb(); }
+  p.lookAt = null;
+}
+/* Holding hands: she walks at your side, hand in hand, and lets go for a moment when a doorway won't fit you both. */
+function partnerHold(p, dt, t) {
+  const side = p.holdSide2 || 1;   // which side of you she walks on (+1 = your left)
+  const lx = Math.cos(PLAYER.yaw), lz = -Math.sin(PLAYER.yaw);   // your left, for a character facing (sin yaw, cos yaw)
+  const tx = PLAYER.x + lx * side * 0.46, tz = PLAYER.z + lz * side * 0.46;
+  const dx = tx - p.x, dz = tz - p.z, d = Math.hypot(dx, dz);
+  if (d > 0.7) {
+    steer(p, tx, tz, clamp(d * 2, 1, 3.2), dt, 0.05);
+  } else {
+    const k = 1 - Math.exp(-10 * dt);
+    moveChar(p, dx * k, dz * k);
+    p.speed = damp(p.speed, PLAYER.speed, 10, dt);
+    p.phase = PLAYER.phase + Math.PI * 0.08;   // in step with you, more or less
+    p.yaw = angDamp(p.yaw, PLAYER.speed > 0.2 ? PLAYER.yaw : Math.atan2(PLAYER.x - p.x, PLAYER.z - p.z) * 0.3 + PLAYER.yaw * 0.7, 8, dt);
+  }
+  const close = Math.hypot(PLAYER.x - p.x, PLAYER.z - p.z) < 0.75;
+  // Arm 0 sits at the rig's −x: the right arm. Each holds with the hand nearest the other.
+  p.holdArm = side > 0 ? 0 : 1; PLAYER.holdArm = side > 0 ? 1 : 0;
+  p.holdOn = close; PLAYER.holdOn = close && !!p.hold;
+  p.lookAt = Math.sin(t * 0.3) > 0.5 ? head(PLAYER) : null;
+}
+G.setHold = (on) => {
+  const p = PARTNER;
+  if (on) { const rx = Math.cos(PLAYER.yaw), rz = -Math.sin(PLAYER.yaw); p.holdSide2 = ((p.x - PLAYER.x) * rx + (p.z - PLAYER.z) * rz) > 0 ? 1 : -1; }
+  p.hold = on; if (!on) { p.holdOn = false; PLAYER.holdOn = false; }
+};
 // Scripted walk. An unreachable target (inside furniture) is moved to the nearest open spot, and a
 // walk that still can't finish gives up after a while, so a story beat can never hang on it.
 const walkTo = (c, x, z, speed, yaw) => new Promise((res) => {
@@ -683,7 +836,7 @@ const Story = (G.Story = {
     STATE.sceneShot = false; STATE.busy = false;
     PARTNER.mode = 'follow';
     releaseCamera();
-    hint(G.MOBILE ? 'Drag on the left to walk; drag on the right to look. Use to interact, ♥ to hug.' : 'WASD to walk, Shift to run. Drag to look, scroll to zoom. E to interact, Q to hug.', 8);
+    hint(G.MOBILE ? 'Drag on the left to walk; drag on the right to look. Use to interact, ♥ to be together.' : 'WASD to walk, Shift to run. Drag to look, scroll to zoom. E to interact, Q to be together.', 8);
     STATE.watchDoor = true;
   },
   async cake() {
@@ -789,25 +942,34 @@ function showEndcard() {
   $('endcard').scrollTop = 0;
   document.body.classList.add('ending');
 }
-async function hug() {
-  if (busy() || Math.hypot(PARTNER.x - PLAYER.x, PARTNER.z - PLAYER.z) > 1.4 || PARTNER.sit > 0.2) return;
-  STATE.busy = true;
+async function hug(kind = 'hug', line) {
+  if (busy() || Math.hypot(PARTNER.x - PLAYER.x, PARTNER.z - PLAYER.z) > 1.8 || PARTNER.sit > 0.2 || PLAYER.sit > 0.2) return false;
+  const kiss = kind === 'kiss';
+  STATE.busy = true; STATE.kiss = kiss;
+  const held = PARTNER.hold; if (held) G.setHold(false);
+  if (PARTNER.task) endTask(PARTNER);
   const a = Math.atan2(PARTNER.x - PLAYER.x, PARTNER.z - PLAYER.z);
   PARTNER.speed = 0; PARTNER.nav = null;
   // Step in toward each other over a few frames instead of snapping, then settle out of any wall.
   const mx = (PLAYER.x + PARTNER.x) / 2, mz = (PLAYER.z + PARTNER.z) / 2;
   STATE.hugIn = { p: [mx - Math.sin(a) * 0.17, mz - Math.cos(a) * 0.17], q: [mx + Math.sin(a) * 0.17, mz + Math.cos(a) * 0.17], yaw: a };
-  STATE.hugging = true; PARTNER.lidsClosed = true; PARTNER.tiltTarget = -0.2;
+  STATE.hugging = true; PARTNER.lidsClosed = true; PARTNER.tiltTarget = kiss ? -0.38 : -0.2;
+  if (kiss) { STATE.hugIn.p = [mx - Math.sin(a) * 0.2, mz - Math.cos(a) * 0.2]; STATE.hugIn.q = [mx + Math.sin(a) * 0.2, mz + Math.cos(a) * 0.2]; PLAYER.leanTarget = 0.14; PLAYER.tiltTarget = 0.18; PLAYER.lidsClosed = true; PARTNER.headDown = -0.12; }
   // Side-on to the hug, favouring her face; try both sides and a closer fallback so walls never block it.
   const side = new THREE.Vector3(Math.cos(a), 0, -Math.sin(a)), fwd = new THREE.Vector3(Math.sin(a), 0, Math.cos(a));
   const camAt = (o) => { const m = G.headPos(PARTNER).add(new THREE.Vector3(0, -0.08, 0)); const pos = m.clone().addScaledVector(side, o[0] * o[2]).addScaledVector(fwd, o[1]); pos.y = m.y - 0.1; return { pos, look: m, fov: 34, focus: pos.distanceTo(m), aperture: 0.016 }; };
-  const pick = [[1, 0.55, 1.25], [-1, 0.55, 1.25], [1, 0.35, 0.9], [-1, 0.35, 0.9]].find((o) => { const c = camAt(o); return !blocked(c.look, c.pos); });
+  // Mostly side-on, a little to your side of the hug, so her face (turned against you) is the one in frame.
+  const pick = [[1, -0.25, 1.25], [-1, -0.25, 1.25], [1, -0.1, 0.9], [-1, -0.1, 0.9]].find((o) => { const c = camAt(o); return !blocked(c.look, c.pos); });
   if (pick) setShot(() => camAt(pick));
-  bark(['Mm. Hi, {giant}.', 'You’re so warm. It’s unfair.', 'Ten out of ten hug.', 'Okay. One more second. Two.'][Math.floor(Math.random() * 4)]);
-  await wait(2.6);
+  bark(line || ['Mm. Hi, {giant}.', 'You’re so warm. It’s unfair.', 'Ten out of ten hug.', 'Okay. One more second. Two.']);
+  await wait(kiss ? 1.7 : 2.6);
   STATE.hugging = false; STATE.hugIn = null; PARTNER.lidsClosed = false; PARTNER.tiltTarget = 0; STATE.busy = false;
+  PLAYER.leanTarget = 0; PLAYER.tiltTarget = 0; PLAYER.lidsClosed = false; PARTNER.headDown = 0;
+  if (held) G.setHold(true);
   releaseCamera();
+  return true;
 }
+G.hug = hug;
 
 /* =====================================================================
  * Pause menu, volume, mute, camera motion
@@ -850,7 +1012,8 @@ function nearest() {
   const fx = Math.sin(PLAYER.yaw), fz = Math.cos(PLAYER.yaw);
   for (const it of G.INTER) {
     const dx = it.pos[0] - PLAYER.x, dz = it.pos[2] - PLAYER.z, d = Math.hypot(dx, dz);
-    if (d > it.r) continue;
+    if (d > it.r || (it.when && !it.when())) continue;
+    if (it.y != null && Math.abs(it.y - PLAYER.y) > 1.2) continue;
     const s = d - ((dx * fx + dz * fz) / (d || 1)) * 0.4;
     if (s < bd) { bd = s; best = it; }
   }
@@ -866,7 +1029,7 @@ function ambientPoses(dt) {
     let facing = toFire - c.yaw; while (facing > Math.PI) facing -= 2 * Math.PI; while (facing < -Math.PI) facing += 2 * Math.PI;
     const nearFire = G.FIRE.on && G.inside(c.x, c.z) && Math.hypot(c.x - FIRE_AT.x, c.z - FIRE_AT.z) < 2.2;
     let pose = null;
-    if (STATE.hugging || (c.sit || 0) > 0.2 || c.script) pose = null;
+    if (STATE.hugging || (c.sit || 0) > 0.2 || c.script || c.lie || c.holdOn) pose = null;
     else if (nearFire && c === PARTNER && c.idleT > 1.2 && !busy()) pose = 'warm';   // not mid-conversation
     else if (nearFire && c === PLAYER && c.idleT > 2.5 && Math.abs(facing) < 1.0) pose = 'warm';
     else if (out && c === PARTNER && (STATE.tod > 0.35 || c.idleT > 5)) pose = 'cold';
@@ -889,7 +1052,7 @@ function ambientBarks(dt) {
   const out = !G.inside(PLAYER.x, PLAYER.z) && !G.underRoof(PLAYER.x, PLAYER.z);
   AMBIENT.runT = PLAYER.speed > 2.4 ? AMBIENT.runT + dt : 0;
   AMBIENT.cd -= dt;
-  if (AMBIENT.cd > 0 || busy() || PARTNER.bark || STATE.watchDoor || (PARTNER.sit || 0) > 0.2) return;
+  if (AMBIENT.cd > 0 || busy() || PARTNER.bark || STATE.watchDoor || (PARTNER.sit || 0) > 0.2 || PARTNER.hidden || PARTNER.task || (G.S && G.S.flags.noBarks)) return;
   if (Math.hypot(PARTNER.x - PLAYER.x, PARTNER.z - PLAYER.z) > 4.5) return;
   const o = { out, inside: G.inside(PLAYER.x, PLAYER.z), idle: PLAYER.idleT || 0, nearFire: PARTNER.pose === 'warm' };
   const b = BARKS.find((x) => !AMBIENT.used.has(x.id) && x.when(o));
@@ -900,7 +1063,14 @@ function step(dt, t) {
   let ix = (keys.has('KeyD') || keys.has('ArrowRight') ? 1 : 0) - (keys.has('KeyA') || keys.has('ArrowLeft') ? 1 : 0);
   let iy = (keys.has('KeyS') || keys.has('ArrowDown') ? 1 : 0) - (keys.has('KeyW') || keys.has('ArrowUp') ? 1 : 0);
   if (stick.on) { ix = stick.x; iy = stick.y; }
-  const free = !busy() && !PLAYER.script && (PLAYER.sit || 0) < 0.05;
+  // Sitting down somewhere of your own accord: any move stands you back up.
+  if (PLAYER.freeSit && !busy() && Math.hypot(ix, iy) > 0.3 && !PLAYER.rise) { PLAYER.rise = { from: { x: PLAYER.x, z: PLAYER.z }, to: PLAYER.freeSit, t: 0 }; PLAYER.sitTarget = 0; PLAYER.freeSit = null; }
+  if (PLAYER.rise) {
+    const R = PLAYER.rise; R.t += dt; const k = G.smooth(0, 0.55, R.t);
+    PLAYER.x = lerp(R.from.x, R.to.x, k); PLAYER.z = lerp(R.from.z, R.to.z, k); PLAYER.yFloor = G.floorAt(PLAYER.x, PLAYER.z);
+    if (R.t > 0.6) { PLAYER.rise = null; if (R.to.yaw != null) PLAYER.yaw = R.to.yaw; }
+  }
+  const free = !busy() && !PLAYER.script && (PLAYER.sit || 0) < 0.05 && !PLAYER.rise && !PLAYER.lie && !STATE.noControl;
   if (!free) ix = iy = 0;
   const l = Math.hypot(ix, iy);
   if (PLAYER.script) {
@@ -923,17 +1093,24 @@ function step(dt, t) {
     for (const [c, p, y] of [[PLAYER, H.p, H.yaw], [PARTNER, H.q, H.yaw + Math.PI]]) { moveChar(c, (p[0] - c.x) * kk, (p[1] - c.z) * kk); c.yaw = angDamp(c.yaw, y, 10, dt); c.speed = 0; }
   }
   // Personal space: she eases out of you rather than overlapping, except when you're hugging or seated together.
-  if (!STATE.hugging && !STATE.hugIn && (PARTNER.sit || 0) < 0.2 && (PLAYER.sit || 0) < 0.2) {
+  if (!STATE.hugging && !STATE.hugIn && (PARTNER.sit || 0) < 0.2 && (PLAYER.sit || 0) < 0.2 && !PARTNER.hold && !PARTNER.lie && !PLAYER.lie && !PARTNER.hidden) {
     const dx = PARTNER.x - PLAYER.x, dz = PARTNER.z - PLAYER.z, d = Math.hypot(dx, dz), min = 0.5;
     if (d < min) { const push = (min - d) * Math.min(1, dt * 8), ux = d > 1e-3 ? dx / d : 1, uz = d > 1e-3 ? dz / d : 0; moveChar(PARTNER, ux * push, uz * push); }
   }
   ambientPoses(dt);
   for (const c of [PLAYER, PARTNER]) {
-    c.y = damp(c.y, c.yFloor != null ? c.yFloor : G.floorAt(c.x, c.z), 14, dt);
+    // A short eased move (sliding into a seat, stepping out of one) instead of a pop.
+    if (c.slide) {
+      const S = c.slide; S.t += dt; const k = G.smooth(0, S.dur, S.t);
+      c.x = lerp(S.from.x, S.x, k); c.z = lerp(S.from.z, S.z, k); c.yFloor = G.floorAt(c.x, c.z); c.speed = 0;
+      if (S.yaw != null) c.yaw = angDamp(c.yaw, S.yaw, 8, dt);
+      if (S.t >= S.dur) { c.slide = null; if (S.yaw != null) c.yaw = S.yaw; S.res && S.res(); }
+    }
+    c.y = c.lie ? c.lieY : damp(c.y, c.yFloor != null ? c.yFloor : G.floorAt(c.x, c.z), 14, dt);
     c.sit = damp(c.sit || 0, c.sitTarget || 0, 5, dt);
     c.tilt = damp(c.tilt || 0, c.tiltTarget || 0, 3, dt);
     c.lean = damp(c.lean || 0, c.leanTarget || 0, 3, dt);
-    c.hug = damp(c.hug || 0, STATE.hugging ? 1 : 0, 7, dt);
+    c.hug = damp(c.hug || 0, STATE.hugging ? (STATE.hugIn && STATE.kiss ? 0.55 : 1) : 0, 7, dt);
     G.animate(c, dt, t);
     // Footsteps: sound and (on snow) a footprint at each heel strike.
     if (c.stepEvent) {
@@ -947,17 +1124,19 @@ function step(dt, t) {
     const cyc = Math.floor((c.breath || 0) / (2 * Math.PI));
     if (cyc !== c._cyc) { c._cyc = cyc; if (!G.inside(c.x, c.z)) G.breathe(c, c.speed > 2 ? 1.3 : 1); }
   }
-  PLAYER.lookAt = Math.hypot(PARTNER.x - PLAYER.x, PARTNER.z - PLAYER.z) < 3 ? head(PARTNER) : null;
+  PLAYER.lookAt = Math.hypot(PARTNER.x - PLAYER.x, PARTNER.z - PLAYER.z) < 3 && !PARTNER.hidden ? head(PARTNER) : null;
   // Interaction prompt
   const it = free ? nearest() : null;
-  const nearP = free && Math.hypot(PARTNER.x - PLAYER.x, PARTNER.z - PLAYER.z) < 1.4 && PARTNER.sit < 0.2;
+  const together = !!(G.Story && G.Story.together);
+  const nearP = free && !PARTNER.hidden && !PARTNER.lie && !PARTNER.script && Math.hypot(PARTNER.x - PLAYER.x, PARTNER.z - PLAYER.z) < (PARTNER.hold ? 1.8 : 1.4) && (together ? (!G.S || !G.S.flags.noTogether) : PARTNER.sit < 0.2);
   let html = '';
-  if (it) html += `<span class="key">${G.MOBILE ? 'Use' : 'E'}</span>${typeof it.label === 'function' ? it.label() : it.label}`;
-  if (nearP) html += `${html ? '<span class="sep"></span>' : ''}<span class="key">${G.MOBILE ? '♥' : 'Q'}</span>Hug`;
+  const lab = it ? G.fmt(typeof it.label === 'function' ? it.label() : it.label) : '';
+  if (it && lab) html += `<span class="key">${G.MOBILE ? 'Use' : 'E'}</span>${lab}`;
+  if (nearP) html += `${html ? '<span class="sep"></span>' : ''}<span class="key">${G.MOBILE ? '♥' : 'Q'}</span>${together ? 'Together' : 'Hug'}`;
   const pr = $('prompt'); if (pr._h !== html) { pr._h = html; pr.innerHTML = html; pr.classList.toggle('hidden', !html); }
-  if (it && hit('KeyE', 'Space', 'Enter')) { pressed.clear(); it.act(); }
-  else if (nearP && hit('KeyQ', 'KeyF')) hug();
-  if (hit('KeyN')) STATE.todTarget = STATE.todTarget > 0.5 ? 0 : 1;
+  if (it && lab && hit('KeyE', 'Space', 'Enter')) { pressed.clear(); it.act(); }
+  else if (nearP && hit('KeyQ', 'KeyF')) { pressed.clear(); if (together) G.Story.together(); else hug(); }
+  if (hit('KeyN')) G.cycleTime();
   if (STATE.watchDoor && G.inside(PLAYER.x, PLAYER.z)) { STATE.watchDoor = false; bark('Cake first. Then the sofa. Then the stars. I made a schedule.', 4); }
   if (STATE.watchDoor && PLAYER.z < 8.5 && !STATE.porchBark) { STATE.porchBark = true; bark('Inside, inside. My nose has stopped working.', 3); }
   ambientBarks(dt);
@@ -968,7 +1147,8 @@ function bubble(dt) {
   const v = G.headPos(c).add(new THREE.Vector3(0, 0.3, 0)).project(G.camera);
   if (v.z > 1) { el.classList.remove('show'); return; }
   if (el.textContent !== c.bark.text) el.textContent = c.bark.text;   // avoid re-laying out the bubble every frame
-  el.style.transform = `translate(${((v.x + 1) / 2 * innerWidth).toFixed(1)}px, ${((1 - v.y) / 2 * innerHeight).toFixed(1)}px) translate(-50%, -100%)`;
+  const bx = G.clamp((v.x + 1) / 2 * innerWidth, 130, innerWidth - 130), by = G.clamp((1 - v.y) / 2 * innerHeight, 110, innerHeight - 40);   // keep it on screen, clear of the HUD
+  el.style.transform = `translate(${bx.toFixed(1)}px, ${by.toFixed(1)}px) translate(-50%, -100%)`;
   el.classList.add('show');
 }
 
@@ -991,18 +1171,20 @@ function stats() {
 
 /* ---------- loop ---------- */
 let last = performance.now();
+G.TICKERS = new Set();   // per-frame callbacks on the game clock (UI widgets)
 G.simT = 0;   // game clock: sum of (capped) frame steps, so everything pauses together with the tab
 function simulate(dt) {
   G.simT += dt;
   const t = G.simT;
   tickTimers(dt);
+  G.TICKERS.forEach((f) => f(dt));
   if (STATE.started) step(dt, t);
   else { for (const c of [PLAYER, PARTNER]) G.animate(c, dt, t); CAM.shot = titleShot; }
   updateCamera(dt, t);
   const focus = STATE.started ? new THREE.Vector3(PLAYER.x, PLAYER.y + 1, PLAYER.z) : new THREE.Vector3(6.5, 1, 8);
   updateLighting(t, dt, focus);
   updateWind(dt);
-  if (SNOW) { const U = SNOW.material.uniforms; U.uTime.value = t; U.uDrift.value = WIND.drift; U.uGust.value = WIND.gust; U.uCenter.value.copy(G.camera.position); U.uLight.value.copy(SNOW_DAY).lerp(SNOW_NIGHT, STATE.tod); }
+  if (SNOW) { const U = SNOW.material.uniforms; U.uTime.value = t; U.uDrift.value = WIND.drift; U.uGust.value = WIND.gust; U.uCenter.value.copy(G.camera.position); U.uLight.value.copy(SNOW_DAY).lerp(SNOW_NIGHT, STATE.tod).lerp(SNOW_NOON, STATE.day); SNOW.geometry.setDrawRange(0, Math.round(G.Q.snow * clamp(STATE.snow, 0, 1))); }
   updateSmoke(dt);
   G.updateFX(dt, t);
   grade.uniforms.uTime.value = t;
@@ -1050,6 +1232,30 @@ function warmUp() {
   G.BOOT_MS.programs = [before, R.info.programs.length];
 }
 
+/* ---------- the prologue's children ---------- */
+function kidDress(root, hatCol, scarfCol) {
+  const u = root.userData, k = u.k;
+  const knit = G.std({ map: G.rep(G.TX.knitCream, 2, 1), color: hatCol, bumpMap: G.TX.knitB, bumpScale: 0.004, roughness: 1 });
+  const hat = new THREE.Mesh(new THREE.SphereGeometry(0.094 * k, 24, 12, 0, Math.PI * 2, 0, Math.PI * 0.55), knit);
+  hat.position.set(0, 0.035 * k, -0.008 * k); hat.scale.set(1.04, 1.12, 1.07); hat.castShadow = true; u.head.add(hat);
+  const brim = new THREE.Mesh(new THREE.TorusGeometry(0.088 * k, 0.014 * k, 8, 28), knit); brim.rotation.x = Math.PI / 2 + 0.12; brim.position.set(0, 0.045 * k, -0.004 * k); brim.scale.set(1.04, 1.1, 1); u.head.add(brim);
+  const pom = new THREE.Mesh(new THREE.SphereGeometry(0.03 * k, 12, 8), knit); pom.position.set(0, 0.145 * k, -0.02 * k); u.head.add(pom);
+  if (scarfCol) {
+    const sm = G.std({ map: G.rep(G.TX.knitCream, 3, 1), color: scarfCol, bumpMap: G.TX.knitB, bumpScale: 0.004, roughness: 1 });
+    const sc = new THREE.Mesh(new THREE.TorusGeometry(0.068 * k, 0.03 * k, 10, 24), sm); sc.rotation.x = Math.PI / 2 - 0.1; sc.position.set(0, 0.14 * k, 0.005 * k); sc.scale.set(1, 1.15, 0.9); u.chest.add(sc);
+    const tail = new THREE.Mesh(new THREE.BoxGeometry(0.06 * k, 0.2 * k, 0.025 * k), sm); tail.position.set(0.04 * k, 0.04 * k, 0.1 * k); tail.rotation.set(0.12, 0, 0.1); u.chest.add(tail);
+  }
+}
+G.useKids = (on) => {
+  const K = G.KIDS;
+  for (const [c, kid, adult] of [[PLAYER, K.player, K.adults.player], [PARTNER, K.partner, K.adults.partner]]) {
+    const m = on ? kid : adult; (on ? adult : kid).visible = false; m.visible = true; c.m = m;
+  }
+  // Children's proportions: a bigger head. Scaled after the body is attached so the rig carries it to the mesh.
+  K.player.userData.head.scale.setScalar(1.32); K.partner.userData.head.scale.setScalar(1.36);
+  K.player.scale.set(1.1, 1, 1.1); K.partner.scale.set(1.1, 1, 1.1);   // sturdier, rounder
+};
+
 /* ---------- boot ---------- */
 function boot() {
   const tTex = performance.now(); G.buildTextures(); G.buildMaterials(); const texMs = Math.round(performance.now() - tTex);
@@ -1063,11 +1269,19 @@ function boot() {
   PARTNER.m = G.makeHuman({ height: 1.6, fem: true, skin: '#e8bfa4', outfit: 'sweater', legs: '#2c2626', hair: '#5e3a26', hairStyle: 'bun', socks: '#e6dccd', eyes: '#4a3020', lips: '#c47a70', seed: 23 });
   placeChar(PLAYER, G.pathX(27) + 0.35, 27, Math.PI); placeChar(PARTNER, G.pathX(27) - 0.45, 26.6, Math.PI);
   PLAYER.hugPose = [-0.95, 0.25, -1.3, -0.7];   // he's taller: arms around her back rather than over her head
+  // The two of them as children, for the prologue: bigger heads, bobble hats, one red scarf.
+  const KIDS = (G.KIDS = {
+    player: G.makeHuman({ height: 1.14, skin: '#dcae90', outfit: 'hoodie', top: '#34506e', legs: '#2a2c33', hair: '#1e140f', hairStyle: 'shaggy', socks: '#3a3a40', seed: 12 }),
+    partner: G.makeHuman({ height: 1.04, fem: true, skin: '#eac2a8', outfit: 'hoodie', top: '#c08a3e', legs: '#3a2e2a', hair: '#5e3a26', hairStyle: 'bun', socks: '#e6dccd', eyes: '#4a3020', lips: '#c98078', seed: 24 }),
+  });
+  kidDress(KIDS.player, '#3e5f8a', '#b8322a'); kidDress(KIDS.partner, '#e9e2d4', null);
+  KIDS.player.visible = KIDS.partner.visible = false;
+  KIDS.adults = { player: PLAYER.m, partner: PARTNER.m };
   buildNav();
-  const bodies = Promise.all([G.attachBlenderBody(PLAYER.m, 'player'), G.attachBlenderBody(PARTNER.m, 'partner')]);
+  const bodies = Promise.all([G.attachBlenderBody(PLAYER.m, 'player'), G.attachBlenderBody(PARTNER.m, 'partner'), G.attachBlenderBody(KIDS.player, 'player'), G.attachBlenderBody(KIDS.partner, 'partner')]);
   buildPost();
   document.querySelectorAll('#quality button').forEach((b) => b.addEventListener('click', () => { G.qName = b.dataset.q; G.applyQuality(); }));
-  $('timeBtn').addEventListener('click', () => { STATE.todTarget = STATE.todTarget > 0.5 ? 0 : 1; });
+  $('timeBtn').addEventListener('click', () => G.cycleTime());
   $('statsBtn').addEventListener('click', toggleStats);
   $('endClose').addEventListener('click', () => Story.closeEnd());
   initPauseUI();
@@ -1079,22 +1293,22 @@ function boot() {
     G.BOOT_MS.total = Math.round(performance.now());
     $('loading').classList.add('done');
   });
-  $('begin').addEventListener('click', async () => {
+  const start = async (fromSave) => {
     if (STATE.started || $('begin').disabled) return;
-    $('begin').disabled = true;
+    $('begin').disabled = true; if ($('continue')) $('continue').disabled = true;
     G.Audio.start();
-    // Dip to black under the title, let the title dissolve, then open on the walk home.
+    // Dip to black under the title, let the title dissolve, then open the first scene behind the fade.
     $('fade').classList.add('on');
     await wait(0.7);
     $('title').classList.add('hide');
     STATE.started = true;
     document.body.classList.add('playing');
-    Story.intro();
-    await wait(0.9);
-    $('fade').classList.remove('on');
-  });
+    if (G.Story.begin) G.Story.begin(fromSave); else { Story.intro(); await wait(0.9); $('fade').classList.remove('on'); }
+  };
+  $('begin').addEventListener('click', () => start(false));
+  if ($('continue')) $('continue').addEventListener('click', () => start(true));
   requestAnimationFrame(frame);
-  window.DEMO = { G, STATE, PLAYER, PARTNER, CAM, SHOTS, Story, skipIntro() { $('title').classList.add('hide'); STATE.started = true; document.body.classList.add('playing'); DLG.q.length = 0; if (DLG.cur) { const r = DLG.cur.res; DLG.cur = null; } STATE.busy = false; STATE.sceneShot = false; PLAYER.script = null; PARTNER.script = null; STATE.watchDoor = false; placeChar(PLAYER, 6.5, 8.5, Math.PI); placeChar(PARTNER, 5.8, 8.8, Math.PI); PARTNER.mode = 'follow'; releaseCamera(); CAM.cut = true; }, setQ(q) { G.qName = q; G.applyQuality(); }, placeChar, simPartner(dt, n) { for (let i = 0; i < n; i++) partnerAI(dt, 0); },
+  window.DEMO = { G, STATE, PLAYER, PARTNER, CAM, SHOTS, Story, partnerAI, steer, skipIntro() { $('title').classList.add('hide'); STATE.started = true; document.body.classList.add('playing'); DLG.q.length = 0; if (DLG.cur) { const r = DLG.cur.res; DLG.cur = null; } STATE.busy = false; STATE.sceneShot = false; PLAYER.script = null; PARTNER.script = null; STATE.watchDoor = false; placeChar(PLAYER, 6.5, 8.5, Math.PI); placeChar(PARTNER, 5.8, 8.8, Math.PI); PARTNER.mode = 'follow'; releaseCamera(); CAM.cut = true; }, setQ(q) { G.qName = q; G.applyQuality(); }, placeChar, simPartner(dt, n) { for (let i = 0; i < n; i++) partnerAI(dt, 0); },
     // Testing aid: run the game for `sec` seconds of game time without rendering.
     async advance(sec, dt = 1 / 30) { for (let k = 0; k < sec / dt; k++) { simulate(dt); await new Promise((r) => setTimeout(r, 0)); } }, keys, press(code) { pressed.add(code); keys.add(code); }, release(code) { keys.delete(code); }, STATE_DLG: DLG };
 }

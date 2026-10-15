@@ -336,9 +336,11 @@ G.animate = (c, dt, t) => {
   const prevYaw = c._prevYaw == null ? c.yaw : c._prevYaw;
   let dy = c.yaw - prevYaw; while (dy > Math.PI) dy -= 2 * Math.PI; while (dy < -Math.PI) dy += 2 * Math.PI;
   c._prevYaw = c.yaw;
-  const sp = clamp(c.speed / 1.6, 0, 2);
+  const sp = c.lie ? 0 : clamp(c.speed / 1.6, 0, 2);
   c.turnLean = damp(c.turnLean || 0, clamp((dy / Math.max(dt, 1e-3)) * sp * 0.05, -0.1, 0.1), 6, dt);
-  c.m.rotation.set(0, c.yaw, -c.turnLean);
+  // Lying down (in bed): the body tips back onto the mattress, head toward −z; lieRoll turns it onto one side.
+  if (c.lie) c.m.rotation.set(-Math.PI / 2 + (c.lieTilt == null ? 0.09 : c.lieTilt), c.lieRoll || 0, 0);   // tilt: head up on the pillow
+  else c.m.rotation.set(0, c.yaw, -c.turnLean);
   const prevPh = c.phase;
   c.phase += dt * (4.0 + sp * 3.0) * Math.min(1, sp * 2);
   const ph = c.phase, w = Math.min(1, sp);
@@ -374,6 +376,7 @@ G.animate = (c, dt, t) => {
   // Arm poses fade in and out instead of popping.
   const pw = c.poseW || (c.poseW = {});
   const want = c.forcePose || c.pose;
+  c.holdW = damp(c.holdW || 0, c.holdOn ? 1 : 0, 8, dt);
   for (const name in ARM_POSES) pw[name] = damp(pw[name] || 0, want === name ? 1 : 0, 4, dt);
   u.arms.forEach((A, i) => {
     const s = i ? 1 : -1, p = ph + (i ? 0 : Math.PI);
@@ -396,7 +399,7 @@ G.animate = (c, dt, t) => {
       const hp = c.hugPose || [-1.3, 0.6, -1.4, 0];
       sx = L(sx, hp[0], c.hug); sz = L(sz, -s * hp[1], c.hug); ex = L(ex, hp[2], c.hug); sy = L(sy, s * hp[3], c.hug);
     }
-    if (c.hold && i === c.holdSide) { sx = -0.2; sz = s * 0.32; ex = -0.2; }
+    if (i === c.holdArm && (c.holdW || 0) > 0.001) { const hw = c.holdW; sx = L(sx, -0.14 + (c.holdReach || 0), hw); sz = L(sz, -s * 0.14, hw); ex = L(ex, -0.18, hw); sy = L(sy, s * 0.2, hw); }
     A.sh.rotation.set(sx, sy, sz); A.el.rotation.set(ex, 0, 0);
   });
   // Blinks on a natural, irregular rhythm (sometimes a double blink).
@@ -405,8 +408,9 @@ G.animate = (c, dt, t) => {
   const shut = c.lidsClosed || c.blinkT < 0;
   if (u.lids) u.lids.forEach((ld) => { ld.position.y = (shut ? 0.0085 : 0.0135) * k; ld.scale.y = (shut ? 0.0125 : 0.0072) * k; });
   // With nothing to look at, glance around now and then.
-  let tgt = c.lookAt;
-  if (!tgt && idle > 0.5 && !c.lockHead) {
+  let tgt = c.lie ? null : c.lookAt;
+  if (c.lie) { c.look = damp(c.look || 0, c.lieLook || 0, 3, dt); c.lookUp = damp(c.lookUp || 0, 0, 3, dt); }
+  else if (!tgt && idle > 0.5 && !c.lockHead) {
     c.glanceT = (c.glanceT || 0) - dt;
     if (c.glanceT <= 0) { c.glanceT = 2.5 + Math.random() * 4; c.glance = Math.random() < 0.35 ? 0 : (Math.random() - 0.5) * 1.6; c.glanceUp = (Math.random() - 0.4) * 0.5; }
     if (c.glance) { const a = c.yaw + c.glance; tgt = { x: c.x + Math.sin(a) * 3, z: c.z + Math.cos(a) * 3, headY: c.y + u.H * 0.93 + (c.glanceUp || 0) * 3 }; }
@@ -417,7 +421,7 @@ G.animate = (c, dt, t) => {
     c.look = damp(c.look || 0, clamp(a, -1.1, 1.1), 4, dt);
     const dy = (tgt.headY || 1.5) - (c.y + u.H * 0.93);
     c.lookUp = damp(c.lookUp || 0, clamp(-Math.atan2(dy, Math.hypot(dx, dz)), -0.4, 0.4), 4, dt);
-  } else { c.look = damp(c.look || 0, 0, 3, dt); c.lookUp = damp(c.lookUp || 0, 0, 3, dt); }
+  } else if (!c.lie) { c.look = damp(c.look || 0, 0, 3, dt); c.lookUp = damp(c.lookUp || 0, 0, 3, dt); }
   u.neck.rotation.set(c.lookUp * 0.4, c.look * 0.45, c.tilt || 0);
   u.head.rotation.set(c.lookUp * 0.6 + Math.sin(t * 0.7 + c.z) * 0.02 + (c.headDown || 0), c.look * 0.55, (c.tilt || 0) * 0.6);
   G.retarget(c.m);

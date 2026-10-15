@@ -1,7 +1,8 @@
 'use strict';
 /* =========================================================================
  * World: terrain, sky, mountains, forest, frozen lake, path and the cabin.
- * Cabin interior is x 0..11, z 0..4.6, floor y = 0. North is −z.
+ * Cabin interior is x 0..15, z 0..4.6, floor y = 0 (bedroom 0–5, living room 5–11,
+ * kitchen 11–15, with the study lean-to outside the east wall). North is −z.
  * ========================================================================= */
 (() => {
 const { clamp, lerp, smooth, fbm, MAT, TX } = G;
@@ -9,18 +10,20 @@ const world = (G.world = new THREE.Group());
 G.scene.add(world);
 
 /* ---------------- layout ---------------- */
-const CAB = (G.CAB = { x0: 0, z0: 0, x1: 11, z1: 4.6, wallH: 2.7, eave: 2.9, ridge: 4.75, ridgeZ: 2.3 });
+const CAB = (G.CAB = { x0: 0, z0: 0, x1: 15, z1: 4.6, wallH: 2.7, eave: 2.9, ridge: 4.75, ridgeZ: 2.3 });
 const PORCH = (G.PORCH = { x0: 3.4, x1: 11.4, z0: 4.6, z1: 6.6, stepX0: 5.85, stepX1: 7.15, stepZ1: 7.7 });
 const GROUND = -0.35;
 const CLEAR = (G.CLEAR = { x: 6.5, z: 15, r: 23 });
 const LAKE = (G.LAKE = { x: 6, z: 60, r: 16, y: -1.15 });
 G.SUN_SET = new THREE.Vector3(0.62, 0.17, -1).normalize();
+G.SUN_DAY = new THREE.Vector3(0.55, 0.42, 0.72).normalize();   // morning sun low in the south-east, in through the south windows
+const ANNEX = (G.ANNEX = { x0: 15.1, x1: 16.9, z0: 2.9, z1: 4.75 });
 const pathX = (G.pathX = (z) => 6.5 + Math.sin((z - 7.6) / 7.5) * 1.6 * smooth(7.6, 12, z));
 const PATH_END = 31;
 
 function rectDist(x, z, x0, z0, x1, z1) { const dx = Math.max(x0 - x, 0, x - x1), dz = Math.max(z0 - z, 0, z - z1); return Math.hypot(dx, dz); }
 function terrainH(x, z) {
-  const dHouse = rectDist(x, z, -0.6, -0.8, 11.8, 7.8);
+  const dHouse = Math.min(rectDist(x, z, -0.6, -0.8, 15.8, 7.8), rectDist(x, z, 14, -0.8, 17.6, 5.4));
   const onPath = z > 7 && z < PATH_END + 2 ? Math.abs(x - pathX(z)) : 99;
   const near = Math.min(dHouse, onPath + 0.3);
   const dC = Math.hypot(x - CLEAR.x, z - CLEAR.z);
@@ -42,7 +45,7 @@ G.floorAt = (x, z) => {
 G.inside = (x, z) => x > CAB.x0 && x < CAB.x1 && z > CAB.z0 && z < CAB.z1;
 // On wooden floor or decking (inside, porch or its steps) rather than snow.
 G.onDeck = (x, z) => G.inside(x, z) || (x > PORCH.x0 && x < PORCH.x1 && z >= PORCH.z0 - 0.1 && z < PORCH.z1) || (x > PORCH.stepX0 && x < PORCH.stepX1 && z >= PORCH.z1 && z < PORCH.stepZ1);
-G.underRoof = (x, z) => (x > CAB.x0 - 0.5 && x < CAB.x1 + 0.5 && z > -0.5 && z < 5) || (x > PORCH.x0 && x < PORCH.x1 && z > PORCH.z0 && z < 6.95);
+G.underRoof = (x, z) => (x > CAB.x0 - 0.5 && x < CAB.x1 + 0.5 && z > -0.5 && z < 5) || (x > ANNEX.x0 && x < ANNEX.x1 + 0.3 && z > ANNEX.z0 - 0.3 && z < ANNEX.z1 + 0.3) || (x > PORCH.x0 && x < PORCH.x1 && z > PORCH.z0 && z < 6.95);
 G.walkable = (x, z) => {
   if (Math.hypot(x - CLEAR.x, (z - CLEAR.z) * 0.9) < CLEAR.r) return true;
   return false;
@@ -105,9 +108,9 @@ G.buildTerrain = () => {
 };
 
 /* ---------------- sky ---------------- */
-G.SKY_UNI = { uSun: { value: G.SUN_SET.clone() }, uTod: { value: 0 }, uTime: { value: 0 } };
+G.SKY_UNI = { uSun: { value: G.SUN_SET.clone() }, uTod: { value: 0 }, uDay: { value: 0 }, uTime: { value: 0 } };
 const SKY_FRAG = `
-  uniform vec3 uSun; uniform float uTod; uniform float uTime; varying vec3 vDir;
+  uniform vec3 uSun; uniform float uTod; uniform float uDay; uniform float uTime; varying vec3 vDir;
   float h21(vec2 p){ p = fract(p*vec2(123.34,456.21)); p += dot(p,p+45.32); return fract(p.x*p.y); }
   float n2(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.-2.*f); return mix(mix(h21(i),h21(i+vec2(1,0)),f.x), mix(h21(i+vec2(0,1)),h21(i+vec2(1,1)),f.x), f.y); }
   float fbm(vec2 p){ float a=0., w=.5; for(int i=0;i<5;i++){ a+=w*n2(p); p*=2.03; w*=.5; } return a; }
@@ -147,6 +150,19 @@ const SKY_FRAG = `
     nc += vec3(0.85, 0.9, 1.0) * star * smoothstep(0.0, 0.12, h) * (0.6 + r * 6.0 - 5.6 * 0.0);
     nc = mix(nc, vec3(0.04, 0.05, 0.10), smoothstep(0.0, -0.08, h));
     c = mix(c, nc, uTod);
+    // Winter day: pale, high and clear, with soft white cloud and a bright low sun.
+    if (uDay > 0.001) {
+      vec3 dz = vec3(0.20, 0.38, 0.72), dm = vec3(0.50, 0.66, 0.88), dh = vec3(0.86, 0.90, 0.94);
+      vec3 dc = mix(dh, dm, smoothstep(0.0, 0.25, h));
+      dc = mix(dc, dz, smoothstep(0.2, 0.9, h));
+      dc += vec3(1.0, 0.95, 0.85) * (pow(sd, 8.0) * 0.35 + pow(sd, 80.0) * 0.9);
+      dc += vec3(1.0, 0.98, 0.92) * smoothstep(0.9995, 0.99985, sd) * 24.0;
+      float dcl = smoothstep(0.45, 0.8, fbm(cp * 0.8 + 3.7)) * smoothstep(0.02, 0.12, h) * (1.0 - smoothstep(0.4, 0.85, h));
+      vec3 cw = mix(vec3(0.78, 0.82, 0.88), vec3(1.0, 0.99, 0.96), pow(sd, 3.0) * 0.6 + 0.4);
+      dc = mix(dc, cw, dcl * 0.85);
+      dc = mix(dc, vec3(0.80, 0.84, 0.90), smoothstep(0.0, -0.08, h));
+      c = mix(c, dc, uDay);
+    }
     c = max(c, vec3(0.0));
     gl_FragColor = vec4(c, 1.0);
   }`;
@@ -161,22 +177,33 @@ G.buildSky = () => {
   G.sky.frustumCulled = false; G.sky.renderOrder = -1;
   G.scene.add(G.sky);
   // Reflections: environment maps from painted equirectangular skies (sunset, night).
-  const paint = (night) => {
+  const paint = (night, day) => {
     const W = 512, H = 256, cv = document.createElement('canvas'); cv.width = W; cv.height = H;
     const c = cv.getContext('2d');
     const g = c.createLinearGradient(0, 0, 0, H);
-    if (night) { g.addColorStop(0, '#04070f'); g.addColorStop(0.45, '#101a33'); g.addColorStop(0.5, '#1b2440'); g.addColorStop(0.52, '#1a2236'); g.addColorStop(1, '#0d1322'); }
+    if (day) { g.addColorStop(0, '#3e6cb4'); g.addColorStop(0.3, '#86a8d8'); g.addColorStop(0.47, '#d6e0ec'); g.addColorStop(0.5, '#eef2f6'); g.addColorStop(0.53, '#e2e8f0'); g.addColorStop(1, '#c8d0dc'); }
+    else if (night) { g.addColorStop(0, '#04070f'); g.addColorStop(0.45, '#101a33'); g.addColorStop(0.5, '#1b2440'); g.addColorStop(0.52, '#1a2236'); g.addColorStop(1, '#0d1322'); }
     else { g.addColorStop(0, '#2a3466'); g.addColorStop(0.3, '#7a5e96'); g.addColorStop(0.46, '#e8a08a'); g.addColorStop(0.5, '#ffc08a'); g.addColorStop(0.52, '#d8bcc4'); g.addColorStop(1, '#a89aaa'); }
     c.fillStyle = g; c.fillRect(0, 0, W, H);
     if (!night) {
-      const sun = G.SUN_SET, u = (Math.atan2(sun.x, -sun.z) / (2 * Math.PI) + 0.5) * W, v = (0.5 - Math.asin(sun.y) / Math.PI) * H;
-      const rg = c.createRadialGradient(u, v, 0, u, v, 90); rg.addColorStop(0, 'rgba(255,240,200,1)'); rg.addColorStop(0.15, 'rgba(255,190,110,0.9)'); rg.addColorStop(1, 'rgba(255,150,80,0)');
+      const sun = day ? G.SUN_DAY : G.SUN_SET, u = (Math.atan2(sun.x, -sun.z) / (2 * Math.PI) + 0.5) * W, v = (0.5 - Math.asin(sun.y) / Math.PI) * H;
+      const rg = c.createRadialGradient(u, v, 0, u, v, 90); if (day) { rg.addColorStop(0, 'rgba(255,252,240,1)'); rg.addColorStop(0.2, 'rgba(255,244,220,0.7)'); rg.addColorStop(1, 'rgba(255,240,220,0)'); } else { rg.addColorStop(0, 'rgba(255,240,200,1)'); rg.addColorStop(0.15, 'rgba(255,190,110,0.9)'); rg.addColorStop(1, 'rgba(255,150,80,0)'); }
       c.fillStyle = rg; c.fillRect(0, 0, W, H);
     }
     const t = new THREE.CanvasTexture(cv); t.mapping = THREE.EquirectangularReflectionMapping; t.encoding = THREE.sRGBEncoding;
     return G.pmrem.fromEquirectangular(t).texture;
   };
-  G.envSunset = paint(false); G.envNight = paint(true);
+  G.envSunset = paint(false); G.envNight = paint(true); G.envDay = paint(false, true);
+  // Indoors by day the "sky" a surface sees is mostly warm pine with a few bright windows, not open blue sky.
+  G.envRoom = (() => {
+    const W = 512, H = 256, cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+    const c = cv.getContext('2d'), g = c.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, '#5a4030'); g.addColorStop(0.42, '#8a6446'); g.addColorStop(0.5, '#9a7252'); g.addColorStop(0.58, '#6e4c34'); g.addColorStop(1, '#3a2a20');
+    c.fillStyle = g; c.fillRect(0, 0, W, H);
+    for (const u of [0.08, 0.3, 0.55, 0.8]) { const rg = c.createRadialGradient(u * W, H * 0.45, 0, u * W, H * 0.45, 34); rg.addColorStop(0, 'rgba(240,244,250,0.95)'); rg.addColorStop(1, 'rgba(240,244,250,0)'); c.fillStyle = rg; c.fillRect(0, 0, W, H); }
+    const t = new THREE.CanvasTexture(cv); t.mapping = THREE.EquirectangularReflectionMapping; t.encoding = THREE.sRGBEncoding;
+    return G.pmrem.fromEquirectangular(t).texture;
+  })();
   G.scene.environment = G.envSunset;
 };
 
@@ -277,7 +304,7 @@ G.buildForest = () => {
   while (total() < want && tries++ < 20000) {
     const a = r() * Math.PI * 2, d = 13 + Math.pow(r(), 0.7) * 95;
     const x = CLEAR.x + Math.cos(a) * d * 1.1, z = CLEAR.z + Math.sin(a) * d;
-    if (rectDist(x, z, -5, -6, 16, 10) < 1) continue;
+    if (rectDist(x, z, -5, -6, 20, 10) < 1) continue;
     if (z > 7 && z < PATH_END + 4 && Math.abs(x - pathX(z)) < 4.5) continue;
     if (Math.hypot(x - LAKE.x, z - LAKE.z) < LAKE.r + 3) continue;
     if (Math.hypot(x - CLEAR.x, (z - CLEAR.z) * 0.9) < CLEAR.r - 6 && r() < 0.85) continue;
@@ -289,7 +316,7 @@ G.buildForest = () => {
     (near(m) ? lists : farLists)[vi].push(m);
   }
   // A few big framing pines close to the cabin, as in the reference shots.
-  for (const [x, z, s] of [[-3.6, 9, 15], [15, 8.5, 14], [-4.5, -2, 17], [16, -1, 16], [-0.5, 23, 12], [13.5, 24, 13], [-3, 16, 11]]) lists[0].push(G.mtx(x, terrainH(x, z) - 0.15, z, s, s, s, r() * 6));
+  for (const [x, z, s] of [[-3.6, 9, 15], [19.5, 9, 14], [-4.5, -2, 17], [20, -1, 16], [-0.5, 23, 12], [13.5, 24, 13], [-3, 16, 11]]) lists[0].push(G.mtx(x, terrainH(x, z) - 0.15, z, s, s, s, r() * 6));
   const place = (geos, ls, shadows) => geos.forEach((g, i) => {
     if (!ls[i].length) return;
     const im = new THREE.InstancedMesh(g, mat, ls[i].length);
@@ -311,7 +338,7 @@ G.buildForest = () => {
   for (let i = 0; i < 160; i++) {
     const a = r() * Math.PI * 2, d = 8 + r() * 26;
     const x = CLEAR.x + Math.cos(a) * d, z = CLEAR.z + Math.sin(a) * d;
-    if (rectDist(x, z, -1, -1, 12, 8.2) < 0.6) continue;
+    if (rectDist(x, z, -1, -1, 18, 8.2) < 0.6) continue;
     if (z > 7 && z < PATH_END + 2 && Math.abs(x - pathX(z)) < 2.6) continue;
     const s = 0.35 + r() * 0.9;
     drifts.push(G.mtx(x, terrainH(x, z) + s * 0.05, z, s * (1 + r()), s * 0.55, s * (1 + r()), r() * 6));
@@ -424,12 +451,50 @@ function windowAt(axis, c, a, b, y0, y1, outward) {
   G.CAMBLOCK.push(out, inn);
   return sill;
 }
+/* The study: a log lean-to on the east wall, reached by a door in the kitchen that is always locked. */
+function signTex() {
+  return G.canvasTex(0, null, { w: 256, h: 192, draw: (c, w, h) => {
+    c.fillStyle = '#f3ecdc'; c.fillRect(0, 0, w, h);
+    c.strokeStyle = 'rgba(80,60,40,0.25)'; c.lineWidth = 2; c.strokeRect(6, 6, w - 12, h - 12);
+    c.save(); c.translate(w / 2, h * 0.42); c.rotate(-0.05);
+    c.fillStyle = '#b8322a'; c.font = 'bold 54px "Comic Sans MS", "Marker Felt", cursive'; c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.fillText('NO', 0, -28); c.fillText('GIANTS', 0, 28); c.restore();
+    c.fillStyle = '#3a3a48'; c.font = '20px "Comic Sans MS", cursive'; c.textAlign = 'center'; c.fillText('(this means you)', w / 2, h - 26);
+  } });
+}
+function buildAnnex() {
+  const A = ANNEX, h0 = 2.55, h1 = 2.05, cx = (A.x0 + A.x1) / 2, cz = (A.z0 + A.z1) / 2;
+  G.box(A.x1 - A.x0 + 0.3, 0.4, A.z1 - A.z0 + 0.3, MAT.stone, cx, -0.2, cz, { uv: [1, 0.3], cast: false });
+  const L = MAT.logs.clone(); L.map = G.rep(TX.logs, 1 / 2.75, 1 / 2.75); L.bumpMap = G.rep(TX.logsB, 1 / 2.75, 1 / 2.75); G.MATS.push(L);
+  // Side walls follow the roof line: tall against the cabin, lower at the far end.
+  const sh = new THREE.Shape(); sh.moveTo(A.x0, -0.4); sh.lineTo(A.x1 + WT / 2, -0.4); sh.lineTo(A.x1 + WT / 2, h1); sh.lineTo(A.x0, h0); sh.closePath();
+  for (const z of [A.z0, A.z1]) { const m = G.add(new THREE.Mesh(new THREE.ExtrudeGeometry(sh, { depth: WT, bevelEnabled: false }), L), world); m.position.z = z - WT / 2; G.CAMBLOCK.push(m); }
+  G.CAMBLOCK.push(G.box(WT, h1 + 0.4, A.z1 - A.z0 + WT, L, A.x1, (h1 - 0.4) / 2, cz, { uv: [A.z1 - A.z0 + WT, h1 + 0.4] }));
+  // A little window, warm at night: somebody is always "just doing something" in here.
+  G.box(0.5, 0.42, 0.04, new THREE.MeshBasicMaterial({ color: '#ffbf7a' }), cx + 0.2, 1.3, A.z1 + WT / 2 + 0.005, { cast: false });
+  G.box(0.62, 0.06, 0.12, MAT.trim, cx + 0.2, 1.06, A.z1 + WT / 2 + 0.04); G.box(0.62, 0.06, 0.1, MAT.trim, cx + 0.2, 1.54, A.z1 + WT / 2 + 0.03);
+  G.box(0.6, 0.05, 0.14, MAT.snow, cx + 0.2, 1.1, A.z1 + WT / 2 + 0.06, { r: 0.02 });
+  // Shed roof falling away from the cabin, with snow.
+  const run = A.x1 - A.x0 + 0.6, slope = Math.atan2(h0 - h1, run), len = Math.hypot(run, h0 - h1);
+  const roof = G.box(len, 0.12, A.z1 - A.z0 + 0.7, MAT.shingle, cx + 0.15, (h0 + h1) / 2 + 0.12, cz, { uv: [1, 1] });
+  roof.rotation.z = -slope; G.CAMBLOCK.push(roof);
+  const sn = G.box(len - 0.05, 0.2, A.z1 - A.z0 + 0.6, MAT.snow, cx + 0.15, (h0 + h1) / 2 + 0.27, cz, { r: 0.08 }); sn.rotation.z = -slope;
+  G.COLL.push({ x0: CAB.x1 + 0.05, z0: A.z0 - 0.15, x1: A.x1 + 0.15, z1: A.z1 + 0.15 });
+  // The door, from the kitchen side: closed, with the sign.
+  const dz = 3.85;
+  G.box(WT * 0.6, 2.0, 0.88, MAT.darkWood, CAB.x1, 1.0, dz);
+  G.box(0.06, 0.08, 1.04, MAT.trim, CAB.x1 - WT / 2, 2.07, dz); for (const s of [-1, 1]) G.box(0.06, 2.05, 0.07, MAT.trim, CAB.x1 - WT / 2, 1.02, dz + s * 0.49);
+  G.sph(0.03, MAT.metal, CAB.x1 - WT / 2 - 0.03, 1.0, dz - 0.32);
+  const sign = new THREE.Mesh(new THREE.PlaneGeometry(0.34, 0.255), G.std({ map: signTex(), roughness: 0.85 }));
+  sign.position.set(CAB.x1 - WT / 2 - 0.012, 1.48, dz); sign.rotation.set(0, -Math.PI / 2, 0.04); world.add(sign);
+  G.STUDY_DOOR = { x: CAB.x1 - 0.5, z: dz };
+}
 G.WINDOWS = [];
 G.buildCabin = () => {
   MAT.logsW = MAT.logs; MAT.boardsW = MAT.boards;
   const { x1, z1, eave } = CAB;
   // Foundation
-  G.box(x1 + 0.5, 0.45, z1 + 0.5, MAT.stone, x1 / 2, -0.2, z1 / 2, { uv: [4, 0.5], cast: false });
+  G.box(x1 + 0.5, 0.45, z1 + 0.5, MAT.stone, x1 / 2, -0.235, z1 / 2, { uv: [4, 0.5], cast: false });   // top just under the floorboards (it used to cover them)
   // Floor & ceiling
   const fl = G.add(new THREE.Mesh(new THREE.PlaneGeometry(x1, z1), MAT.floor), world, false, true);
   fl.rotation.x = -Math.PI / 2; fl.position.set(x1 / 2, 0.002, z1 / 2);
@@ -441,16 +506,21 @@ G.buildCabin = () => {
   // Walls (outer log face, inner boards).
   const W_win = { bedS: { a: 1.6, b: 3.2 }, livS1: { a: 8.6, b: 10.2 }, door: { a: 6.0, b: 7.0 } };
   wall('x', -WT / 2 + 0.11, -0.11, x1 + 0.11, [], '+z', eave);
-  wall('x', z1 + WT / 2 - 0.11, -0.11, x1 + 0.11, [{ a: 1.6, b: 3.2, y0: 0.85, y1: 2.05 }, { a: 8.6, b: 10.2, y0: 0.85, y1: 2.05 }, { a: 6.0, b: 7.0, y0: -0.4, y1: 2.12 }], '-z', eave);
+  wall('x', z1 + WT / 2 - 0.11, -0.11, x1 + 0.11, [{ a: 1.6, b: 3.2, y0: 0.85, y1: 2.05 }, { a: 8.6, b: 10.2, y0: 0.85, y1: 2.05 }, { a: 6.0, b: 7.0, y0: -0.4, y1: 2.12 }, { a: 12.2, b: 13.8, y0: 0.85, y1: 2.05 }], '-z', eave);
   wall('z', -WT / 2 + 0.11, 0, z1, [{ a: 1.5, b: 3.0, y0: 0.85, y1: 2.05 }], '+x', eave);
-  wall('z', x1 + WT / 2 - 0.11, 0, z1, [{ a: 1.4, b: 3.2, y0: 0.75, y1: 2.1 }], '-x', eave);
+  wall('z', x1 + WT / 2 - 0.11, 0, z1, [{ a: 1.4, b: 2.8, y0: 0.85, y1: 2.05 }, { a: 3.4, b: 4.3, y0: -0.4, y1: 2.05 }], '-x', eave);
   // Interior partition (boards both sides).
   const P2 = [MAT.boards, MAT.boards, MAT.boards, MAT.boards, MAT.boards, MAT.boards];
   wall('z', 5, 0.11, z1 - 0.11, [{ a: 3.0, b: 4.0, y0: -0.4, y1: 2.12 }], 'none', CAB.wallH, P2);
+  wall('z', 11, 0.11, z1 - 0.11, [{ a: 1.5, b: 2.6, y0: -0.4, y1: 2.12 }], 'none', CAB.wallH, P2);   // living room | kitchen
+  for (const [zz, xx] of [[1.5, 11], [2.6, 11]]) G.box(0.26, 2.12, 0.07, MAT.trim, xx, 1.06, zz);
+  G.box(0.26, 0.08, 1.24, MAT.trim, 11, 2.16, 2.05);
   windowAt('x', z1, 1.6, 3.2, 0.85, 2.05, 1);
   windowAt('x', z1, 8.6, 10.2, 0.85, 2.05, 1);
   windowAt('z', 0, 1.5, 3.0, 0.85, 2.05, -1);
-  windowAt('z', x1, 1.4, 3.2, 0.75, 2.1, 1);
+  windowAt('x', z1, 12.2, 13.8, 0.85, 2.05, 1);
+  windowAt('z', x1, 1.4, 2.8, 0.85, 2.05, 1);
+  buildAnnex();
   // Door frame + open door leaf (hinged at x = 6.0, swung inward).
   const T = MAT.trim;
   G.box(1.16, 0.1, WT + 0.08, T, 6.5, 2.17, z1); G.box(0.08, 2.12, WT + 0.08, T, 5.96, 1.06, z1); G.box(0.08, 2.12, WT + 0.08, T, 7.04, 1.06, z1);
