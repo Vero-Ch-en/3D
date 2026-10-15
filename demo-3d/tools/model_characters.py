@@ -448,23 +448,29 @@ def build_cowl(coll, P):
 
 
 def build_hood(coll, P):
-    """Hood lying in folds behind the neck, opening forward around the collar."""
+    """A hood lying down: a soft triangular drape across the upper back, its sides wrapping forward round the neck."""
     rings = []
-    for k, (y, w, d, zc) in enumerate((
-        (NECK_Y - 0.075, 0.03, 0.012, -0.075),
-        (NECK_Y - 0.055, 0.105, 0.03, -0.085),
-        (NECK_Y - 0.02, 0.122, 0.05, -0.095),
-        (NECK_Y + 0.025, 0.115, 0.05, -0.092),
-        (NECK_Y + 0.06, 0.095, 0.038, -0.082),
-        (NECK_Y + 0.08, 0.04, 0.016, -0.072),
-    )):
-        rings.append((y, 0, zc, w, d, d * 1.1, 2.2))
-    hood = loft('hood', coll, rings, seg=28, sub=1)
+    # (y, half-width, centre z, thickness)
+    for y, w, zc, d in (
+        (NECK_Y + 0.015, 0.075, -0.06, 0.022),
+        (NECK_Y - 0.02, 0.112, -0.088, 0.03),
+        (SH_Y - 0.005, 0.128, -0.108, 0.032),
+        (SH_Y - 0.05, 0.108, -0.118, 0.028),
+        (SH_Y - 0.1, 0.07, -0.12, 0.022),
+        (SH_Y - 0.14, 0.028, -0.116, 0.014),
+        (SH_Y - 0.16, 0.008, -0.112, 0.008),
+    ):
+        rings.append((y, 0, zc, w, d * 0.6, d, 2.4))
+    hood = loft('hood', coll, rings, seg=32, sub=1)
 
     def drape(x, y, z):
-        # Sides of the hood wrap forward along the collar line.
-        z += 0.05 * smoothstep(0.04, 0.12, abs(x)) * smoothstep(NECK_Y + 0.07, NECK_Y - 0.04, y)
-        z += 0.003 * math.sin(x * 60)   # folds
+        ax = abs(x)
+        # Sides curl forward around the neck; the drape follows the curve of the back.
+        z += 0.06 * smoothstep(0.05, 0.12, ax) * smoothstep(SH_Y - 0.06, NECK_Y, y)
+        z += 0.25 * x * x
+        # A centre fold and a couple of soft creases.
+        z -= 0.006 * gauss(x * x, 0.0006) * smoothstep(NECK_Y, SH_Y - 0.1, y)
+        z += 0.003 * math.sin(x * 70 + y * 25)
         return x, y, z
     deform(hood, drape)
     rim = loft('hood_rim', coll, [
