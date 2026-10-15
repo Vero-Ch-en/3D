@@ -163,6 +163,9 @@ G.Audio = (() => {
     // The house settling in the cold, and night birds outside.
     creak() { if (!ctx) return; const t = ctx.currentTime, o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.setValueAtTime(90 + Math.random() * 40, t); o.frequency.linearRampToValueAtTime(70 + Math.random() * 30, t + 0.5); const bf = ctx.createBiquadFilter(); bf.type = 'bandpass'; bf.frequency.value = 420; bf.Q.value = 8; const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.012, t + 0.12); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.6); o.connect(bf); bf.connect(g); g.connect(master); o.start(t); o.stop(t + 0.7); },
     owl() { if (!ctx) return; for (const [w, f, d] of [[0, 410, 0.35], [0.55, 380, 0.2], [0.85, 400, 0.6]]) { const t = ctx.currentTime + w, o = ctx.createOscillator(); o.frequency.setValueAtTime(f, t); o.frequency.linearRampToValueAtTime(f * 0.92, t + d); const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.018, t + 0.06); g.gain.exponentialRampToValueAtTime(0.0001, t + d + 0.1); o.connect(g); g.connect(outF); o.start(t); o.stop(t + d + 0.2); } },
+    poke() { if (!ctx) return; burst(0.12, 400, 0.08, 'lowpass', 1, 0, SPOTS.fire.in); for (let i = 0; i < 10; i++) burst(0.03, 1800 + Math.random() * 3500, 0.07, 'bandpass', 2, 0.05 + Math.random() * 0.5, SPOTS.fire.in); },
+    thwump() { burst(0.12, 500, 0.12, 'lowpass', 1); burst(0.15, 3000, 0.04, 'highpass', 0.8, 0.01); },
+    tap() { tone(900, 0.03, 0.03); tone(900, 0.03, 0.03, 0.14); },
     flump() { burst(0.5, 300, 0.07, 'lowpass', 0.8, 0, outF); burst(0.35, 2400, 0.02, 'highpass', 0.7, 0.05, outF); },
     step(surface, vol = 1) {
       if (!ctx) return;
@@ -686,7 +689,9 @@ function updateCamera(dt, t) {
   // Subtle handheld drift.
   handT += dt;
   const hm = G.MOTION;
-  const hx = (Math.sin(handT * 0.9) * 0.006 + Math.sin(handT * 2.3) * 0.003) * hm, hy = (Math.sin(handT * 1.3 + 1) * 0.005 + Math.sin(handT * 3.1) * 0.002) * hm;
+  c.shake = Math.max(0, (c.shake || 0) - dt * 2.5);
+  const sk = c.shake * c.shake * 0.05 * (0.4 + 0.6 * G.MOTION);
+  const hx = (Math.sin(handT * 0.9) * 0.006 + Math.sin(handT * 2.3) * 0.003) * hm + Math.sin(handT * 61) * sk, hy = (Math.sin(handT * 1.3 + 1) * 0.005 + Math.sin(handT * 3.1) * 0.002) * hm + Math.cos(handT * 53) * sk;
   G.camera.position.copy(c.pos).add(new THREE.Vector3(hx, hy, 0));
   G.camera.lookAt(c.look.x + hx * 0.5, c.look.y + hy * 0.5, c.look.z);
   // Portrait phones: widen the vertical angle so the frame keeps most of a landscape shot's width.
@@ -935,7 +940,7 @@ function partnerHold(p, dt, t) {
 G.setHold = (on) => {
   const p = PARTNER;
   if (on) { const rx = Math.cos(PLAYER.yaw), rz = -Math.sin(PLAYER.yaw); p.holdSide2 = ((p.x - PLAYER.x) * rx + (p.z - PLAYER.z) * rz) > 0 ? 1 : -1; }
-  p.hold = on; if (!on) { p.holdOn = false; PLAYER.holdOn = false; }
+  p.hold = on; p.holdTimer = null; if (!on) { p.holdOn = false; PLAYER.holdOn = false; }
 };
 // Scripted walk. An unreachable target (inside furniture) is moved to the nearest open spot, and a
 // walk that still can't finish gives up after a while, so a story beat can never hang on it.
@@ -1274,6 +1279,21 @@ function step(dt, t) {
     PLAYER.swayTarget = 0;
   }
   G.Audio.humAt(G.headPos(PARTNER));
+  // When things are going well, now and then she reaches for you first.
+  if (G.S && STATE.started && G.S.chapter !== 'prologue' && PARTNER.mode === 'follow' && !busy() && !PARTNER.task && !PARTNER.lead && !PARTNER.hidden && !PARTNER.lie && !(PARTNER.sit > 0.2) && !(PLAYER.sit > 0.2)) {
+    PARTNER.initT = (PARTNER.initT == null ? 45 : PARTNER.initT) - dt;
+    const dP = Math.hypot(PARTNER.x - PLAYER.x, PARTNER.z - PLAYER.z);
+    if (PARTNER.initT < 0 && dP < 2.4) {
+      PARTNER.initT = 55 + Math.random() * 55;
+      if (G.S.vars.bond >= 2 || G.S.mem.affection >= 3) {
+        const r = Math.random();
+        if (r < 0.4) { G.Audio.tap(); bark('*tap tap*', 1.2); wait(1.1).then(() => { if (!busy()) bark(['Hello. I only wanted to say hello.', 'Still here? Good.', 'You look thoughtful, Partner.', 'Just checking you’re real.']); }); }
+        else if (r < 0.75 && !PARTNER.hold) { G.setHold(true); PARTNER.holdTimer = 18 + Math.random() * 14; bark(['*takes your hand*', 'Hand, please.', 'I’ll have this, thank you.']); G.S.mem.partnerInit = (G.S.mem.partnerInit || 0) + 1; }
+        else bark(['*rests her head on your shoulder for a moment*', '*bumps your arm with hers*'], 2.4);
+      }
+    }
+  }
+  if (PARTNER.holdTimer != null && PARTNER.hold) { PARTNER.holdTimer -= dt; if (PARTNER.holdTimer <= 0) { G.setHold(false); bark(['*lets go, reluctantly*', 'Free range again.'], 1.8); } }
   if (STATE.hugIn) {
     const H = STATE.hugIn, kk = 1 - Math.exp(-8 * dt);
     for (const [c, p, y] of [[PLAYER, H.p, H.yaw], [PARTNER, H.q, H.yaw + Math.PI]]) { moveChar(c, (p[0] - c.x) * kk, (p[1] - c.z) * kk); c.yaw = angDamp(c.yaw, y, 10, dt); c.speed = 0; }

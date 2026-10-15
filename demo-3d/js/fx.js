@@ -295,6 +295,53 @@ G.snowPuff = (near) => {
   for (const p of PUFF) { if (p.age < p.life) continue; p.age = 0; p.life = 0.9 + Math.random() * 0.7; p.x = best.x + (Math.random() - 0.5) * 0.5; p.z = best.z + (Math.random() - 0.5) * 0.2; p.y = best.y; p.vy = -Math.random() * 0.5; p.vx = (Math.random() - 0.5) * 0.4 + G.WIND.gust * 0.3; p.s.visible = true; if (++n > 14) break; }
   return true;
 };
+// A burst of powder at a point (a snowball landing).
+G.puffAt = (x, y, z, n = 12) => {
+  let k = 0;
+  for (const p of PUFF) { if (p.age < p.life) continue; p.age = 0; p.life = 0.5 + Math.random() * 0.5; p.x = x + (Math.random() - 0.5) * 0.15; p.z = z + (Math.random() - 0.5) * 0.15; p.y = y + (Math.random() - 0.5) * 0.15; p.vy = Math.random() * 1.2; p.vx = (Math.random() - 0.5) * 1.6; p.s.visible = true; if (++k >= n) break; }
+};
+/* Snowballs: a packed ball flying in an arc from one hand to its target. Resolves when it lands. */
+const BALLS = [];
+let ballGeo, ballMat;
+G.throwSnow = (from, to, dur = 0.55) => new Promise((res) => {
+  if (!ballGeo) { ballGeo = new THREE.SphereGeometry(0.045, 10, 8); ballMat = G.MAT.snow; }
+  const m = new THREE.Mesh(ballGeo, ballMat); m.castShadow = true; G.scene.add(m);
+  BALLS.push({ m, from: from.clone(), to: to.clone(), t: 0, dur, res });
+});
+function updateBalls(dt) {
+  for (let i = BALLS.length - 1; i >= 0; i--) {
+    const b = BALLS[i]; b.t += dt; const k = Math.min(1, b.t / b.dur);
+    b.m.position.lerpVectors(b.from, b.to, k); b.m.position.y += Math.sin(k * Math.PI) * 0.35 * b.from.distanceTo(b.to) / 3;
+    if (k >= 1) { G.scene.remove(b.m); BALLS.splice(i, 1); G.puffAt(b.to.x, b.to.y, b.to.z, 14); b.res(); }
+  }
+}
+/* The snow globe on the mantle: shake it and the snow inside swirls, then settles. */
+let GLOBE;
+function buildGlobeSnow() {
+  const N = 70, pos = new Float32Array(N * 3), seed = new Float32Array(N);
+  for (let i = 0; i < N; i++) seed[i] = Math.random();
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('seed', new THREE.BufferAttribute(seed, 1));
+  const mat = new THREE.ShaderMaterial({
+    transparent: true, depthWrite: false,
+    uniforms: { uT: { value: 99 }, uC: { value: new THREE.Vector3(8.5, 1.56, 0.75) }, uPx: { value: 1 } },
+    vertexShader: `
+      attribute float seed; uniform float uT; uniform vec3 uC; uniform float uPx; varying float vA;
+      void main(){
+        float s = fract(seed * 13.7), a = seed * 6.283 + uT * (2.5 - uT * 0.25) * (0.6 + s);
+        float settle = clamp(uT / 7.0, 0.0, 1.0);
+        float r = 0.055 * sqrt(fract(seed * 7.3)) * (1.0 - settle * 0.3);
+        float y = mix(0.05 * (fract(seed * 3.1) * 2.0 - 1.0) + sin(uT * 2.0 + seed * 9.0) * 0.015 * (1.0 - settle), -0.045, settle * settle);
+        vec3 p = uC + vec3(cos(a) * r, y, sin(a) * r);
+        vA = 1.0 - smoothstep(9.0, 12.0, uT);
+        vec4 mv = modelViewMatrix * vec4(p, 1.0);
+        gl_PointSize = uPx * (2.0 + s * 2.0) / -mv.z;
+        gl_Position = projectionMatrix * mv;
+      }`,
+    fragmentShader: 'varying float vA; void main(){ float d = length(gl_PointCoord - 0.5); if (d > 0.5) discard; gl_FragColor = vec4(1.0, 1.0, 1.0, smoothstep(0.5, 0.1, d) * vA); }',
+  });
+  GLOBE = new THREE.Points(g, mat); GLOBE.frustumCulled = false; GLOBE.renderOrder = 5; G.scene.add(GLOBE);
+}
+G.shakeGlobe = () => { if (GLOBE) GLOBE.material.uniforms.uT.value = 0; };
 function updatePuffs(dt) {
   for (const p of PUFF) {
     if (p.age >= p.life) { if (p.s.visible) p.s.visible = false; continue; }
@@ -377,13 +424,14 @@ function buildSpindrift() {
   DRIFT = new THREE.Points(g, mat); DRIFT.frustumCulled = false; G.scene.add(DRIFT);
 }
 
-G.buildFX = () => { buildBird(); buildSpindrift(); buildFootprints(); buildWetPrints(); buildBreath(); buildSteam(); buildEmbers(); buildDust(); buildWindowLight(); buildSunbeams(); buildPuffs(); };
+G.buildFX = () => { buildGlobeSnow(); buildBird(); buildSpindrift(); buildFootprints(); buildWetPrints(); buildBreath(); buildSteam(); buildEmbers(); buildDust(); buildWindowLight(); buildSunbeams(); buildPuffs(); };
 let sparkT = 0;
 G.sparkBurst = () => { sparkT = 1; };
 G.updateFX = (dt, t) => {
   fxTime += dt;
   updateFootprints(); updateWetPrints();
-  updateBreath(dt); updateSteam(dt); updatePuffs(dt); updateBird(dt, t);
+  updateBreath(dt); updateSteam(dt); updatePuffs(dt); updateBird(dt, t); updateBalls(dt);
+  if (GLOBE) { const U = GLOBE.material.uniforms; U.uT.value = Math.min(99, U.uT.value + dt); U.uPx.value = innerHeight * Math.min(window.devicePixelRatio || 1, G.Q.dpr) / 900 * 0.45; GLOBE.visible = U.uT.value < 12; }
   if (DRIFT) { const U = DRIFT.material.uniforms, P = G.PLAYER; U.uTime.value = t; U.uGust.value = G.WIND.gust; U.uCenter.value.set(P.x, G.terrainH(P.x, P.z) + 0.02, P.z); U.uPx.value = innerHeight * Math.min(window.devicePixelRatio || 1, G.Q.dpr) / 900; DRIFT.visible = !G.inside(P.x, P.z); }
   sparkT = Math.max(0, sparkT - dt * 1.5);
   if (SHAFTS) { const i = (G.STATE.day || 0) * 0.06; SHAFTS.visible = i > 0.002; SHAFTS.material.uniforms.uI.value = i; SHAFTS.material.uniforms.uTime.value = t; }

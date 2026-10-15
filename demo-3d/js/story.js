@@ -152,6 +152,9 @@ const REACT = {
   lampR: { lines: [], drowsy: ['That is my lamp. I can feel it from here.'] },
   fire: { lines: ['There. Now it feels like a proper morning.', 'I do love watching you be competent at things.'] },
   clock: { lines: ['Leave it fast, please. It’s the only reason we’re ever on time.', 'Four minutes fast. Like you, at breakfast.'], drowsy: ['What time is it? No. Don’t tell me.'] },
+  globe: { lines: ['Gently. It’s older than both of us.', 'I always wanted to live in there.'] },
+  armchair: { lines: ['That chair suits you. Very distinguished.', 'You look like someone about to read a will.'] },
+  chairB: { lines: ['That’s the creaky one. It likes you.'] },
   basil: { lines: ['Thank you for looking after my son.', 'Basil says thank you. Basil is very shy about it.'] },
   scrap: { lines: ['We need more pages, I think.', 'Please skip the lake page. I’m begging you, Partner.', 'Is that my handwriting? It’s dreadful.'] },
   shelf2: { lines: ['Six copies. And neither of us has made a single recipe.', 'The pine candle is for emergencies. Don’t light it on a whim.'] },
@@ -205,12 +208,17 @@ rewire('photos', () => N('(Six polaroids on a string. The lake. The fire. The ni
 for (const id of ['lampL', 'lampR']) { const it = findInter(id); const was = it.act; it.act = () => { was(); S.lastUse = { id, t: G.simT, room: hereRoom() }; react(id); }; }
 // Living room
 const fire = rewire('fire', async () => {
-  if (G.FIRE.on) { await N(cyc('fireOn', ['(Warm. The kind of warm that gets into your sleeves.)', '(You add a log. The fire approves.)'])); return; }
+  if (G.FIRE.on) {
+    S.n.poke = (S.n.poke || 0) + 1;
+    if (S.n.poke % 2) { G.Audio.poke(); G.sparkBurst(); await N(S.n.poke === 1 ? '(You poke the fire. It sends up a tall spray of sparks, as if it were showing off.)' : '(Another poke. More sparks. The fire is enjoying the attention.)'); }
+    else await N(cyc('fireOn', ['(Warm. The kind of warm that gets into your sleeves.)', '(You add a log. The fire approves.)']));
+    return;
+  }
   G.FIRE.on = true; G.Audio.blow();
   await N('(It takes three matches and a certain amount of quiet swearing.)');
   if (canHear()) await Pt('The fire person, at work. My hero, Partner.');
 });
-fire.label = () => (G.FIRE.on ? 'Fireplace' : 'Light the fire');
+fire.label = () => (G.FIRE.on ? 'Poke the fire' : 'Light the fire');
 const sofa = findInter('sofa');
 sofa.label = () => (ch() === 'evening' ? (STATE.cuddled ? 'Sofa' : 'Curl up together') : 'Sit');
 sofa.act = () => { if (ch() === 'evening') return G.Story.cuddle(); return run(sitSofa, 'sofa'); };
@@ -233,7 +241,7 @@ inter('cushion', [9.2, 0.6, 2.5], 0.6, 'Under the cushions', async () => {
   await N(`(Under the cushion: three of your socks, a pen, the remote for a radio you no longer own,${pancake} and half a biscuit.)`);
   if (!S.flags.stash) { S.flags.stash = 1; await N('(It’s her stash. Everything in it was taken from you. You decide to let it grow.)'); }
 }, () => morning());
-inter('armchair', [6.0, 0.6, 2.45], 0.75, 'Armchair', () => N(cyc('armchair', ['(The armchair. Technically yours. {P}’s blanket lives on it.)', '(The blanket smells of her. You fold it. Badly.)'])));
+inter('armchair', [6.62, 0.6, 1.68], 0.8, 'Sit in the armchair', () => sitFree(SEATS.armchair));
 inter('frontdoor', [6.5, 1, 4.15], 0.8, 'Front door', async () => {
   if (morning()) {
     if (!S.flags.breakfastDone) { await N('(Breakfast first. Snow-day law, apparently.)'); if (canHear() && !PARTNER.lie) await Pt('Not without breakfast, Partner. I won’t allow it.'); return; }
@@ -304,11 +312,48 @@ G.SMART = [
   { id: 'kwin', spot: { x: 13.0, z: 4.1 }, yaw: 0, dur: [4, 6], look: { x: 13, y: 1.4, z: 8 }, lines: ['It’s so white out there. As if someone had tidied the world away.', 'Somebody drew a heart on the porch rail. It was me. Please don’t look.'] },
 ];
 
+/* ---------- other places to sit, and Partner coming to join you ---------- */
+const SEATS = {
+  armchair: { id: 'armchair', x: 6.22, z: 1.97, yaw: 2.23, y: 0.47, line: '(The armchair. Technically yours. {P}’s blanket lives on it, and it smells of her.)' },
+  chairB: { id: 'chairB', x: 13.3, z: 3.58, yaw: Math.PI, y: 0.49, join: 'kitA', line: '(The kitchen chair creaks the way it always has. You know exactly which one it is by the creak.)' },
+  chairC: { id: 'chairC', x: 13.0, z: 2.3, yaw: 0, y: 0.49, join: 'kitA' },
+  bench: { id: 'bench', x: 9.83, z: 5.52, yaw: 0, y: 0.47, join: 'bench', line: '(The bench is cold enough to count as a dare. The clearing is white and still, all the way to the trees.)' },
+};
+const JOIN = {
+  kitA: { id: 'kitA', spot: { x: 12.72, z: 4.1 }, seatAt: { x: 12.72, z: 3.58, yaw: Math.PI, y: 0.49 }, dur: [12, 20], ask: ['Mind if I join you?', 'Is this seat taken? It is now.'], lines: ['*rests her chin in her hands*', 'This is nice. Kitchen-table nice.'] },
+  bench: { id: 'benchJ', spot: { x: 8.75, z: 6.15 }, seatAt: { x: 9.07, z: 5.52, yaw: 0, y: 0.47 }, dur: [14, 22], ask: ['It’s freezing out here. …Budge up.', 'Don’t sit out here alone. Wait for me.'], lines: ['*tucks her hands under your arm*', 'The quiet out here is my favourite sound.'] },
+};
+async function sitFree(seat) {
+  if (PARTNER.hold) G.setHold(false);
+  const from = { x: PLAYER.x, z: PLAYER.z, yaw: PLAYER.yaw };
+  await G.sitDown(PLAYER, seat.x, seat.z, seat.yaw, seat.y);
+  PLAYER.freeSit = from; S.pSpoke = true;
+  if (G.SETTINGS.view === 'first') G.CAM.yaw = seat.yaw + Math.PI;   // look the way the seat faces
+  if (seat.line && !S.flags['sat_' + seat.id]) { S.flags['sat_' + seat.id] = 1; await N(seat.line); }
+  const o = seat.join && JOIN[seat.join];
+  if (o && canHear() && PARTNER.mode === 'follow' && !PARTNER.lie && !PARTNER.hidden && !(PARTNER.sit > 0.1)) {
+    if (PARTNER.task) G.endPartnerTask();
+    PARTNER.task = { o, phase: 'go', t: 0 }; G.bark(o.ask, 2.4); addBond(0.2);
+  }
+}
+const breakfastNow = () => morning() && S.flags.pancakesMade && !S.flags.breakfastDone;
+inter('chairB', [13.3, 0.5, 3.95], 0.55, 'Sit', () => sitFree(SEATS.chairB), () => !breakfastNow());
+inter('chairC', [13.0, 0.5, 1.95], 0.55, 'Sit', () => sitFree(SEATS.chairC), () => !breakfastNow());
+// The old snow globe on the mantle: pick it up and shake it.
+inter('globe', [8.5, 1.5, 1.0], 0.7, 'Shake the snow globe', async () => {
+  STATE.sceneShot = true;
+  G.setShot(fixed(V(8.62, 1.66, 1.17), V(8.5, 1.555, 0.75), 30, 0.012));
+  G.shakeGlobe(); G.Audio.musicBox();
+  await N(cyc('globe', ['(You give the snow globe a shake. Inside: a tiny cabin and a single, very determined pine. The snow takes its time.)', '(The snow swirls and settles. The little cabin’s window is painted yellow, as if someone were home.)']), { shot: 'keep' });
+  await wait(1.5);
+  STATE.sceneShot = false; G.releaseCamera();
+});
 async function sitSofa() {
   if (PARTNER.hold) G.setHold(false);
   const S0 = G.SOFA, from = { x: PLAYER.x, z: PLAYER.z, yaw: PLAYER.yaw };
   await G.sitDown(PLAYER, S0.x + 0.45, S0.z - 0.05, Math.PI, S0.seatY);
   PLAYER.freeSit = from;
+  if (G.SETTINGS.view === 'first') G.CAM.yaw = 0;
   S.pSpoke = true;   // the sofa has its own replies
   const partnerThere = PARTNER.task && PARTNER.task.o.id === 'sofa' && PARTNER.task.phase === 'do';
   if (partnerThere) { S.mem.affection++; addBond(0.4); G.bark(['*leans against you*', 'Mm. My pillow has arrived.', 'Oh, good. The heater.'], 2.4); return; }
@@ -339,6 +384,7 @@ const ABOUT = {
     else { await Pt('Were you about to open my cupboard?'); await Y('Admiring it. From a respectful distance.'); await Pt('Keep it respectful.'); }
   },
   basil: async () => { await Pt('Basil likes you, you know. He just can’t show it.'); await Y('He’s a plant.'); await Pt('He is a very reserved plant.'); },
+  globe: async () => { await Pt('That snow globe was my grandmother’s.'); await Y('The cabin in it looks a bit like ours.'); await Pt('I know. I think that’s why I wanted this place.'); },
   radio: async () => { await Pt('Do you remember the first time we danced in here?'); await Y('Two in the morning. The kettle was boiling.'); await Pt('And you stepped on my foot, and the kettle screamed, and neither of us stopped.'); },
   study: async () => {
     await Pt('You were looking at the study door.');
@@ -436,6 +482,37 @@ const TEASES = [
   ['You snore, you know.', 'I purr. There’s a difference, and it’s considerable.'],
   ['You’re staring.', 'I’m looking. You are the one staring.'],
 ];
+/* A snowball, and the inevitable reply. */
+async function snowball() {
+  const p = PARTNER;
+  if (p.hold) G.setHold(false);
+  STATE.busy = true;
+  // She steps back a few paces first; it's only fair.
+  const ax = Math.atan2(p.x - PLAYER.x, p.z - PLAYER.z), d = Math.hypot(p.x - PLAYER.x, p.z - PLAYER.z);
+  if (d < 2.5) { G.bark('Oh, no. Not the snow. Partner, don’t you dare.', 2); await G.walkTo(p, PLAYER.x + Math.sin(ax) * 3.2, PLAYER.z + Math.cos(ax) * 3.2, 1.9); }
+  PLAYER.yaw = Math.atan2(p.x - PLAYER.x, p.z - PLAYER.z); p.yaw = PLAYER.yaw + Math.PI;
+  // Side-on, wide enough to see the ball fly both ways.
+  { const mx = (PLAYER.x + p.x) / 2, mz = (PLAYER.z + p.z) / 2, sx = Math.cos(PLAYER.yaw), sz = -Math.sin(PLAYER.yaw), D = Math.hypot(p.x - PLAYER.x, p.z - PLAYER.z) * 0.9 + 1.8;
+    const look = V(mx, G.floorAt(mx, mz) + 1.1, mz), side = Math.random() < 0.5 ? 1 : -1;
+    const pos = V(mx + sx * D * side, look.y + 0.45, mz + sz * D * side);
+    STATE.sceneShot = true; G.setShot(fixed(pos, look, 44, 0.004)); }
+  PLAYER.forcePose = 'throw'; await wait(0.45); PLAYER.forcePose = null;
+  const hand = (c, up = 1.45) => { const h = G.headPos(c); return new THREE.Vector3(h.x + Math.cos(c.yaw) * -0.2, h.y - 0.3 * up, h.z - Math.sin(c.yaw) * -0.2); };
+  const chest = (c) => { const h = G.headPos(c); return new THREE.Vector3(h.x, h.y - 0.35, h.z); };
+  await G.throwSnow(hand(PLAYER), chest(p), 0.55);
+  G.Audio.thwump(); p.lidsClosed = true; wait(0.4).then(() => { p.lidsClosed = false; });
+  S.mem.snowballs = (S.mem.snowballs || 0) + 1; addRivalry(0.3); addBond(0.2);
+  G.bark(S.mem.snowballs === 1 ? 'Oh. Oh, you did not, Partner.' : ['That’s it. That is war.', 'You’ll regret that. Lovingly.', 'Right in the scarf!'], 2);
+  await wait(1.1);
+  p.forcePose = 'throw'; await wait(0.5); p.forcePose = null;
+  await G.throwSnow(hand(p), chest(PLAYER), 0.6);
+  G.Audio.thwump(); G.CAM.shake = 1;
+  G.bark(['Fair is fair.', 'Ha! Direct hit.', 'We are even. For now.'], 2.2);
+  if (S.mem.snowballs === 1) addScrap('snowball', 'A snowball fight in the clearing. Both claimed victory. Both were wet to the elbow.');
+  await wait(1.2);
+  STATE.sceneShot = false; G.releaseCamera();
+  STATE.busy = false;
+}
 async function together() {
   if (G.busy() || S.flags.noTogether) return;
   const p = PARTNER;
@@ -444,6 +521,8 @@ async function together() {
   const acts = [];
   if (!seated) acts.push({ id: 'hug', t: 'Hug' }, { id: 'hand', t: p.hold ? 'Let go' : 'Hold hands' });
   const music = G.Audio.radioOn() && G.inside(PLAYER.x, PLAYER.z) && PLAYER.x > 5;
+  const snowy = !G.onDeck(PLAYER.x, PLAYER.z) && !G.onDeck(p.x, p.z) && !p.lie && !p.sit;
+  if (!seated && snowy) acts.push({ id: 'snow', t: 'Throw a snowball' });
   if (!seated && music) acts.push({ id: 'dance', t: 'Dance' });
   if (!p.lie) acts.push({ id: 'tease', t: 'Tease' });
   acts.push({ id: 'kiss', t: 'Kiss' }, { id: 'talk', t: 'Talk' });
@@ -478,6 +557,7 @@ async function together() {
       if (seated || !(await G.hug('kiss', line))) G.bark(line, 2.4);
       return;
     }
+    case 'snow': await snowball(); return;
     case 'dance': S.mem.dances = (S.mem.dances || 0) + 1; S.mem.affection++; addBond(S.mem.dances < 3 ? 0.5 : 0.1); if (S.mem.dances === 1) addScrap('dance', 'A slow dance in the kitchen. Somebody stepped on somebody’s foot.'); await G.dance(); return;
     case 'talk': STATE.busy = true; await talk(); STATE.busy = false; return;
   }
@@ -770,7 +850,7 @@ G.setCake = setCake;
 G.CH = CH; G.go = go;
 
 const bench = findInter('bench');
-bench.label = () => (ch() === 'evening' ? (STATE.porchDone ? 'Bench' : 'Watch the stars') : 'Bench');
-bench.act = () => { if (ch() === 'evening') return G.Story.porch(); return run(() => N(cyc('bench', ['(Someone has carved two initials into the bench. Not you. Probably.)', '(The bench is cold enough to count as a dare. Later. When there are stars.)'])), 'bench'); };
+bench.label = () => (ch() === 'evening' ? (STATE.porchDone ? 'Bench' : 'Watch the stars') : 'Sit on the bench');
+bench.act = () => { if (ch() === 'evening') return G.Story.porch(); return run(() => sitFree(SEATS.bench), 'bench'); };
 G.$('pScrap').addEventListener('click', () => { G.UI.scrapbook(S.scrap); });
 });

@@ -54,6 +54,7 @@ function floorLamp(x, z) {
   const shadeMat = G.std({ color: '#f1dcb2', roughness: 0.9, emissive: '#ffb060', emissiveIntensity: 1, side: THREE.DoubleSide });
   const shade = cyl(0.16, 0.23, 0.3, shadeMat, 0, 1.55, 0, { parent: g, open: true, cast: false });
   const light = new THREE.PointLight('#ffb062', 0, 8, 2); light.position.set(0, 1.5, 0); g.add(light);
+  G.CAMBLOCK.push(shade);   // keep the camera from ending up inside the shade
   const L = { g, light, shade, on: true, power: 9, flick: 1 };
   LAMPS.push(L);
   G.COLL.push({ x0: x - 0.2, z0: z - 0.2, x1: x + 0.2, z1: z + 0.2 });
@@ -143,11 +144,19 @@ G.buildInterior = () => {
   G.FIRE = { planes: firePlanes, light: fireLight, on: true, power: 9, level: 1 };
   G.INTER.push({ id: 'fire', pos: [fx, 0.6, 1.25], r: 1.3, label: () => (G.FIRE.on ? 'Fireplace' : 'Light the fire'), act: () => { G.FIRE.on = !G.FIRE.on; if (G.FIRE.on) G.say('partner', 'The fire person, at work. My hero, {giant}.'); } });
   // Mantle: candles, frames, a snow globe, a sprig of pine.
-  candle(fx - 0.85, 1.48, 0.6, 0.16, 0.03); candle(fx - 0.72, 1.48, 0.62, 0.11, 0.03); candle(fx + 0.82, 1.48, 0.62, 0.13, 0.03);
+  // Mantle things sit on the shelf in front of the stone (its face is at z = 0.66), not inside it.
+  candle(fx - 0.85, 1.48, 0.74, 0.16, 0.03); candle(fx - 0.72, 1.48, 0.77, 0.11, 0.03); candle(fx + 0.82, 1.48, 0.76, 0.13, 0.03);
   G.MANTLE_LIGHT = new THREE.PointLight('#ffa850', 1.4, 3, 2); G.MANTLE_LIGHT.position.set(fx, 1.75, 0.8); W.add(G.MANTLE_LIGHT);
-  polaroid(fx - 0.3, 1.62, 0.68, 0, 'lake', -0.12); polaroid(fx + 0.05, 1.6, 0.68, 0, 'hill', 0.08);
-  sph(0.07, G.std({ color: '#dcebfa', roughness: 0.02, transparent: true, opacity: 0.35, env: 1.5 }), fx + 0.5, 1.56, 0.6);
-  cyl(0.07, 0.08, 0.05, MAT.darkWood, fx + 0.5, 1.5, 0.6);
+  polaroid(fx - 0.3, 1.6, 0.675, 0, 'lake', -0.12); polaroid(fx + 0.05, 1.58, 0.675, 0, 'hill', 0.08);
+  // The old snow globe: a tiny cabin and one pine on a snowy base, under glass.
+  { const gx = fx + 0.5, gy = 1.56, gz = 0.75;
+    cyl(0.06, 0.062, 0.012, MAT.snow, gx, gy - 0.031, gz, { seg: 24 });
+    box(0.034, 0.022, 0.026, G.shared({ color: '#7a5038', roughness: 0.8 }), gx - 0.012, gy - 0.014, gz + 0.004);
+    const rf = box(0.04, 0.008, 0.03, MAT.snow, gx - 0.012, gy + 0.001, gz + 0.004); rf.rotation.z = 0.12;
+    box(0.006, 0.006, 0.002, new THREE.MeshBasicMaterial({ color: '#ffd27a' }), gx - 0.006, gy - 0.014, gz + 0.018, { cast: false });
+    const pine = new THREE.Mesh(new THREE.ConeGeometry(0.014, 0.045, 8), G.shared({ color: '#2f4a38', roughness: 0.8 })); pine.position.set(gx + 0.024, gy - 0.002, gz - 0.006); G.world.add(pine);
+    const glass = sph(0.07, G.std({ color: '#e8f2fc', roughness: 0.02, transparent: true, opacity: 0.12, env: 0.7 }), gx, gy, gz, [1, 1, 1], G.world, 40); glass.renderOrder = 6; }
+  cyl(0.07, 0.08, 0.05, MAT.darkWood, fx + 0.5, 1.5, 0.75);
   // Tall bookshelf left of the fireplace.
   bookshelf(6.15, 0.3, 1.5, 0.34, 2.4, 0);
   // Sofa facing the fire.
@@ -182,7 +191,7 @@ G.buildInterior = () => {
   candle(tx - 0.45, 0.46, tz - 0.16, 0.09, 0.03);
   G.INTER.push({ id: 'cake', pos: [tx, 0.6, tz], r: 1.1, label: () => (G.CAKE.lit ? 'Make a wish' : 'Cake'), act: () => G.Story.cake() });
   // Armchair.
-  const chair = new THREE.Group(); chair.position.set(6.25, 0, 1.95); chair.rotation.y = 0.95; W.add(chair);
+  const chair = new THREE.Group(); chair.position.set(6.25, 0, 1.95); chair.rotation.y = -0.91; W.add(chair);   // turned to face the fire
   const cm = G.std({ map: TX.knitDark, color: '#9a6a52', roughness: 1 });
   box(0.86, 0.42, 0.82, cm, 0, 0.21, 0, { parent: chair, r: 0.07, seg: 4 });
   box(0.86, 0.64, 0.2, cm, 0, 0.72, 0.33, { parent: chair, r: 0.08, seg: 4 });

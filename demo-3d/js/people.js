@@ -347,6 +347,7 @@ const ARM_POSES = (G.ARM_POSES = {
   cold: [-0.5, 0.3, -1.65, -0.85],   // arms wrapped around yourself
   warm: [-1.0, 0.18, -0.45, -0.25],  // hands held out to the fire
   pockets: [-0.18, 0.22, -1.05, -0.55], // hands tucked into the hoodie pocket
+  throw: [-2.5, -0.15, -0.5, 0.2],      // arm back over the shoulder (snowballs)
 });
 G.animate = (c, dt, t) => {
   const u = c.m.userData, k = u.k, { lerp: L, clamp, damp } = G;
@@ -416,7 +417,7 @@ G.animate = (c, dt, t) => {
     if (sit > 0.5) { sx = -0.3; ex = -0.75; sz = s * 0.1; }
     for (const name in ARM_POSES) {
       const wgt = pw[name] * (1 - sit) * (name === 'warm' ? idle : 1);
-      if (wgt < 0.001) continue;
+      if (wgt < 0.001 || (name === 'throw' && i !== 0)) continue;   // one arm throws
       const P = ARM_POSES[name];
       // On this rig +s rolls the arm in toward the body (−s spreads it, as the hug does).
       sx = L(sx, P[0] + (name === 'cold' ? Math.sin(t * 31 + i) * 0.012 : 0), wgt); sz = L(sz, s * P[1], wgt); ex = L(ex, P[2], wgt); sy = L(sy, s * P[3], wgt);
