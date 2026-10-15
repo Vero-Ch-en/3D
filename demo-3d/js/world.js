@@ -527,7 +527,9 @@ G.buildCabin = () => {
   // Door frame + open door leaf (hinged at x = 6.0, swung inward).
   const T = MAT.trim;
   G.box(1.16, 0.1, WT + 0.08, T, 6.5, 2.17, z1); G.box(0.08, 2.12, WT + 0.08, T, 5.96, 1.06, z1); G.box(0.08, 2.12, WT + 0.08, T, 7.04, 1.06, z1);
-  const leaf = new THREE.Group(); leaf.position.set(6.04, 0, z1 - 0.08); leaf.rotation.y = -1.75; world.add(leaf);
+  const leaf = new THREE.Group(); leaf.position.set(6.04, 0, z1 - 0.08); leaf.rotation.y = 0; world.add(leaf);
+  leaf.userData.dynamic = true;   // closed against the cold; swings open as someone comes near (game.js)
+  G.FRONT_DOOR = { leaf, openAngle: -1.75, amt: 0, want: 0, x: 6.5, z: z1 };
   G.box(0.94, 2.08, 0.06, MAT.darkWood, 0.47, 1.04, 0, { parent: leaf });
   G.sph(0.03, MAT.metal, 0.85, 1.0, 0.05, [1, 1, 1], leaf);
   // Corner log ends: crossing logs stacked at each corner.

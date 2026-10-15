@@ -155,7 +155,7 @@
     <h1>Snowed In</h1>
     <p class="lede">The first real snow of the winter, a cabin in the pines, and a whole day with nowhere to be. Wake up tangled in the blanket, burn the pancakes, take the long way round, and find your way home by the light in the windows.</p>
     <div class="row"><button class="btn primary" id="begin">Begin</button><button class="btn" id="continue" hidden>Continue</button></div>
-    <div class="keys">WASD walk · Shift run · drag to look · scroll to zoom · E interact · Q together · N time of day · ` stats</div>
+    <div class="keys">WASD walk · Shift run · drag to look · scroll to zoom · E interact · Q together · V first person · N time of day · ` stats</div>
   </div>
 </div>
 
@@ -197,8 +197,14 @@
         <button class="btn small" data-motion="full">Full</button><button class="btn small" data-motion="reduced">Reduced</button>
       </div>
     </div>
+    <div class="prow">
+      <span>View</span>
+      <div class="seg" role="group" aria-label="View">
+        <button class="btn small" data-view="third">Third person</button><button class="btn small" data-view="first">First person</button>
+      </div>
+    </div>
     <button class="btn" id="pScrap">Scrapbook</button>
-    <p class="pkeys">Esc pause · M mute · WASD walk · Shift run · E interact · Q together</p>
+    <p class="pkeys">Esc pause · M mute · V first/third person · WASD walk · Shift run · E interact · Q together</p>
   </div>
 </div>
 

@@ -356,6 +356,15 @@ function buildKitchen() {
   box(0.012, 1.7, 0.01, G.shared({ color: '#55604f', roughness: 0.8 }), 11.42, 0.95, 4.045, { cast: false });
   const note = new THREE.Mesh(new THREE.PlaneGeometry(0.17, 0.17), G.std({ map: noteTex([{ t: 'Property', size: 30 }, { t: 'of me.', size: 30, gap: 44 }, { t: 'Not', size: 34, color: '#b8322a', gap: 56 }, { t: 'Partner’s.', size: 36, color: '#b8322a', gap: 46 }]), roughness: 0.9 }));
   note.position.set(11.52, 1.3, 4.044); note.rotation.set(0, Math.PI, -0.05); W.add(note);
+  // A little radio on the window sill (story.js switches it on and off).
+  K.radio = G.propSlot('radio', 13.58, 0.88, 4.42, Math.PI, (g) => {
+    box(0.26, 0.15, 0.1, enamel('#7c2f2a'), 0, 0.075, 0, { parent: g, r: 0.025, seg: 3 });
+    const grille = box(0.12, 0.09, 0.005, G.shared({ color: '#d8ccb4', roughness: 0.9 }), -0.05, 0.08, 0.051, { parent: g, cast: false });
+    cyl(0.025, 0.025, 0.02, G.shared({ color: '#e9e1d2', roughness: 0.4 }), 0.075, 0.08, 0.055, { parent: g, seg: 14 }).rotation.x = Math.PI / 2;
+    box(0.005, 0.18, 0.005, MAT.metal, 0.1, 0.24, -0.02, { parent: g }).rotation.z = -0.3;
+    const dial = new THREE.Mesh(new THREE.PlaneGeometry(0.035, 0.02), new THREE.MeshBasicMaterial({ color: '#ffb468', transparent: true, opacity: 0 }));
+    dial.position.set(0.075, 0.125, 0.051); dial.userData.dynamic = true; g.add(dial); K.radioDial = dial;
+  });
   // Pendant over the table, a runner rug, herbs on the sill.
   const pend = new THREE.Group(); pend.position.set(13.0, 2.7, 2.95); W.add(pend);
   cyl(0.006, 0.006, 0.7, MAT.darkMetal, 0, -0.35, 0, { parent: pend, seg: 6 });

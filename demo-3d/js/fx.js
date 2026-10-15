@@ -305,13 +305,86 @@ function updatePuffs(dt) {
   }
 }
 
-G.buildFX = () => { buildFootprints(); buildWetPrints(); buildBreath(); buildSteam(); buildEmbers(); buildDust(); buildWindowLight(); buildSunbeams(); buildPuffs(); };
+/* ---------------- Gerald ----------------
+ * The bullfinch who lives on the bedroom window sill (outside). He hops, looks about, and flies off
+ * if you come too close outside, coming back a while later. Mornings only. */
+let BIRD;
+function buildBird() {
+  const g = new THREE.Group(), body = new THREE.Group(); g.add(body);
+  const rose = G.shared({ color: '#d0573e', roughness: 0.85 }), grey = G.shared({ color: '#6f7480', roughness: 0.9 }), black = G.shared({ color: '#1a1a1e', roughness: 0.7 }), white = G.shared({ color: '#f2f0ea', roughness: 0.9 });
+  const part = (geo, mat, x, y, z, sx = 1, sy = 1, sz = 1) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.scale.set(sx, sy, sz); m.castShadow = true; body.add(m); return m; };
+  const sph = new THREE.SphereGeometry(1, 12, 9);
+  part(sph, rose, 0, 0.045, 0.005, 0.034, 0.036, 0.04);       // round rosy front
+  part(sph, grey, 0, 0.055, -0.012, 0.032, 0.032, 0.038);     // grey back
+  const head = new THREE.Group(); head.position.set(0, 0.085, 0.022); body.add(head);
+  const hm = (geo, mat, x, y, z, sx, sy, sz) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.scale.set(sx, sy, sz); head.add(m); return m; };
+  hm(sph, rose, 0, 0, 0, 0.022, 0.022, 0.022); hm(sph, black, 0, 0.008, -0.004, 0.023, 0.016, 0.022);
+  hm(new THREE.ConeGeometry(1, 1, 8), black, 0, -0.002, 0.024, 0.008, 0.014, 0.008).rotation.x = Math.PI / 2;
+  for (const s of [-1, 1]) hm(sph, black, s * 0.014, 0.004, 0.012, 0.004, 0.004, 0.004);
+  part(new THREE.BoxGeometry(1, 1, 1), black, 0, 0.05, -0.05, 0.024, 0.008, 0.04).rotation.x = 0.4;   // tail
+  part(sph, white, 0, 0.04, -0.03, 0.02, 0.012, 0.012);
+  for (const s of [-1, 1]) part(new THREE.CylinderGeometry(0.002, 0.002, 0.02, 4), black, s * 0.01, 0.008, 0, 1, 1, 1);
+  g.position.set(2.35, 0.87, 4.8); g.rotation.y = Math.PI * 0.85; G.scene.add(g);
+  BIRD = { g, body, head, home: g.position.clone(), state: 'sit', t: 0, hopT: 1, lookT: 1, away: 0, v: new THREE.Vector3() };
+}
+function updateBird(dt, t) {
+  if (!BIRD) return;
+  const B = BIRD, day = (G.STATE.day || 0) > 0.5, P = G.PLAYER;
+  B.g.visible = day && B.state !== 'gone';
+  if (!day) return;
+  B.t += dt;
+  const near = !G.inside(P.x, P.z) && Math.hypot(P.x - B.home.x, P.z - B.home.z) < 2.6;
+  if (B.state === 'sit') {
+    B.hopT -= dt; B.lookT -= dt;
+    if (B.lookT < 0) { B.lookT = 0.4 + Math.random() * 1.6; B.head.rotation.y = (Math.random() - 0.5) * 1.6; B.head.rotation.z = (Math.random() - 0.5) * 0.5; }
+    if (B.hopT < 0) { B.hopT = 1.5 + Math.random() * 4; B.hop = 0.25; B.g.rotation.y += (Math.random() - 0.5) * 1.4; if (Math.random() < 0.4 && G.Audio.tweet) G.Audio.tweet(); }
+    if (B.hop > 0) { B.hop -= dt; B.body.position.y = Math.sin((1 - B.hop / 0.25) * Math.PI) * 0.025; }
+    if (near) { B.state = 'fly'; B.t = 0; B.v.set(0.6, 1.4, 1.8); if (G.Audio.tweet) G.Audio.tweet(); }
+  } else if (B.state === 'fly') {
+    B.g.position.addScaledVector(B.v, dt); B.v.y += dt * 0.6;
+    B.body.rotation.x = -0.4; B.body.position.y = Math.sin(t * 60) * 0.004;
+    if (B.t > 3) { B.state = 'gone'; B.t = 0; }
+  } else if (B.state === 'gone' && B.t > 35 && !near) { B.state = 'sit'; B.g.position.copy(B.home); B.body.rotation.x = 0; }
+}
+
+/* ---------------- spindrift ----------------
+ * When a gust comes through, loose snow skims along the ground outside. */
+let DRIFT;
+function buildSpindrift() {
+  const N = 260, pos = new Float32Array(N * 3), seed = new Float32Array(N);
+  for (let i = 0; i < N; i++) { pos[i * 3] = Math.random() * 16 - 8; pos[i * 3 + 1] = Math.random(); pos[i * 3 + 2] = Math.random() * 16 - 8; seed[i] = Math.random(); }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('seed', new THREE.BufferAttribute(seed, 1));
+  const mat = new THREE.ShaderMaterial({
+    transparent: true, depthWrite: false,
+    uniforms: { uTime: { value: 0 }, uGust: { value: 0 }, uCenter: { value: new THREE.Vector3() }, uPx: { value: 1 }, uCol: { value: new THREE.Color('#f4f7ff') } },
+    vertexShader: `
+      attribute float seed; uniform float uTime; uniform float uGust; uniform vec3 uCenter; uniform float uPx; varying float vA;
+      void main(){
+        vec3 p = position;
+        float sp = 1.5 + seed * 2.5;
+        p.x = mod(p.x + uTime * sp + 8.0, 16.0) - 8.0 + uCenter.x;
+        p.z = mod(p.z - uTime * sp * 0.35 + 8.0, 16.0) - 8.0 + uCenter.z;
+        p.y = uCenter.y + seed * 0.25 + abs(sin(uTime * 3.0 + seed * 20.0)) * 0.08;
+        float edge = 1.0 - smoothstep(5.0, 8.0, length(p.xz - uCenter.xz));
+        bool roof = p.x > -0.6 && p.x < 15.6 && p.z > -0.6 && p.z < 7.0;
+        vA = roof ? 0.0 : smoothstep(0.45, 0.85, uGust) * edge;
+        vec4 mv = modelViewMatrix * vec4(p, 1.0);
+        gl_PointSize = uPx * (5.0 + seed * 6.0) / -mv.z;
+        gl_Position = projectionMatrix * mv;
+      }`,
+    fragmentShader: 'uniform vec3 uCol; varying float vA; void main(){ float d = length(gl_PointCoord - 0.5); if (d > 0.5) discard; gl_FragColor = vec4(uCol, smoothstep(0.5, 0.0, d) * vA * 0.5); }',
+  });
+  DRIFT = new THREE.Points(g, mat); DRIFT.frustumCulled = false; G.scene.add(DRIFT);
+}
+
+G.buildFX = () => { buildBird(); buildSpindrift(); buildFootprints(); buildWetPrints(); buildBreath(); buildSteam(); buildEmbers(); buildDust(); buildWindowLight(); buildSunbeams(); buildPuffs(); };
 let sparkT = 0;
 G.sparkBurst = () => { sparkT = 1; };
 G.updateFX = (dt, t) => {
   fxTime += dt;
   updateFootprints(); updateWetPrints();
-  updateBreath(dt); updateSteam(dt); updatePuffs(dt);
+  updateBreath(dt); updateSteam(dt); updatePuffs(dt); updateBird(dt, t);
+  if (DRIFT) { const U = DRIFT.material.uniforms, P = G.PLAYER; U.uTime.value = t; U.uGust.value = G.WIND.gust; U.uCenter.value.set(P.x, G.terrainH(P.x, P.z) + 0.02, P.z); U.uPx.value = innerHeight * Math.min(window.devicePixelRatio || 1, G.Q.dpr) / 900; DRIFT.visible = !G.inside(P.x, P.z); }
   sparkT = Math.max(0, sparkT - dt * 1.5);
   if (SHAFTS) { const i = (G.STATE.day || 0) * 0.06; SHAFTS.visible = i > 0.002; SHAFTS.material.uniforms.uI.value = i; SHAFTS.material.uniforms.uTime.value = t; }
   const px = innerHeight * Math.min(window.devicePixelRatio || 1, G.Q.dpr);

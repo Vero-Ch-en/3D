@@ -104,6 +104,9 @@ These are deliberately cheap approximations, each in one place:
 | Fire | animated flame planes | flipbook or simulated fire with a light probe |
 | Faces | procedural eyes, lids, lips | the model's own head with blend shapes |
 | Hair | alpha-tested cards | the model's hair cards or strands |
+| Radio music, humming, sound effects | synthesised in `game.js` (`G.Audio`) | recorded audio through the same placed sources |
+| Gerald (the bullfinch) | primitive shapes (`fx.js`) | a small rigged bird with a few animation clips |
+| Front door | hinged box, swings by proximity | modelled door with the same pivot (`G.FRONT_DOOR`) |
 
 ## Performance budget
 

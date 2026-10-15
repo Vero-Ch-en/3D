@@ -6,7 +6,7 @@
 (() => {
 const { $, clamp, lerp, damp, rand, MAT } = G;
 /* Player settings, remembered per browser. */
-const SETTINGS = (G.SETTINGS = { volume: 0.8, muted: false, motion: (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) ? 'reduced' : 'full' });
+const SETTINGS = (G.SETTINGS = { volume: 0.8, muted: false, view: 'third', motion: (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) ? 'reduced' : 'full' });
 try { Object.assign(SETTINGS, JSON.parse(localStorage.getItem('cbs.base.settings') || '{}')); } catch (e) { /* storage unavailable */ }
 const saveSettings = () => { try { localStorage.setItem('cbs.base.settings', JSON.stringify(SETTINGS)); } catch (e) { /* ignore */ } };
 G.MOTION = SETTINGS.motion === 'reduced' ? 0 : 1;   // scales handheld sway, step bob and the run zoom
@@ -58,7 +58,7 @@ G.Audio = (() => {
     if (p.positionX) { p.positionX.value = x; p.positionY.value = y; p.positionZ.value = z; } else p.setPosition(x, y, z);
     const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 16000;
     const inp = ctx.createGain(); inp.connect(p); p.connect(lp); lp.connect(master);
-    return (SPOTS[id] = { in: inp, lp, x, z, room: roomOf(x, z) });
+    return (SPOTS[id] = { in: inp, lp, x, z, room: roomOf(x, z), panner: p });
   }
   function buildSpots() {
     spot('fire', 8.0, 0.5, 0.9, { ref: 1.2 });
@@ -68,13 +68,38 @@ G.Audio = (() => {
     const lfo = ctx.createOscillator(); lfo.frequency.value = 0.07; const lg = ctx.createGain(); lg.gain.value = 0.003; lfo.connect(lg); lg.connect(hum.gain); lfo.start();
     spot('clock', 5.15, 1.95, 1.5, { ref: 0.5, roll: 1.8 });
     spot('kettle', 11.55, 1.0, 0.36, { ref: 0.8 });
+    spot('door', 6.5, 1.2, 4.6, { ref: 1 });
+    spot('gerald', 2.4, 1.0, 4.85, { ref: 0.5, roll: 1.6 });
+    // The kitchen radio: a small speaker, so the music is band-limited and a little boxy.
+    const rs = spot('radio', 13.55, 1.0, 4.4, { ref: 0.9, roll: 1.3 });
+    const box = ctx.createBiquadFilter(); box.type = 'bandpass'; box.frequency.value = 1300; box.Q.value = 0.45;
+    radioOut = ctx.createGain(); radioOut.gain.value = 0; radioOut.connect(box); box.connect(rs.in);
+    // Partner humming: a source that follows her around.
+    const hs = spot('hum', 0, 1.5, 0, { ref: 0.7, roll: 1.5 }); hs.moving = true;
     // Wind finding the gaps around the window frames.
     for (const [i, x, z] of [[0, 2.4, 4.6], [1, 9.4, 4.6], [2, 13.0, 4.6], [3, 0, 2.25], [4, 15, 2.1]]) {
       const s = spot('win' + i, x, 1.4, z, { ref: 0.7, roll: 1.6 }), n = noise(), bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 900 + i * 230; bp.Q.value = 4;
       const g = ctx.createGain(); g.gain.value = 0; n.connect(bp); bp.connect(g); g.connect(s.in); n.start(Math.random()); s.g = g; s.bp = bp;
     }
   }
-  let nextTick = 0, tickN = 0;
+  let humPos = null;
+  let nextTick = 0, tickN = 0, radioOut = null, radioOn = false, radioNext = 0, radioBar = 0;
+  /* The radio plays something soft: a four-chord loop on an electric-piano-ish voice, a wandering
+   * melody over it, brushed noise on the beat, and a little crackle. Scheduled a bar ahead. */
+  const RCH = [[174.6, 220, 261.6, 329.6], [146.8, 174.6, 220, 261.6], [116.5, 146.8, 174.6, 220], [130.8, 164.8, 196, 220]];
+  const RMEL = [523.3, 587.3, 659.3, 784, 880, 698.5];
+  const ep = (f, t, d, v) => { const o = ctx.createOscillator(), o2 = ctx.createOscillator(), g = ctx.createGain(); o.frequency.value = f; o2.frequency.value = f * 2.001; o2.type = 'sine'; const g2 = ctx.createGain(); g2.gain.value = 0.25; o.connect(g); o2.connect(g2); g2.connect(g); g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(v, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + d); g.connect(radioOut); o.start(t); o2.start(t); o.stop(t + d + 0.1); o2.stop(t + d + 0.1); };
+  let melI = 2;
+  function radioTick(now) {
+    if (!radioOn || now < radioNext - 0.6) return;
+    if (radioNext < now) radioNext = now + 0.1;
+    const t = radioNext, bar = 2.6, beat = bar / 4, C = RCH[radioBar % 4];
+    C.forEach((f, i) => ep(f, t + i * 0.012, bar * 0.95, 0.05));
+    for (let b = 0; b < 4; b++) { burst(0.06, 6000, 0.012, 'highpass', 0.7, t + b * beat - now, radioOut); if (b % 2 === 0) ep(C[0] / 2, t + b * beat, beat * 1.6, 0.06); }
+    for (let n = 0; n < 4; n++) { if (Math.random() < 0.3) continue; melI = Math.max(0, Math.min(RMEL.length - 1, melI + Math.floor(Math.random() * 3) - 1)); ep(RMEL[melI], t + n * beat + (Math.random() < 0.3 ? beat / 2 : 0), beat * 1.4, 0.035); }
+    if (Math.random() < 0.6) burst(0.02, 3000, 0.01, 'bandpass', 1, t + Math.random() * bar - now, radioOut);
+    radioNext += bar; radioBar++;
+  }
   function updateSpots(lx, ly, lz, fx, fz, room, t) {
     const L = ctx.listener, now = ctx.currentTime;
     if (L.positionX) { L.positionX.setTargetAtTime(lx, now, 0.03); L.positionY.setTargetAtTime(ly, now, 0.03); L.positionZ.setTargetAtTime(lz, now, 0.03); L.forwardX.value = fx; L.forwardY.value = 0; L.forwardZ.value = fz; L.upX.value = 0; L.upY.value = 1; L.upZ.value = 0; }
@@ -86,6 +111,8 @@ G.Audio = (() => {
     }
     // The clock: a tick and a slightly different tock, once a second.
     if (now > nextTick - 0.05) { if (nextTick < now) nextTick = now + 0.05; burst(0.025, tickN % 2 ? 2600 : 3200, 0.05, 'bandpass', 6, nextTick - now, SPOTS.clock.in); tickN++; nextTick += 1; }
+    radioTick(now);
+    if (humPos && SPOTS.hum) { const pn = SPOTS.hum.panner; if (pn.positionX) { pn.positionX.setTargetAtTime(humPos.x, now, 0.1); pn.positionY.setTargetAtTime(humPos.y, now, 0.1); pn.positionZ.setTargetAtTime(humPos.z, now, 0.1); } else pn.setPosition(humPos.x, humPos.y, humPos.z); SPOTS.hum.room = roomOf(humPos.x, humPos.z); }
     const gust = G.WIND.gust;
     for (let i = 0; i < 5; i++) { const s = SPOTS['win' + i]; s.g.gain.setTargetAtTime(Math.max(0, gust - 0.45) * 0.05, now, 0.6); s.bp.frequency.setTargetAtTime(800 + i * 230 + gust * 600, now, 0.8); }
   }
@@ -102,7 +129,7 @@ G.Audio = (() => {
       if (o.fire != null) fireG.gain.setTargetAtTime(o.fire * 0.22, t, 0.6);
       if (o.wind != null) { windG.gain.setTargetAtTime(o.wind * 0.1, t, 0.8); windF.frequency.setTargetAtTime(320 + o.wind * 380, t, 0.8); }
       if (o.pad != null) padG.gain.setTargetAtTime(o.pad * 0.04, t, 1.5);
-      if (o.inside != null) outF.frequency.setTargetAtTime(o.inside ? 650 : 9000, t, 0.35);
+      if (o.inside != null) outF.frequency.setTargetAtTime(o.inside ? (o.doorOpen ? 2600 : 650) : 9000, t, 0.35);   // an open front door lets the outside in
       if (t > nextChord) { chordI = (chordI + 1) % CHORDS.length; CHORDS[chordI].forEach((fr, i) => pad[i].frequency.setTargetAtTime(fr, t, 1.8)); nextChord = t + 9 + Math.random() * 3; }
     },
     click() { tone(1800, 0.01, 0.03); },
@@ -113,6 +140,20 @@ G.Audio = (() => {
       if (Math.random() < dt * 0.04 * level) { burst(0.25, 160, 0.14, 'lowpass', 1, 0, SPOTS.fire.in); for (let i = 0; i < 6; i++) burst(0.03, 2000 + Math.random() * 3000, 0.08, 'bandpass', 2, 0.05 + i * 0.04 * Math.random(), SPOTS.fire.in); if (G.sparkBurst) G.sparkBurst(); }
     },
     spatial(lx, ly, lz, fx, fz, room, t) { if (ctx) updateSpots(lx, ly, lz, fx, fz, room, t); },
+    radio(on) { radioOn = on; if (!ctx) return; radioOut.gain.setTargetAtTime(on ? 1 : 0, ctx.currentTime, on ? 0.4 : 0.15); burst(0.05, 2500, 0.05, 'bandpass', 3, 0, SPOTS.radio.in); if (on) radioNext = ctx.currentTime + 0.3; },
+    radioOn: () => radioOn,
+    humAt(p) { humPos = p; },
+    // Partner humming the snow globe's tune to herself, a few bars, off-key and content.
+    hum() {
+      if (!ctx || radioOn) return 0; const N = [659.3, 784, 880, 784, 659.3, 587.3, 659.3, 523.3], b = 0.55;
+      N.forEach((f0, i) => { const t = ctx.currentTime + i * b * (i === 3 ? 1.6 : 1), f = f0 / 2 * (1 + (Math.random() - 0.5) * 0.01), o = ctx.createOscillator(), v = ctx.createOscillator(), vg = ctx.createGain(), lp = ctx.createBiquadFilter(), g = ctx.createGain();
+        o.type = 'triangle'; o.frequency.value = f; v.frequency.value = 5.2; vg.gain.value = f * 0.012; v.connect(vg); vg.connect(o.frequency); lp.type = 'lowpass'; lp.frequency.value = 900;
+        g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.022, t + 0.08); g.gain.setTargetAtTime(0.0001, t + b * 0.8, 0.12); o.connect(lp); lp.connect(g); g.connect(SPOTS.hum.in); o.start(t); v.start(t); o.stop(t + b * 1.6); v.stop(t + b * 1.6); });
+      return N.length * b;
+    },
+    door(open) { if (!ctx) return; if (open) { const t = ctx.currentTime, o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.setValueAtTime(220, t); o.frequency.linearRampToValueAtTime(160, t + 0.7); const bf = ctx.createBiquadFilter(); bf.type = 'bandpass'; bf.frequency.value = 700; bf.Q.value = 9; const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.012, t + 0.1); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.8); o.connect(bf); bf.connect(g); g.connect(SPOTS.door.in); o.start(t); o.stop(t + 0.9); burst(0.04, 1500, 0.05, 'bandpass', 3, 0, SPOTS.door.in); } else { burst(0.18, 140, 0.16, 'lowpass', 1, 0, SPOTS.door.in); burst(0.03, 2000, 0.05, 'bandpass', 4, 0.02, SPOTS.door.in); } },
+    rattle() { for (let i = 0; i < 4; i++) burst(0.03, 1700 + Math.random() * 600, 0.06, 'bandpass', 5, i * 0.07); },
+    tweet() { if (!ctx) return; const n = 2 + Math.floor(Math.random() * 3), f0 = 3600 + Math.random() * 900; for (let i = 0; i < n; i++) { const t = ctx.currentTime + i * 0.11, o = ctx.createOscillator(), g = ctx.createGain(); o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f0 * 0.75, t + 0.07); g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.02, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.09); o.connect(g); g.connect(SPOTS.gerald.in); o.start(t); o.stop(t + 0.1); } },
     // A kettle coming to the boil: rising hiss, then the click.
     kettle() {
       if (!ctx) return; const t = ctx.currentTime, n = noise(), bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 1.2; bp.frequency.setValueAtTime(500, t); bp.frequency.linearRampToValueAtTime(3200, t + 5);
@@ -243,7 +284,7 @@ function Audio_ambience(focus, dt, fp) {
   const dFire = Math.hypot(focus.x - 8, focus.z - 1);
   const gust = WIND.gust;
   // The fire is a placed source now: distance and walls do the work.
-  G.Audio.set({ fire: fp, wind: (inside ? 0.35 : 0.45 + STATE.tod * 0.15) + gust * 0.55, pad: STATE.started ? 1 : 0.6, inside });
+  G.Audio.set({ doorOpen: !!STATE.doorOpen, fire: fp, wind: (inside ? 0.35 : 0.45 + STATE.tod * 0.15) + gust * 0.55, pad: STATE.started ? 1 : 0.6, inside });
   G.Audio.crackle(dt, fp * (dFire < 12 ? 1 : 0));
   const cp = G.camera.position, fw = tmpV.set(0, 0, -1).applyQuaternion(G.camera.quaternion);
   const room = inside ? (focus.x < 5 ? 'bed' : focus.x < 11 ? 'liv' : 'kit') : 'out';
@@ -555,7 +596,17 @@ function clampToWalls(target, desired) {
 }
 /* Shots return { pos, look, fov, focus, aperture }. */
 const SHOTS = {
+  // First person: the camera is your eyes. Drag (or the stick) looks; you face where you look.
+  first(t) {
+    const p = PLAYER, h = G.headPos(p);
+    const bob = Math.sin(p.phase * 2) * 0.018 * clamp(p.speed / 1.5, 0, 1.6) * G.MOTION, sway = Math.cos(p.phase) * 0.012 * clamp(p.speed / 1.5, 0, 1.6) * G.MOTION;
+    const fx = -Math.sin(CAM.yaw), fz = -Math.cos(CAM.yaw), pitch = CAM.fpPitch || 0;
+    const pos = new THREE.Vector3(h.x + fx * 0.09 + fz * sway, h.y + 0.02 + bob, h.z + fz * 0.09 - fx * sway);
+    const look = pos.clone().add(new THREE.Vector3(fx * Math.cos(pitch), -Math.sin(pitch), fz * Math.cos(pitch)));
+    return { pos, look, fov: 62 + CAM.run * 4 * G.MOTION, focus: 2.5, aperture: 0.001 };
+  },
   follow(t) {
+    if (SETTINGS.view === 'first') return SHOTS.first(t);
     const p = PLAYER, inside = G.inside(p.x, p.z) || G.underRoof(p.x, p.z);
     const ks = clamp(p.m.userData.H / 1.84, 0.62, 1);   // smaller people (the prologue) get a lower, closer camera
     // Running pulls the camera back a little and widens the lens; walking adds a faint step rhythm.
@@ -617,13 +668,13 @@ function updateCamera(dt, t) {
   else {
     // Exploration: recentre behind the player while moving; drift toward an
     // over-the-shoulder framing of Partner when standing still near them.
-    if (PLAYER.speed > 0.3 && t - c.lastDrag > 2.5) c.yaw = angDamp(c.yaw, PLAYER.yaw + Math.PI, 1.2 * clamp(PLAYER.speed / 1.5, 0.3, 1.5), dt);
+    if (SETTINGS.view !== 'first' && PLAYER.speed > 0.3 && t - c.lastDrag > 2.5) c.yaw = angDamp(c.yaw, PLAYER.yaw + Math.PI, 1.2 * clamp(PLAYER.speed / 1.5, 0.3, 1.5), dt);
     c.idle = PLAYER.speed < 0.1 ? c.idle + dt : 0;
     s = SHOTS.follow(t);
     const dP = Math.hypot(PARTNER.x - PLAYER.x, PARTNER.z - PLAYER.z);
     // Only when she's actually turned toward you; otherwise this framed the back of her head.
     const faces = (Math.sin(PARTNER.yaw) * (PLAYER.x - PARTNER.x) + Math.cos(PARTNER.yaw) * (PLAYER.z - PARTNER.z)) / Math.max(dP, 1e-3);
-    if (c.idle > 2.2 && t - c.lastDrag > 4 && dP < 3.2 && dP > 0.6 && !(PARTNER.sit > 0.5) && !PARTNER.hidden && !PARTNER.lie && !PLAYER.freeSit && faces > 0.5 && PARTNER.pose !== 'warm') {
+    if (SETTINGS.view !== 'first' && c.idle > 2.2 && t - c.lastDrag > 4 && dP < 3.2 && dP > 0.6 && !(PARTNER.sit > 0.5) && !PARTNER.hidden && !PARTNER.lie && !PLAYER.freeSit && faces > 0.5 && PARTNER.pose !== 'warm') {
       const o = SHOTS.ots(PARTNER, PLAYER, 1), k = G.smooth(2.2, 4.5, c.idle);
       s = { pos: s.pos.clone().lerp(o.pos, k), look: s.look.clone().lerp(o.look, k), fov: lerp(s.fov, o.fov + 8, k), focus: lerp(s.focus, o.focus, k), aperture: lerp(s.aperture, o.aperture * 0.8, k) };
     }
@@ -647,6 +698,8 @@ function updateCamera(dt, t) {
     // Depth of field re-renders the whole scene for depth; only pay for it in shots where the blur shows.
     bokeh.enabled = G.Q.dof && c.aperture > 0.006;
   }
+  // In first person your own body is out of frame (and would sit around the lens).
+  if (PLAYER.m) PLAYER.m.visible = !(SETTINGS.view === 'first' && !c.shot && STATE.started);
   c.bars = damp(c.bars, c.shot && !G.MOBILE ? 0.06 : 0, 4, dt);
   grade.uniforms.uBars.value = c.bars;
 }
@@ -674,6 +727,7 @@ const keys = (G.keys = new Set()), pressed = new Set();
 addEventListener('keydown', (e) => {
   if (e.code === 'Escape' || e.code === 'KeyP') { setPaused(!STATE.paused); e.preventDefault(); return; }
   if (e.code === 'KeyM') { setMuted(!SETTINGS.muted); return; }
+  if (e.code === 'KeyV' && !STATE.paused) { setView(SETTINGS.view === 'first' ? 'third' : 'first'); return; }
   if (STATE.paused) return;
   if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
   if (!keys.has(e.code)) pressed.add(e.code);
@@ -685,9 +739,9 @@ addEventListener('blur', () => keys.clear());
 const hit = (...c) => c.some((k) => pressed.has(k));
 let drag = null;
 G.canvas.addEventListener('pointerdown', (e) => { drag = { id: e.pointerId, x: e.clientX, y: e.clientY }; try { G.canvas.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ } G.Audio.start(); });
-G.canvas.addEventListener('pointermove', (e) => { if (!drag || drag.id !== e.pointerId || CAM.shot || STATE.paused) return; CAM.yaw -= (e.clientX - drag.x) * 0.006; CAM.pitch = clamp(CAM.pitch + (e.clientY - drag.y) * 0.004, -0.2, 0.85); drag.x = e.clientX; drag.y = e.clientY; CAM.lastDrag = G.simT; });
+G.canvas.addEventListener('pointermove', (e) => { if (!drag || drag.id !== e.pointerId || CAM.shot || STATE.paused) return; CAM.yaw -= (e.clientX - drag.x) * 0.006; if (SETTINGS.view === 'first') CAM.fpPitch = clamp((CAM.fpPitch || 0) + (e.clientY - drag.y) * 0.004, -0.9, 1.0); else CAM.pitch = clamp(CAM.pitch + (e.clientY - drag.y) * 0.004, -0.2, 0.85); drag.x = e.clientX; drag.y = e.clientY; CAM.lastDrag = G.simT; });
 G.canvas.addEventListener('pointerup', () => { drag = null; });
-G.canvas.addEventListener('wheel', (e) => { e.preventDefault(); CAM.zoom = clamp(CAM.zoom * (e.deltaY > 0 ? 1.1 : 0.9), 0.6, 1.8); }, { passive: false });
+G.canvas.addEventListener('wheel', (e) => { e.preventDefault(); if (SETTINGS.view === 'first') return; CAM.zoom = clamp(CAM.zoom * (e.deltaY > 0 ? 1.1 : 0.9), 0.6, 1.8); }, { passive: false });
 const stick = { x: 0, y: 0, on: false };
 (() => {
   const zone = $('stickzone'), knob = $('knob'), base = $('stick');
@@ -823,6 +877,7 @@ function partnerTask(p, dt, t) {
       if (o.hide) { p.m.visible = false; p.hidden = true; if (o.line) bark(o.line, 2.6); }
       else if (o.seatAt) G.sitDown(p, o.seatAt.x, o.seatAt.z, o.seatAt.yaw, o.seatAt.y);
       if (o.lines && Math.random() < 0.8 && !o.hide) bark(o.lines, 3);
+      else if (!o.hide && Math.random() < 0.6) G.Audio.hum();   // or she hums to herself
       if (o.onArrive) o.onArrive(p);
     }
     p.lookAt = null;
@@ -1050,6 +1105,31 @@ async function hug(kind = 'hug', line) {
   return true;
 }
 G.hug = hug;
+/* A slow dance in the kitchen to the radio: close, swaying, the camera drifting round. Any move ends it. */
+async function dance() {
+  if (busy() || Math.hypot(PARTNER.x - PLAYER.x, PARTNER.z - PLAYER.z) > 1.8 || PARTNER.sit > 0.2 || PLAYER.sit > 0.2) return false;
+  STATE.busy = true; STATE.kiss = false; STATE.dancing = true;
+  if (PARTNER.hold) G.setHold(false);
+  if (PARTNER.task) endTask(PARTNER);
+  const a = Math.atan2(PARTNER.x - PLAYER.x, PARTNER.z - PLAYER.z), mx = (PLAYER.x + PARTNER.x) / 2, mz = (PLAYER.z + PARTNER.z) / 2;
+  STATE.hugIn = { p: [mx - Math.sin(a) * 0.19, mz - Math.cos(a) * 0.19], q: [mx + Math.sin(a) * 0.19, mz + Math.cos(a) * 0.19], yaw: a };
+  STATE.hugging = true; PARTNER.tiltTarget = -0.22; PLAYER.swayTarget = PARTNER.swayTarget = 1;
+  // Find the most open direction around the pair (kitchens are small), then drift slowly either side of it.
+  const t0 = G.simT, m0 = new THREE.Vector3(mx, 1.25, mz);
+  let a0 = a + Math.PI / 2, best = -1;
+  for (let i = 0; i < 16; i++) { const ang = i / 16 * Math.PI * 2, p = m0.clone().add(new THREE.Vector3(Math.sin(ang) * 2.2, 0.15, Math.cos(ang) * 2.2)), d = clampToWalls(m0, p).distanceTo(m0) - Math.abs(Math.sin(ang - a)) * -0.3; if (d > best) { best = d; a0 = ang; } }
+  const R = Math.min(1.9, Math.max(1.1, best - 0.15));
+  setShot(() => { const ang = a0 + Math.sin((G.simT - t0) * 0.18) * 0.45; let pos = m0.clone().add(new THREE.Vector3(Math.sin(ang) * R, 0.15, Math.cos(ang) * R)); pos = clampToWalls(m0, pos); return { pos, look: m0, fov: 42, focus: pos.distanceTo(m0), aperture: 0.012 }; });
+  bark(['Mm. I was hoping you’d ask.', 'Don’t step on my feet. …Too late.', 'We are very bad at this. Don’t stop.'], 3);
+  const moving = () => ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].some((k) => keys.has(k)) || stick.on;
+  await wait(1.2);
+  hint(G.MOBILE ? 'Move to stop dancing.' : 'Move to stop dancing.', 3);
+  while (G.simT - t0 < 40 && !moving() && G.Audio.radioOn()) await wait(0.1);
+  STATE.hugging = false; STATE.hugIn = null; STATE.dancing = false; PARTNER.tiltTarget = 0; PLAYER.swayTarget = PARTNER.swayTarget = 0; STATE.busy = false;
+  releaseCamera();
+  return true;
+}
+G.dance = dance;
 
 /* =====================================================================
  * Pause menu, volume, mute, camera motion
@@ -1064,12 +1144,15 @@ function setPaused(on) {
   G.Audio.hold(on);
   if (on) { syncPauseUI(); $('pResume').focus(); } else { G.needsRender = true; }
 }
+function setView(v) { SETTINGS.view = v; saveSettings(); syncPauseUI(); CAM.cut = true; if (v === 'first') { CAM.fpPitch = 0.05; CAM.yaw = PLAYER.yaw + Math.PI; } hint(v === 'first' ? 'First person. V switches back.' : 'Third person. V for first person.', 3); }
+G.setView = setView;
 function setMuted(m) { SETTINGS.muted = m; saveSettings(); G.Audio.applyVolume(); syncPauseUI(); }
 function syncPauseUI() {
   $('pVolume').value = Math.round(SETTINGS.volume * 100);
   $('pMute').setAttribute('aria-pressed', String(SETTINGS.muted));
   $('pMute').textContent = SETTINGS.muted ? 'Muted' : 'Mute';
   document.querySelectorAll('[data-motion]').forEach((b) => b.classList.toggle('on', b.dataset.motion === SETTINGS.motion));
+  document.querySelectorAll('[data-view]').forEach((b) => b.classList.toggle('on', b.dataset.view === SETTINGS.view));
 }
 G.setPaused = setPaused;
 function initPauseUI() {
@@ -1078,6 +1161,7 @@ function initPauseUI() {
   $('pause').addEventListener('pointerdown', (e) => { if (e.target === $('pause')) setPaused(false); });   // tap outside the panel
   $('pVolume').addEventListener('input', (e) => { SETTINGS.volume = e.target.value / 100; if (SETTINGS.volume > 0 && SETTINGS.muted) SETTINGS.muted = false; saveSettings(); G.Audio.applyVolume(); syncPauseUI(); });
   $('pMute').addEventListener('click', () => setMuted(!SETTINGS.muted));
+  document.querySelectorAll('[data-view]').forEach((b) => b.addEventListener('click', () => setView(b.dataset.view)));
   document.querySelectorAll('[data-motion]').forEach((b) => b.addEventListener('click', () => { SETTINGS.motion = b.dataset.motion; G.MOTION = SETTINGS.motion === 'reduced' ? 0 : 1; saveSettings(); syncPauseUI(); }));
   // Leaving the tab pauses the game and its sound.
   document.addEventListener('visibilitychange', () => { if (document.hidden) setPaused(true); });
@@ -1162,13 +1246,34 @@ function step(dt, t) {
     const run = keys.has('ShiftLeft') || keys.has('ShiftRight') || (stick.on && l > 0.95);
     const target = l > 0.05 ? (run ? 3.1 : 1.5) * Math.min(1, l) : 0;
     PLAYER.speed = damp(PLAYER.speed, target, 7, dt);
+    const fp = SETTINGS.view === 'first' && !CAM.shot;
     if (l > 0.05) {
       const cy = Math.cos(CAM.yaw), sy = Math.sin(CAM.yaw);
-      PLAYER.yaw = angDamp(PLAYER.yaw, Math.atan2(ix * cy + iy * sy, -ix * sy + iy * cy), 9, dt);
-    }
-    if (PLAYER.speed > 0.01) moveChar(PLAYER, Math.sin(PLAYER.yaw) * PLAYER.speed * dt, Math.cos(PLAYER.yaw) * PLAYER.speed * dt);
+      const moveYaw = Math.atan2(ix * cy + iy * sy, -ix * sy + iy * cy);
+      PLAYER.yaw = fp ? CAM.yaw + Math.PI : angDamp(PLAYER.yaw, moveYaw, 9, dt);
+      PLAYER.moveYaw = moveYaw;
+    } else if (fp && (PLAYER.sit || 0) < 0.1) PLAYER.yaw = angDamp(PLAYER.yaw, CAM.yaw + Math.PI, 12, dt);
+    // On the touch screen in first person, the right half of the screen looks around (drag) as before.
+    { const my = fp && PLAYER.moveYaw != null ? PLAYER.moveYaw : PLAYER.yaw; if (PLAYER.speed > 0.01) moveChar(PLAYER, Math.sin(my) * PLAYER.speed * dt, Math.cos(my) * PLAYER.speed * dt); }
   }
   partnerAI(dt, t);
+  // The front door swings open for whoever comes near and closes behind them.
+  const FD = G.FRONT_DOOR;
+  if (FD) {
+    const dd = Math.min(Math.hypot(PLAYER.x - FD.x, PLAYER.z - FD.z), PARTNER.hidden ? 99 : Math.hypot(PARTNER.x - FD.x, PARTNER.z - FD.z));
+    const want = dd < 1.6 ? 1 : 0;
+    if (want !== FD.want) { FD.want = want; if (want && FD.amt < 0.3) G.Audio.door(true); }
+    const prev = FD.amt; FD.amt = damp(FD.amt, want, want ? 4 : 2.4, dt);
+    if (!want && prev > 0.05 && FD.amt <= 0.05) { FD.amt = 0; G.Audio.door(false); }
+    FD.leaf.rotation.y = FD.openAngle * FD.amt; STATE.doorOpen = FD.amt > 0.3;
+  }
+  // Music: she sways a little when the radio's on and she's standing about nearby.
+  if (G.Audio.radioOn && !STATE.dancing) {
+    const hearRadio = G.Audio.radioOn() && G.inside(PARTNER.x, PARTNER.z) && PARTNER.x > 5;
+    PARTNER.swayTarget = hearRadio && PARTNER.speed < 0.15 && !(PARTNER.sit > 0.2) && !PARTNER.task && !PARTNER.lie ? 0.55 : 0;
+    PLAYER.swayTarget = 0;
+  }
+  G.Audio.humAt(G.headPos(PARTNER));
   if (STATE.hugIn) {
     const H = STATE.hugIn, kk = 1 - Math.exp(-8 * dt);
     for (const [c, p, y] of [[PLAYER, H.p, H.yaw], [PARTNER, H.q, H.yaw + Math.PI]]) { moveChar(c, (p[0] - c.x) * kk, (p[1] - c.z) * kk); c.yaw = angDamp(c.yaw, y, 10, dt); c.speed = 0; }
@@ -1192,7 +1297,7 @@ function step(dt, t) {
     c.sit = damp(c.sit || 0, c.sitTarget || 0, 5, dt);
     c.tilt = damp(c.tilt || 0, c.tiltTarget || 0, 3, dt);
     c.lean = damp(c.lean || 0, c.leanTarget || 0, 3, dt);
-    c.hug = damp(c.hug || 0, STATE.hugging ? (STATE.hugIn && STATE.kiss ? 0.55 : 1) : 0, 7, dt);
+    c.hug = damp(c.hug || 0, STATE.hugging ? (STATE.dancing ? 0.62 : STATE.hugIn && STATE.kiss ? 0.55 : 1) : 0, 7, dt);
     G.animate(c, dt, t);
     // Footsteps: sound and (on snow) a footprint at each heel strike.
     if (c.stepEvent) {

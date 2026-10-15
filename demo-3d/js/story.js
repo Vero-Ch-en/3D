@@ -57,6 +57,8 @@ function setBreakfast(o = {}) {
   });
 }
 function houseFor(chapter) {
+  if (G.Audio.radioOn && G.Audio.radioOn()) G.Audio.radio(false);
+  if (K().radioDial) K().radioDial.material.opacity = 0;
   for (const id of ['kettle', 'mug0', 'mug1', 'pan', 'plate0', 'plate1']) G.steam(id, 0, 0, 0, { off: true });
   if (chapter === 'morning') {
     setLamps(false); G.FIRE.on = false; setCake(false); setBreakfast({});
@@ -277,6 +279,13 @@ inter('cupboard', [11.45, 1, 3.75], 0.7, 'Snack cupboard', async () => {
   if (c === 1) { S.flags.snackDone = 1; S.flags.stoleSnack = 1; addRivalry(0.5); await N('(Delicious. Illegal. Delicious.)'); if (canHear()) await Pt('I saw that, Partner. I see everything.'); }
 });
 inter('kwin', [13.0, 1.3, 4.05], 0.75, 'Window', () => N(morning() ? cyc('kwin', ['(The clearing, white and blue and perfectly still. Somebody has drawn a heart in the snow on the porch rail.)', '(The heart is still there. So is a smaller, crosser one beside it.)']) : '(Your reflection, and the snow behind it.)'));
+inter('radio', [13.58, 1.0, 4.1], 0.7, () => (G.Audio.radioOn() ? 'Turn the radio off' : 'Turn the radio on'), async () => {
+  const on = !G.Audio.radioOn();
+  G.Audio.radio(on); K().radioDial.material.opacity = on ? 0.9 : 0;
+  S.pSpoke = true;
+  if (on && !S.flags.radioN) { S.flags.radioN = 1; await N('(The radio warms up with a hum, wanders through some static, and settles on something slow.)'); }
+  if (canHear() && !PARTNER.lie) G.bark(on ? pick(['Oh, I love this one.', 'Leave it on. Please.', 'Is this an invitation, Partner?']) : pick(['Oh. I was enjoying that.', 'Spoilsport.']), 2.6);
+});
 inter('ewin', [14.6, 1.3, 2.1], 0.6, 'Window', () => N(cyc('ewin', ['(The study’s roof, sloping away under a fat roll of snow.)', '(The study’s little window has a curtain drawn across it. It didn’t yesterday.)'])));
 inter('study', [14.6, 1, 3.85], 0.7, 'Study door', async () => {
   if (PARTNER.hidden) { G.bark(['Not now, Partner!', 'Private business. Please go away. Lovingly.', 'I can hear you breathing on the door.', 'The sign says “private”. I wrote it myself.'], 2.6); S.pSpoke = true; return; }
@@ -330,6 +339,7 @@ const ABOUT = {
     else { await Pt('Were you about to open my cupboard?'); await Y('Admiring it. From a respectful distance.'); await Pt('Keep it respectful.'); }
   },
   basil: async () => { await Pt('Basil likes you, you know. He just can’t show it.'); await Y('He’s a plant.'); await Pt('He is a very reserved plant.'); },
+  radio: async () => { await Pt('Do you remember the first time we danced in here?'); await Y('Two in the morning. The kettle was boiling.'); await Pt('And you stepped on my foot, and the kettle screamed, and neither of us stopped.'); },
   study: async () => {
     await Pt('You were looking at the study door.');
     const c = await choose(['“What’s in there?”', '“I wasn’t.”', '“I’ll wait.”']);
@@ -433,6 +443,8 @@ async function together() {
   const seated = (p.sit || 0) > 0.3 || (PLAYER.sit || 0) > 0.3 || p.lie;
   const acts = [];
   if (!seated) acts.push({ id: 'hug', t: 'Hug' }, { id: 'hand', t: p.hold ? 'Let go' : 'Hold hands' });
+  const music = G.Audio.radioOn() && G.inside(PLAYER.x, PLAYER.z) && PLAYER.x > 5;
+  if (!seated && music) acts.push({ id: 'dance', t: 'Dance' });
   if (!p.lie) acts.push({ id: 'tease', t: 'Tease' });
   acts.push({ id: 'kiss', t: 'Kiss' }, { id: 'talk', t: 'Talk' });
   STATE.busy = true;   // she waits while you decide
@@ -466,6 +478,7 @@ async function together() {
       if (seated || !(await G.hug('kiss', line))) G.bark(line, 2.4);
       return;
     }
+    case 'dance': S.mem.dances = (S.mem.dances || 0) + 1; S.mem.affection++; addBond(S.mem.dances < 3 ? 0.5 : 0.1); if (S.mem.dances === 1) addScrap('dance', 'A slow dance in the kitchen. Somebody stepped on somebody’s foot.'); await G.dance(); return;
     case 'talk': STATE.busy = true; await talk(); STATE.busy = false; return;
   }
 }
@@ -702,7 +715,7 @@ CH.morning = async () => {
     STATE.sceneShot = false; G.releaseCamera(); G.CAM.yaw = -Math.PI / 2 + Math.PI; G.CAM.cut = true;
   });
   STATE.busy = false;
-  G.hint(G.MOBILE ? 'Tap Use near things to interact. Tap ♥ near {P} to be together.' : 'E or Space: interact.   Q: be together (hug, hold hands, talk).', 9);
+  G.hint(G.MOBILE ? 'Tap Use near things to interact. Tap ♥ near {P} to be together.' : 'E or Space: interact.   Q: be together (hug, hold hands, talk).   V: first person.', 9);
   // She gets up on her own after a while; never in front of you mid-move.
   const run = S.run, live = () => S.run === run;
   (async () => {

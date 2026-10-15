@@ -386,6 +386,15 @@ G.animate = (c, dt, t) => {
   u.spine.rotation.y = -Math.sin(ph) * 0.15 * w;
   u.spine.rotation.z = shift * 0.045;
   u.spine.rotation.x = 0.04 * w * (sp > 1.2 ? 2.5 : 1) - sit * 0.08 + (c.lean || 0);
+  // Swaying to music (the radio, or a slow dance): weight rocks side to side on the beat.
+  c.swayW = damp(c.swayW || 0, c.swayTarget || 0, 2, dt);
+  c.headSway = 0;
+  if (c.swayW > 0.002) {
+    const sw = c.swayW, bt = t * 4.83;
+    u.hips.position.x += Math.sin(bt) * 0.028 * sw * k; u.hips.position.y -= Math.abs(Math.cos(bt)) * 0.012 * sw;
+    u.hips.rotation.z += Math.sin(bt) * 0.05 * sw; u.spine.rotation.z -= Math.sin(bt) * 0.06 * sw;
+    c.headSway = Math.sin(bt + 0.6) * 0.07 * sw;
+  }
   // Breathing: a slow chest rise, quicker after running.
   c.breathRate = damp(c.breathRate || 1.8, sp > 1.2 ? 3.4 : 1.8, 0.6, dt);   // ~3.5 s per breath at rest
   c.breath = (c.breath || 0) + dt * c.breathRate;
@@ -442,7 +451,7 @@ G.animate = (c, dt, t) => {
     c.lookUp = damp(c.lookUp || 0, clamp(-Math.atan2(dy, Math.hypot(dx, dz)), -0.4, 0.4), 4, dt);
   } else if (!c.lie) { c.look = damp(c.look || 0, 0, 3, dt); c.lookUp = damp(c.lookUp || 0, 0, 3, dt); }
   u.neck.rotation.set(c.lookUp * 0.4, c.look * 0.45, c.tilt || 0);
-  u.head.rotation.set(c.lookUp * 0.6 + Math.sin(t * 0.7 + c.z) * 0.02 + (c.headDown || 0), c.look * 0.55, (c.tilt || 0) * 0.6);
+  u.head.rotation.set(c.lookUp * 0.6 + Math.sin(t * 0.7 + c.z) * 0.02 + (c.headDown || 0), c.look * 0.55, (c.tilt || 0) * 0.6 + c.headSway);
   G.retarget(c.m);
 };
 })();
