@@ -11,6 +11,8 @@ Both are static sites with no build step. Open `cozy-birthday-simulator/index.ht
 
 In the 3D demo, E interacts and Q opens Together (hug, hold hands, tease, kiss, talk). Esc (or the II button) pauses, with volume, mute (M), a reduced camera motion option and the scrapbook. The game saves at the start of each chapter; Continue on the title screen picks up from there.
 
+The 3D version is built procedurally but is set up to take realistic models, textures and characters later through `demo-3d/js/assets.js`; `demo-3d/REALISM.md` explains how.
+
 three.js and its example post-processing modules are bundled under `demo-3d/lib/` (MIT licence, see `three.LICENSE`).
 
 ## Rebuilding the character models

@@ -6,7 +6,8 @@
  * Also: hidden relationship values, memories, the scrapbook, checkpoints,
  * the house's small interactions, Partner's own habits and Together.
  * ========================================================================= */
-(() => {
+// Runs once the world is built (boot waits for any real assets first; see assets.js).
+(G.afterBuild = G.afterBuild || []).push(() => {
 const { PLAYER, PARTNER, STATE } = G;
 const P = (t, o) => G.say('partner', t, o);
 const Y = (t, o) => G.say('player', t, o);
@@ -56,6 +57,7 @@ function setBreakfast(o = {}) {
   });
 }
 function houseFor(chapter) {
+  for (const id of ['kettle', 'mug0', 'mug1', 'pan', 'plate0', 'plate1']) G.steam(id, 0, 0, 0, { off: true });
   if (chapter === 'morning') {
     setLamps(false); G.FIRE.on = false; setCake(false); setBreakfast({});
     G.bedMade(false); G.shapeBed({ L: true, R: true });
@@ -128,7 +130,7 @@ async function run(fn, id) {
   STATE.busy = true; S.pSpoke = false;
   try { await fn(); } catch (e) { console.error(e); }
   STATE.busy = false;
-  if (id) { S.lastUse = { id, t: G.simT, room: hereRoom() }; react(id); }
+  if (id) { S.lastUse = { id, t: G.simT, room: hereRoom() }; react(id); const it = findInter(id); if (it && canHear() && !PARTNER.task) G.gaze(PARTNER, it.pos, 2.4); }
 }
 const inter = (id, pos, r, label, act, when) => G.INTER.push({ id, pos, r, label, act: () => run(act, id), when });
 const rewire = (id, act) => { const it = findInter(id); it.act = () => run(act, id); return it; };
@@ -147,6 +149,7 @@ const REACT = {
   lampL: { lines: [], drowsy: ['Too bright, Partner. Far too bright.', 'Mood lighting. Very bold for this hour.'] },
   lampR: { lines: [], drowsy: ['That is my lamp. I can feel it from here.'] },
   fire: { lines: ['There. Now it feels like a proper morning.', 'I do love watching you be competent at things.'] },
+  clock: { lines: ['Leave it fast, please. It’s the only reason we’re ever on time.', 'Four minutes fast. Like you, at breakfast.'], drowsy: ['What time is it? No. Don’t tell me.'] },
   basil: { lines: ['Thank you for looking after my son.', 'Basil says thank you. Basil is very shy about it.'] },
   scrap: { lines: ['We need more pages, I think.', 'Please skip the lake page. I’m begging you, Partner.', 'Is that my handwriting? It’s dreadful.'] },
   shelf2: { lines: ['Six copies. And neither of us has made a single recipe.', 'The pine candle is for emergencies. Don’t light it on a whim.'] },
@@ -195,6 +198,7 @@ inter('bwin', [2.4, 1.3, 4.05], 0.9, 'Window', async () => {
   if (S.n.bwin === 1 && canHear() && !PARTNER.lie) await Pt('That’s Gerald. He isn’t judging you. That’s simply his face.');
 });
 inter('wwin', [0.6, 1.3, 2.25], 0.9, 'Window', () => N(morning() ? cyc('wwin', ['(The pines are still holding last night’s snow, very carefully, as if it might break.)', '(A clump of snow slides off a branch. The tree looks relieved.)']) : '(The trees, and the dark between them.)'));
+rewire('clock', () => N(cyc('clock', ['(The clock is four minutes fast. It has been four minutes fast for as long as anyone can remember. Nobody fixes it.)', '(Tick. Tock. Four minutes ahead of the rest of the world, and perfectly content.)'])));
 rewire('photos', () => N('(Six polaroids on a string. The lake. The fire. The night you both got lost and didn’t mind.)'));
 for (const id of ['lampL', 'lampR']) { const it = findInter(id); const was = it.act; it.act = () => { was(); S.lastUse = { id, t: G.simT, room: hereRoom() }; react(id); }; }
 // Living room
@@ -239,8 +243,10 @@ inter('frontdoor', [6.5, 1, 4.15], 0.8, 'Front door', async () => {
 inter('kettle', [11.55, 1, 0.75], 0.75, () => (morning() && !S.flags.teaMade ? 'Make tea' : 'Kettle'), async () => {
   if (morning() && !S.flags.teaMade) {
     S.flags.teaMade = true;
+    G.Audio.kettle(); G.steam('kettle', 11.65, 1.12, 0.36, { rate: 3, dur: 9 });
     await N('(You fill the kettle and take two mugs down. One for you. One for her: two sugars, which she will deny.)');
     setBreakfast({ mugs: true, plates: S.flags.pancakesMade, burnt: S.flags.pancakeQuality === 'burnt' });
+    K().mugs.forEach((m, i) => G.steam('mug' + i, m.position.x, 0.86, m.position.z, { rate: 1.1, dur: 240, size: 0.55 }));
     return;
   }
   await N('(The kettle’s still warm.)');
@@ -341,6 +347,7 @@ const ABOUT = {
   coats: async () => { await Pt('The scarf. Be honest. Is it yours?'); await Y('It’s yours.'); await Pt('Then we’re agreed. It belongs to no one. A free scarf.'); },
   cushion: async () => { await Pt('You found my collection.'); await Y('Three of my socks are in there.'); await Pt('They were lonely. I gave them a home.'); },
   ktable: async () => { await Pt('You didn’t open the card, did you?'); await Y('It said “not yet”.'); await Pt('Good. Tonight. It’s for tonight.'); },
+  clock: async () => { await Pt('Do you ever think we should fix the clock?'); await Y('No.'); await Pt('No. It would feel like someone else’s house.'); },
   toaster: async () => { await Pt('We are not speaking about the toaster.'); await Y('We never do.'); await Pt('And that is how it will stay.'); },
   bed: async () => { await Pt('You made the bed. I noticed.'); await Y('Badly.'); await Pt('Lovingly badly. That’s the best kind.'); },
   sofa: async () => { await Pt('This is my favourite place in the cabin.'); await Y('The sofa?'); await Pt('Next to you on it. The sofa’s only part of it.'); addBond(0.2); },
@@ -515,14 +522,15 @@ Object.assign(Story, {
     STATE.sceneShot = true;
     await G.slideTo(PLAYER, 12.22, 0.97, Math.PI, 0.35);   // stand at the hob, a little left of the pan, so the camera can see both
     G.setShot(panShot());
-    k.burner.material.opacity = 0.8; G.Audio.sizzle(true);
+    k.burner.material.opacity = 0.8; G.Audio.sizzle(true); G.steam('pan', 12.5, 0.96, 0.51, { rate: 4, size: 1.3 });
     await N('(Flour, eggs, milk, a pinch of salt. The pan hisses.)', { shot: 'keep' });
     k.pancakeInPan.visible = true;
     const col = (q) => (q > 0.75 ? '#e0ad66' : q > 0.35 ? '#c58a46' : '#5a3a22');
     const sc = await G.UI.timing({ title: 'Flip the pancakes', rounds: 3, zone: [0.58, 0.74], labels: ['Charcoal.', 'Pancake-shaped.', 'Golden.'], onPress: (q) => { G.Audio.flip(); flipAnim(k.pancakeInPan, col(q)); } });
     const avg = sc.reduce((a, b) => a + b, 0) / sc.length;
     const q = (S.flags.pancakeQuality = avg > 0.7 ? 'golden' : avg > 0.38 ? 'fine' : 'burnt');
-    k.burner.material.opacity = 0; G.Audio.sizzle(false); k.pancakeInPan.visible = false;
+    k.burner.material.opacity = 0; G.Audio.sizzle(false); k.pancakeInPan.visible = false; G.steam('pan', 0, 0, 0, { off: true });
+    k.plates.forEach((pl, i) => { if (i < 2) G.steam('plate' + i, pl.g.position.x, 0.82, pl.g.position.z, { rate: 1.4, dur: 120, size: 0.7 }); });
     S.flags.pancakesMade = true;
     setBreakfast({ mugs: S.flags.teaMade, plates: true, burnt: q === 'burnt' });
     G.setShot(tableShot('B')); G.CAM.cut = true;
@@ -752,4 +760,4 @@ const bench = findInter('bench');
 bench.label = () => (ch() === 'evening' ? (STATE.porchDone ? 'Bench' : 'Watch the stars') : 'Bench');
 bench.act = () => { if (ch() === 'evening') return G.Story.porch(); return run(() => N(cyc('bench', ['(Someone has carved two initials into the bench. Not you. Probably.)', '(The bench is cold enough to count as a dare. Later. When there are stars.)'])), 'bench'); };
 G.$('pScrap').addEventListener('click', () => { G.UI.scrapbook(S.scrap); });
-})();
+});

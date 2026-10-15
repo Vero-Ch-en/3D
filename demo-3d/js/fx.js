@@ -1,7 +1,8 @@
 'use strict';
 /* =========================================================================
- * Atmosphere: footprints in the snow, breath vapour, fire embers, dust motes
- * in the lamplight and window light falling on the snow outside.
+ * Atmosphere: footprints in the snow (and wet ones indoors), breath vapour,
+ * steam, fire embers, dust motes, sunbeams through the windows by day, window
+ * light falling on the snow at night, and snow sliding off the eaves.
  * Built by G.buildFX() after the world; ticked by G.updateFX(dt, t).
  * ========================================================================= */
 (() => {
@@ -129,14 +130,14 @@ function buildEmbers() {
 /* ---------------- dust motes ---------------- */
 let DUST;
 function buildDust() {
-  const N = 220, pos = new Float32Array(N * 3), seed = new Float32Array(N);
-  for (let i = 0; i < N; i++) { pos[i * 3] = G.rand(0.3, 10.7); pos[i * 3 + 1] = G.rand(0.3, 2.5); pos[i * 3 + 2] = G.rand(0.3, 4.3); seed[i] = Math.random(); }
+  const N = 300, pos = new Float32Array(N * 3), seed = new Float32Array(N);
+  for (let i = 0; i < N; i++) { pos[i * 3] = G.rand(0.3, 14.7); pos[i * 3 + 1] = G.rand(0.3, 2.5); pos[i * 3 + 2] = G.rand(0.3, 4.3); seed[i] = Math.random(); }
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('seed', new THREE.BufferAttribute(seed, 1));
   const mat = new THREE.ShaderMaterial({
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
-    uniforms: { uTime: { value: 0 }, uPx: { value: 1 }, uVis: { value: 0 } },
+    uniforms: { uTime: { value: 0 }, uPx: { value: 1 }, uVis: { value: 0 }, uDay: { value: 0 } },
     vertexShader: `
-      attribute float seed; uniform float uTime; uniform float uPx; uniform float uVis; varying float vA;
+      attribute float seed; uniform float uTime; uniform float uPx; uniform float uVis; uniform float uDay; varying float vA;
       void main(){
         vec3 p = position;
         p.x += sin(uTime * 0.13 + seed * 31.0) * 0.25;
@@ -144,7 +145,9 @@ function buildDust() {
         p.z += cos(uTime * 0.11 + seed * 23.0) * 0.25;
         // Brighter near the fire and the lamps, where light would catch them.
         float warm = exp(-pow(distance(p.xz, vec2(8.0, 1.2)), 2.0) * 0.35) + exp(-pow(distance(p.xz, vec2(2.4, 0.5)), 2.0) * 0.6) * 0.6 + 0.25;
-        vA = uVis * warm * (0.5 + 0.5 * sin(uTime * 0.7 + seed * 50.0));
+        // By day they glitter where the sunbeams come in through the south windows.
+        float beam = uDay * 1.4 * smoothstep(1.8, 4.3, p.z) * (smoothstep(0.6, 1.8, p.y));
+        vA = uVis * (warm * (1.0 - uDay * 0.6) + beam) * (0.5 + 0.5 * sin(uTime * 0.7 + seed * 50.0));
         vec4 mv = modelViewMatrix * vec4(p, 1.0);
         gl_PointSize = uPx * (4.0 + seed * 5.0) / -mv.z;
         gl_Position = projectionMatrix * mv;
@@ -182,17 +185,147 @@ function buildWindowLight() {
   }
 }
 
-G.buildFX = () => { buildFootprints(); buildBreath(); buildEmbers(); buildDust(); buildWindowLight(); };
+/* ---------------- wet boot prints indoors ----------------
+ * Darken the boards (multiply blend) and dry off over a minute or so. */
+const WP = { N: 80, i: 0, born: null, str: null, mesh: null, life: 60 };
+function buildWetPrints() {
+  const tex = G.canvasTex(0, null, { w: 64, h: 160, draw: (c, w, h) => {
+    c.fillStyle = '#ffffff'; c.fillRect(0, 0, w, h);
+    c.filter = 'blur(4px)'; c.fillStyle = 'rgb(150,140,130)';
+    c.beginPath(); c.ellipse(32, 52, 20, 42, 0, 0, Math.PI * 2); c.fill(); c.beginPath(); c.ellipse(32, 128, 15, 24, 0, 0, Math.PI * 2); c.fill();
+  } });
+  tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
+  const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, blending: THREE.MultiplyBlending, polygonOffset: true, polygonOffsetFactor: -4 });
+  const geo = new THREE.PlaneGeometry(0.12, 0.3); geo.rotateX(-Math.PI / 2); geo.rotateY(Math.PI);
+  const m = new THREE.InstancedMesh(geo, mat, WP.N); m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  for (let i = 0; i < WP.N; i++) { m.setMatrixAt(i, HIDE); m.setColorAt(i, new THREE.Color(1, 1, 1)); }
+  m.frustumCulled = false; m.renderOrder = 2; G.scene.add(m);
+  WP.mesh = m; WP.born = new Float32Array(WP.N).fill(-1e9); WP.str = new Float32Array(WP.N);
+}
+G.addWetPrint = (x, z, yaw, leg, size = 1, str = 1) => {
+  if (!WP.mesh || str < 0.05) return;
+  const i = WP.i; WP.i = (WP.i + 1) % WP.N;
+  WP.mesh.setMatrixAt(i, G.mtx(x, 0.006, z, (leg ? 1 : -1) * size, 1, size, yaw + (Math.random() - 0.5) * 0.12));
+  WP.born[i] = fxTime; WP.str[i] = str; WP.mesh.instanceMatrix.needsUpdate = true;
+};
+function updateWetPrints() {
+  if (!WP.mesh) return;
+  let dirty = false;
+  for (let i = 0; i < WP.N; i++) {
+    const age = fxTime - WP.born[i];
+    if (age > WP.life + 1) { if (WP.born[i] > -1e8) { WP.mesh.setMatrixAt(i, HIDE); WP.born[i] = -1e9; WP.mesh.instanceMatrix.needsUpdate = true; } continue; }
+    // White = no darkening; the print fades back to white as the boards dry.
+    const k = 1 - (1 - Math.min(1, age / WP.life)) * WP.str[i] * 0.85; _c.setRGB(k, k, k); WP.mesh.setColorAt(i, _c); dirty = true;
+  }
+  if (dirty) WP.mesh.instanceColor.needsUpdate = true;
+}
+
+/* ---------------- steam ----------------
+ * Emitters (mugs, the kettle, the pan) breathe out soft wisps that rise, drift and thin out. */
+const STEAM = { pool: [], em: new Map() };
+function buildSteam() {
+  const tex = softDot();
+  for (let i = 0; i < 48; i++) { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, color: '#ffffff', transparent: true, depthWrite: false, opacity: 0 })); s.visible = false; G.scene.add(s); STEAM.pool.push({ s, age: 9, life: 1 }); }
+}
+// rate: wisps per second; dur: seconds of game time (Infinity until cleared); size: wisp scale.
+G.steam = (id, x, y, z, o = {}) => { if (o.off) { STEAM.em.delete(id); return; } STEAM.em.set(id, { x, y, z, rate: o.rate || 2, until: fxTime + (o.dur == null ? Infinity : o.dur), size: o.size || 1, acc: 0 }); };
+function updateSteam(dt) {
+  for (const [id, e] of STEAM.em) {
+    if (fxTime > e.until) { STEAM.em.delete(id); continue; }
+    e.acc += dt * e.rate;
+    while (e.acc > 1) { e.acc -= 1; const p = STEAM.pool.find((q) => q.age >= q.life); if (!p) break; p.age = 0; p.life = 1.6 + Math.random(); p.size = e.size; p.s.position.set(e.x + (Math.random() - 0.5) * 0.03, e.y, e.z + (Math.random() - 0.5) * 0.03); p.vx = (Math.random() - 0.5) * 0.05; p.s.visible = true; }
+  }
+  for (const p of STEAM.pool) {
+    if (p.age >= p.life) { if (p.s.visible) p.s.visible = false; continue; }
+    p.age += dt; const k = p.age / p.life;
+    p.s.position.y += dt * (0.22 - k * 0.08); p.s.position.x += (p.vx + Math.sin(p.age * 3 + p.life) * 0.03) * dt;
+    p.s.scale.setScalar((0.03 + k * 0.16) * p.size);
+    p.s.material.opacity = Math.sin(Math.min(1, k * 3) * Math.PI * 0.5) * (1 - k) * 0.18;
+  }
+}
+
+/* ---------------- sunbeams ----------------
+ * By day, a soft shaft of light from each sunlit window, extruded along the sun's direction and
+ * faded with distance. A stand-in for real volumetric light: swap it out when the renderer has one. */
+let SHAFTS;
+function buildSunbeams() {
+  const d = G.SUN_DAY.clone().negate(), len = 4.2;
+  // [window corners as (x, y, z) × 4]: the south windows and the kitchen's east window.
+  const wins = [[1.6, 3.2, 'S'], [8.6, 10.2, 'S'], [12.2, 13.8, 'S'], [1.4, 2.8, 'E']];
+  // Each side of the shaft is its own quad with an 'across' coordinate, so the beam's edges fade out
+  // instead of reading as flat glass panels.
+  const P = [], A = [], U = [];
+  for (const [a, b, side] of wins) {
+    const y0 = 0.85, y1 = 2.05;
+    const q = side === 'S' ? [[a, y0, 4.48], [b, y0, 4.48], [b, y1, 4.48], [a, y1, 4.48]] : [[14.88, y0, a], [14.88, y0, b], [14.88, y1, b], [14.88, y1, a]];
+    const far = (v) => [v[0] + d.x * len, v[1] + d.y * len, v[2] + d.z * len];
+    for (let k = 0; k < 4; k++) {
+      const v0 = q[k], v1 = q[(k + 1) % 4], f0 = far(v0), f1 = far(v1);
+      for (const [v, al, u] of [[v0, 0, 0], [v1, 0, 1], [f1, 1, 1], [v0, 0, 0], [f1, 1, 1], [f0, 1, 0]]) { P.push(v[0], v[1], v[2]); A.push(al); U.push(u); }
+    }
+  }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('along', new THREE.Float32BufferAttribute(A, 1)); g.setAttribute('across', new THREE.Float32BufferAttribute(U, 1));
+  const mat = new THREE.ShaderMaterial({
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+    uniforms: { uI: { value: 0 }, uTime: { value: 0 } },
+    vertexShader: 'attribute float along; attribute float across; varying float vA; varying float vU; varying vec3 vP; void main(){ vA = along; vU = across; vP = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+    fragmentShader: `uniform float uI; uniform float uTime; varying float vA; varying float vU; varying vec3 vP;
+      void main(){
+        float f = pow(1.0 - vA, 1.8) * smoothstep(0.0, 0.06, vA) * pow(sin(vU * 3.14159), 1.5);
+        float flicker = 0.85 + 0.15 * sin(vP.x * 3.0 + vP.y * 2.0 + uTime * 0.3);
+        gl_FragColor = vec4(vec3(1.0, 0.93, 0.8) * f * uI * flicker, 1.0);
+      }`,
+  });
+  SHAFTS = new THREE.Mesh(g, mat); SHAFTS.frustumCulled = false; SHAFTS.renderOrder = 4; G.scene.add(SHAFTS);
+}
+
+/* ---------------- snow sliding off the eaves ---------------- */
+const PUFF = [];
+function buildPuffs() {
+  const tex = softDot();
+  for (let i = 0; i < 40; i++) { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, color: '#f4f7ff', transparent: true, depthWrite: false, opacity: 0 })); s.visible = false; G.scene.add(s); PUFF.push({ s, age: 9, life: 1 }); }
+}
+// Eave lines a clump can fall from: [x0, x1, z, y].
+const EAVES = [[3.3, 11.6, 6.98, 2.35], [11.6, 15.6, 5.15, 2.75], [-0.6, 3.3, 5.15, 2.75], [-0.6, 15.6, -0.75, 2.75]];
+G.snowPuff = (near) => {
+  let best = null, bd = 1e9;
+  for (const [x0, x1, z, y] of EAVES) { const x = G.clamp(near.x + (Math.random() - 0.5) * 6, x0, x1), dd = Math.hypot(x - near.x, z - near.z); if (dd < bd) { bd = dd; best = { x, y, z }; } }
+  if (!best || bd > 9) return false;
+  let n = 0;
+  for (const p of PUFF) { if (p.age < p.life) continue; p.age = 0; p.life = 0.9 + Math.random() * 0.7; p.x = best.x + (Math.random() - 0.5) * 0.5; p.z = best.z + (Math.random() - 0.5) * 0.2; p.y = best.y; p.vy = -Math.random() * 0.5; p.vx = (Math.random() - 0.5) * 0.4 + G.WIND.gust * 0.3; p.s.visible = true; if (++n > 14) break; }
+  return true;
+};
+function updatePuffs(dt) {
+  for (const p of PUFF) {
+    if (p.age >= p.life) { if (p.s.visible) p.s.visible = false; continue; }
+    p.age += dt; const k = p.age / p.life;
+    p.vy -= dt * 6; p.y = Math.max(G.floorAt(p.x, p.z) + 0.05, p.y + p.vy * dt); p.x += p.vx * dt;
+    p.s.position.set(p.x, p.y, p.z); p.s.scale.setScalar(0.12 + k * 0.5);
+    p.s.material.opacity = (1 - k) * 0.55;
+  }
+}
+
+G.buildFX = () => { buildFootprints(); buildWetPrints(); buildBreath(); buildSteam(); buildEmbers(); buildDust(); buildWindowLight(); buildSunbeams(); buildPuffs(); };
+let sparkT = 0;
+G.sparkBurst = () => { sparkT = 1; };
 G.updateFX = (dt, t) => {
   fxTime += dt;
-  updateFootprints();
-  updateBreath(dt);
+  updateFootprints(); updateWetPrints();
+  updateBreath(dt); updateSteam(dt); updatePuffs(dt);
+  sparkT = Math.max(0, sparkT - dt * 1.5);
+  if (SHAFTS) { const i = (G.STATE.day || 0) * 0.06; SHAFTS.visible = i > 0.002; SHAFTS.material.uniforms.uI.value = i; SHAFTS.material.uniforms.uTime.value = t; }
   const px = innerHeight * Math.min(window.devicePixelRatio || 1, G.Q.dpr);
-  if (EMB) { EMB.material.uniforms.uTime.value = t; EMB.material.uniforms.uPower.value = G.FIRE.on ? G.FIRE.level : 0; EMB.material.uniforms.uPx.value = px / 900; }
+  if (EMB) { EMB.material.uniforms.uTime.value = t; EMB.material.uniforms.uPower.value = (G.FIRE.on ? G.FIRE.level : 0) * (1 + sparkT * 2.5); EMB.material.uniforms.uPx.value = px / 900; }
   if (DUST) {
     const camIn = G.inside(G.camera.position.x, G.camera.position.z);
     DUST.material.uniforms.uTime.value = t; DUST.material.uniforms.uPx.value = px / 900;
     DUST.material.uniforms.uVis.value = G.damp(DUST.material.uniforms.uVis.value, camIn ? 1 : 0, 2, dt);
+    DUST.material.uniforms.uDay.value = G.STATE.day || 0;
+  }
+  // The wall clock follows the day: mid-morning, late afternoon, then night, creeping on as you play.
+  if (G.CLOCK) {
+    const S = G.STATE, h = (S.day > 0.5 ? 9.2 : lerp(17.0, 21.0, S.tod)) + (G.simT % 3600) / 3600 * 0.5;
+    G.CLOCK.m.rotation.z = -(h % 1) * Math.PI * 2; G.CLOCK.h.rotation.z = -((h % 12) / 12) * Math.PI * 2;
   }
   if (WINPOOL) WINPOOL.opacity = lerp(0.18, 0.65, G.STATE.tod) * (1 - (G.STATE.day || 0));
 };

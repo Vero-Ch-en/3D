@@ -188,6 +188,7 @@ G.buildInterior = () => {
   box(0.86, 0.64, 0.2, cm, 0, 0.72, 0.33, { parent: chair, r: 0.08, seg: 4 });
   for (const s of [-1, 1]) box(0.16, 0.56, 0.82, cm, s * 0.43, 0.33, 0, { parent: chair, r: 0.07, seg: 4 });
   box(0.6, 0.05, 0.6, MAT.knitCream, 0, 0.45, -0.02, { parent: chair, r: 0.02 });
+  G.propify('armchair', chair);
   G.COLL.push({ x0: 5.75, z0: 1.45, x1: 6.75, z1: 2.45 });
   // East wall bookshelf, floor lamp, plant, rug.
   bookshelf(10.72, 3.95, 0.34, 1.05, 2.1, Math.PI / 2);
@@ -195,6 +196,15 @@ G.buildInterior = () => {
   floorLamp(6.15, 3.55);
   plant(10.4, 4.2, 1.2);   // Basil (not basil)
   const rug2 = G.add(new THREE.Mesh(new THREE.PlaneGeometry(2.9, 2.0), MAT.rug), W, false, true); rug2.rotation.x = -Math.PI / 2; rug2.position.set(8, 0.006, 2.2);
+  // A wall clock on the partition, hands set to the time of day (fx.js turns them).
+  const clock = G.propSlot('clock', 5.13, 1.95, 1.5, Math.PI / 2, (g) => {
+    cyl(0.17, 0.17, 0.04, MAT.darkWood, 0, 0, 0, { parent: g, seg: 32 }).rotation.x = Math.PI / 2;
+    cyl(0.15, 0.15, 0.01, MAT.ceramic, 0, 0, 0.022, { parent: g, seg: 32 }).rotation.x = Math.PI / 2;
+    for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2; box(i % 3 ? 0.008 : 0.014, 0.025, 0.004, MAT.darkMetal, Math.sin(a) * 0.125, Math.cos(a) * 0.125, 0.029, { parent: g, cast: false }).rotation.z = -a; }
+    const hand = (len, w) => { const p = new THREE.Group(); p.position.z = 0.032; p.userData.dynamic = true; g.add(p); box(w, len, 0.004, MAT.darkMetal, 0, len / 2 - 0.015, 0, { parent: p, cast: false }); return p; };
+    G.CLOCK = { h: hand(0.08, 0.012), m: hand(0.115, 0.008) };
+  });
+  G.INTER.push({ id: 'clock', pos: [5.4, 1.6, 1.5], r: 0.9, label: 'Clock', act: () => G.say(null, '(The clock is four minutes fast. It has been four minutes fast for as long as anyone can remember. Nobody fixes it.)') });
   // Coats by the door.
   box(0.6, 0.05, 0.08, MAT.darkWood, 5.5, 1.75, 4.45);
   const coat = G.std({ map: TX.jersey, color: '#5c5f63', roughness: 1 });
@@ -282,7 +292,7 @@ function buildKitchen() {
   sph(0.018, MAT.darkMetal, 0, 0.21, 0, [1, 1, 1], kg, 10);
   const spout = cyl(0.012, 0.02, 0.12, enamel('#b9473a'), 0.1, 0.11, 0, { parent: kg, seg: 8 }); spout.rotation.z = -0.9;
   const hdl = new THREE.Mesh(new THREE.TorusGeometry(0.06, 0.012, 6, 16, Math.PI), MAT.darkMetal); hdl.position.set(0, 0.2, 0); kg.add(hdl);
-  K.kettleG = kg;
+  K.kettleG = G.propify('kettle', kg);
   K.stove = { x: 12.35, z: 0.38 };
   box(0.62, 0.02, 0.5, G.shared({ color: '#1e1c1c', roughness: 0.3, metalness: 0.4, env: 0.8 }), 12.35, 0.895, 0.39, { cast: false });
   for (const [dx, dz, rr] of [[-0.15, -0.1, 0.08], [0.15, -0.1, 0.06], [-0.15, 0.12, 0.06], [0.15, 0.12, 0.09]]) cyl(rr, rr, 0.008, G.shared({ color: '#3a3330', roughness: 0.6, metalness: 0.5 }), 12.35 + dx, 0.905, 0.39 + dz, { seg: 20, cast: false });
@@ -322,7 +332,7 @@ function buildKitchen() {
     for (const a of [-0.18, 0.18]) box(0.035, 0.5, 0.035, MAT.darkWood, a, 0.72, -0.18, { parent: g });
     box(0.4, 0.12, 0.03, MAT.darkWood, 0, 0.9, -0.18, { parent: g });
     box(0.36, 0.035, 0.34, MAT.plaid, 0, 0.485, 0.01, { parent: g, r: 0.012 });
-    return g;
+    return G.propify('chair', g);
   };
   // ry = π: the seat faces −z (toward the table from the window side).
   K.chairs = { A: { x: 12.72, z: 3.58, yaw: Math.PI }, B: { x: 13.3, z: 3.58, yaw: Math.PI }, C: { x: 13.0, z: 2.3, yaw: 0 } };

@@ -249,9 +249,10 @@ const loadEmbedded = () => embedded || (embedded = new Promise((res) => {
   document.head.appendChild(s);
 }));
 G.loadModelBuffer = async (name) => {
+  const custom = G.ASSET_MANIFEST && G.ASSET_MANIFEST.characters[name];
   if (location.protocol !== 'file:') {
     try {
-      const r = await fetch('models/' + name + '.glb');
+      const r = await fetch(custom ? custom.url : 'models/' + name + '.glb');
       if (r.ok) return await r.arrayBuffer();
     } catch (e) { /* fall through to the embedded copy */ }
   }
@@ -267,7 +268,11 @@ G.attachBlenderBody = async (root, name) => {
     new THREE.GLTFLoader().parse(bin, '', (gltf) => {
       const u = root.userData, k = u.k;
       const model = gltf.scene;
-      model.scale.setScalar(k);
+      // A model from the asset manifest can bring its own materials and proportions; the built-in ones
+      // are authored for a 1.75 m body and take the game's knit and jersey materials.
+      const spec = (G.ASSET_MANIFEST && G.ASSET_MANIFEST.characters[name]) || {};
+      if (spec.fit) { const b = new THREE.Box3().setFromObject(model); model.scale.setScalar(u.H / Math.max(0.1, b.max.y - b.min.y)); }
+      else model.scale.setScalar(spec.scale || k);
       // Rest pose: zero every rig rotation, then capture world matrices.
       const groups = { hips: u.hips, spine: u.spine, chest: u.chest, neck: u.neck, head: u.head };
       u.arms.forEach((a, i) => { const s = i ? 'R' : 'L'; groups['sh_' + s] = a.sh; groups['el_' + s] = a.el; groups['hand_' + s] = a.hand; });
@@ -280,9 +285,23 @@ G.attachBlenderBody = async (root, name) => {
       u.hips.position.y = u.hipY;
       root.add(model);
       root.updateMatrixWorld(true);
-      const map = [];
+      const map = [], used = new Set(), wpos = new THREE.Vector3();
+      // Match bones to rig groups: exact names first (the built-in models), else by common rig naming,
+      // picking the left or right group by which side of the body the bone actually sits on.
+      const groupFor = (o) => {
+        if (groups[o.name]) return o.name;
+        const a = G.boneAlias ? G.boneAlias(o.name) : null;
+        if (!a) return null;
+        if (['hips', 'spine', 'chest', 'neck', 'head'].includes(a.part)) return a.part;
+        const x = o.getWorldPosition(wpos).x, l = groups[a.part + '_L'], r = groups[a.part + '_R'];
+        if (!l || !r) return null;
+        const lx = l.getWorldPosition(new THREE.Vector3()).x;
+        return Math.sign(x) === Math.sign(lx) ? a.part + '_L' : a.part + '_R';
+      };
       model.traverse((o) => {
-        if (o.isBone && groups[o.name]) map.push({ bone: o, group: groups[o.name], restInv: new THREE.Matrix4().copy(groups[o.name].matrixWorld).invert(), boneRest: o.matrixWorld.clone() });
+        const gn = o.isBone ? groupFor(o) : null;
+        if (gn && !used.has(gn)) { used.add(gn); map.push({ bone: o, group: groups[gn], restInv: new THREE.Matrix4().copy(groups[gn].matrixWorld).invert(), boneRest: o.matrixWorld.clone() }); }
+        if (o.isMesh && spec.keepMaterials) { o.frustumCulled = false; o.castShadow = true; o.receiveShadow = true; return; }
         if (o.isMesh) {
           o.frustumCulled = false; o.castShadow = true; o.receiveShadow = true;
           const nm = (o.material.name || '').split('.')[0];
@@ -301,7 +320,7 @@ G.attachBlenderBody = async (root, name) => {
       root.position.copy(pos0); root.rotation.copy(rot0);
       // Hide procedural body parts.
       const hide = new Set(u.bodyMats);
-      root.traverse((o) => { if (o.isMesh && !o.isSkinnedMesh && hide.has(o.material) && !u.lids.includes(o)) o.visible = false; });
+      root.traverse((o) => { if (o.isMesh && !o.isSkinnedMesh && (spec.hideProcedural === 'all' ? !model.getObjectById(o.id) : hide.has(o.material) && !u.lids.includes(o))) o.visible = false; });
       u.retarget = { map, model };
       resolve(true);
     }, (err) => { console.error('model', name, err); resolve(false); });

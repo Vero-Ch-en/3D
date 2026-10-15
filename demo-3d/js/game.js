@@ -41,11 +41,53 @@ G.Audio = (() => {
     ctx = new AC(); master = ctx.createGain(); master.gain.value = level(); master.connect(ctx.destination);
     // Outdoor bus: muffled through the walls when you're inside.
     outF = ctx.createBiquadFilter(); outF.type = 'lowpass'; outF.frequency.value = 9000; outF.connect(master);
-    const f = noise(), ff = ctx.createBiquadFilter(); ff.type = 'lowpass'; ff.frequency.value = 220; fireG = ctx.createGain(); fireG.gain.value = 0; f.connect(ff); ff.connect(fireG); fireG.connect(master); f.start();
+    const f = noise(), ff = ctx.createBiquadFilter(); ff.type = 'lowpass'; ff.frequency.value = 220; fireG = ctx.createGain(); fireG.gain.value = 0; f.connect(ff); ff.connect(fireG); f.start();
+    buildSpots(); fireG.connect(SPOTS.fire.in);
     const w = noise(); windF = ctx.createBiquadFilter(); windF.type = 'bandpass'; windF.frequency.value = 400; windF.Q.value = 0.6; windG = ctx.createGain(); windG.gain.value = 0.05; w.connect(windF); windF.connect(windG); windG.connect(outF); w.start();
     padG = ctx.createGain(); padG.gain.value = 0.04; const pf = ctx.createBiquadFilter(); pf.type = 'lowpass'; pf.frequency.value = 900; pf.connect(padG); padG.connect(master);
     CHORDS[0].forEach((fr, i) => { const o = ctx.createOscillator(); o.type = 'triangle'; o.frequency.value = fr; o.detune.value = (i - 1.5) * 3; o.connect(pf); o.start(); pad.push(o); });
     nextChord = ctx.currentTime + 9;
+  }
+  /* ---------- the soundscape: sources placed in the cabin ----------
+   * Each source sits at a point in the world, heard through an HRTF panner from the camera, and is
+   * muffled by a low-pass when it's in another room (walls) or outside while you're in. */
+  const SPOTS = {};
+  const roomOf = (x, z) => (G.inside(x, z) ? (x < 5 ? 'bed' : x < 11 ? 'liv' : 'kit') : 'out');
+  function spot(id, x, y, z, o = {}) {
+    const p = ctx.createPanner(); p.panningModel = 'HRTF'; p.distanceModel = 'inverse'; p.refDistance = o.ref || 1; p.rolloffFactor = o.roll || 1.4; p.maxDistance = 40;
+    if (p.positionX) { p.positionX.value = x; p.positionY.value = y; p.positionZ.value = z; } else p.setPosition(x, y, z);
+    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 16000;
+    const inp = ctx.createGain(); inp.connect(p); p.connect(lp); lp.connect(master);
+    return (SPOTS[id] = { in: inp, lp, x, z, room: roomOf(x, z) });
+  }
+  function buildSpots() {
+    spot('fire', 8.0, 0.5, 0.9, { ref: 1.2 });
+    // The fridge: a low hum, two partials, slowly breathing in and out.
+    const fr = spot('fridge', 14.55, 1.0, 0.5, { ref: 0.6, roll: 2 }), hum = ctx.createGain(); hum.gain.value = 0.006; hum.connect(fr.in);
+    for (const [f, v] of [[50, 1], [100, 0.5], [151, 0.18]]) { const o = ctx.createOscillator(); o.frequency.value = f; const g = ctx.createGain(); g.gain.value = v; o.connect(g); g.connect(hum); o.start(); }
+    const lfo = ctx.createOscillator(); lfo.frequency.value = 0.07; const lg = ctx.createGain(); lg.gain.value = 0.003; lfo.connect(lg); lg.connect(hum.gain); lfo.start();
+    spot('clock', 5.15, 1.95, 1.5, { ref: 0.5, roll: 1.8 });
+    spot('kettle', 11.55, 1.0, 0.36, { ref: 0.8 });
+    // Wind finding the gaps around the window frames.
+    for (const [i, x, z] of [[0, 2.4, 4.6], [1, 9.4, 4.6], [2, 13.0, 4.6], [3, 0, 2.25], [4, 15, 2.1]]) {
+      const s = spot('win' + i, x, 1.4, z, { ref: 0.7, roll: 1.6 }), n = noise(), bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 900 + i * 230; bp.Q.value = 4;
+      const g = ctx.createGain(); g.gain.value = 0; n.connect(bp); bp.connect(g); g.connect(s.in); n.start(Math.random()); s.g = g; s.bp = bp;
+    }
+  }
+  let nextTick = 0, tickN = 0;
+  function updateSpots(lx, ly, lz, fx, fz, room, t) {
+    const L = ctx.listener, now = ctx.currentTime;
+    if (L.positionX) { L.positionX.setTargetAtTime(lx, now, 0.03); L.positionY.setTargetAtTime(ly, now, 0.03); L.positionZ.setTargetAtTime(lz, now, 0.03); L.forwardX.value = fx; L.forwardY.value = 0; L.forwardZ.value = fz; L.upX.value = 0; L.upY.value = 1; L.upZ.value = 0; }
+    else { L.setPosition(lx, ly, lz); L.setOrientation(fx, 0, fz, 0, 1, 0); }
+    for (const id in SPOTS) {
+      const s = SPOTS[id];
+      const f = s.room === room ? 16000 : s.room === 'out' || room === 'out' ? 450 : 1100;
+      s.lp.frequency.setTargetAtTime(f, now, 0.25);
+    }
+    // The clock: a tick and a slightly different tock, once a second.
+    if (now > nextTick - 0.05) { if (nextTick < now) nextTick = now + 0.05; burst(0.025, tickN % 2 ? 2600 : 3200, 0.05, 'bandpass', 6, nextTick - now, SPOTS.clock.in); tickN++; nextTick += 1; }
+    const gust = G.WIND.gust;
+    for (let i = 0; i < 5; i++) { const s = SPOTS['win' + i]; s.g.gain.setTargetAtTime(Math.max(0, gust - 0.45) * 0.05, now, 0.6); s.bp.frequency.setTargetAtTime(800 + i * 230 + gust * 600, now, 0.8); }
   }
   const tone = (f, d, v = 0.06, when = 0, dest) => { if (!ctx) return; const t = ctx.currentTime + when; const o = ctx.createOscillator(); o.frequency.value = f; const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(v, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + d + 0.2); o.connect(g); g.connect(dest || master); o.start(t); o.stop(t + d + 0.3); };
   const burst = (dur, freq, vol, type = 'bandpass', q = 1, when = 0, dest) => { if (!ctx) return; const t = ctx.currentTime + when; const s = noise(); const bf = ctx.createBiquadFilter(); bf.type = type; bf.frequency.value = freq; bf.Q.value = q; const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(vol, t + 0.006); g.gain.exponentialRampToValueAtTime(0.0001, t + dur); s.connect(bf); bf.connect(g); g.connect(dest || master); s.start(t, Math.random() * 1.5); s.stop(t + dur + 0.05); };
@@ -64,9 +106,27 @@ G.Audio = (() => {
       if (t > nextChord) { chordI = (chordI + 1) % CHORDS.length; CHORDS[chordI].forEach((fr, i) => pad[i].frequency.setTargetAtTime(fr, t, 1.8)); nextChord = t + 9 + Math.random() * 3; }
     },
     click() { tone(1800, 0.01, 0.03); },
-    crackle(dt, level) { if (ctx && Math.random() < dt * 10 * level) burst(0.04, 1500 + Math.random() * 2500, 0.1 * Math.random(), 'bandpass', 2); },
+    crackle(dt, level) {
+      if (!ctx) return;
+      if (Math.random() < dt * 10 * level) burst(0.04, 1500 + Math.random() * 2500, 0.1 * Math.random(), 'bandpass', 2, 0, SPOTS.fire.in);
+      // Now and then a log settles: a soft thump and a little shower of sparks.
+      if (Math.random() < dt * 0.04 * level) { burst(0.25, 160, 0.14, 'lowpass', 1, 0, SPOTS.fire.in); for (let i = 0; i < 6; i++) burst(0.03, 2000 + Math.random() * 3000, 0.08, 'bandpass', 2, 0.05 + i * 0.04 * Math.random(), SPOTS.fire.in); if (G.sparkBurst) G.sparkBurst(); }
+    },
+    spatial(lx, ly, lz, fx, fz, room, t) { if (ctx) updateSpots(lx, ly, lz, fx, fz, room, t); },
+    // A kettle coming to the boil: rising hiss, then the click.
+    kettle() {
+      if (!ctx) return; const t = ctx.currentTime, n = noise(), bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 1.2; bp.frequency.setValueAtTime(500, t); bp.frequency.linearRampToValueAtTime(3200, t + 5);
+      const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.05, t + 4.5); g.gain.setTargetAtTime(0, t + 5.2, 0.4); n.connect(bp); bp.connect(g); g.connect(SPOTS.kettle.in); n.start(); n.stop(t + 7.5);
+      burst(0.03, 1800, 0.12, 'bandpass', 4, 5.2, SPOTS.kettle.in);
+    },
+    // The house settling in the cold, and night birds outside.
+    creak() { if (!ctx) return; const t = ctx.currentTime, o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.setValueAtTime(90 + Math.random() * 40, t); o.frequency.linearRampToValueAtTime(70 + Math.random() * 30, t + 0.5); const bf = ctx.createBiquadFilter(); bf.type = 'bandpass'; bf.frequency.value = 420; bf.Q.value = 8; const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.012, t + 0.12); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.6); o.connect(bf); bf.connect(g); g.connect(master); o.start(t); o.stop(t + 0.7); },
+    owl() { if (!ctx) return; for (const [w, f, d] of [[0, 410, 0.35], [0.55, 380, 0.2], [0.85, 400, 0.6]]) { const t = ctx.currentTime + w, o = ctx.createOscillator(); o.frequency.setValueAtTime(f, t); o.frequency.linearRampToValueAtTime(f * 0.92, t + d); const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.018, t + 0.06); g.gain.exponentialRampToValueAtTime(0.0001, t + d + 0.1); o.connect(g); g.connect(outF); o.start(t); o.stop(t + d + 0.2); } },
+    flump() { burst(0.5, 300, 0.07, 'lowpass', 0.8, 0, outF); burst(0.35, 2400, 0.02, 'highpass', 0.7, 0.05, outF); },
     step(surface, vol = 1) {
       if (!ctx) return;
+      if (surface === 'rug') { burst(0.06, 260, 0.035 * vol, 'lowpass', 0.8); return; }
+      if (surface === 'porch') { burst(0.09, 180, 0.1 * vol, 'lowpass', 1.6); burst(0.05, 900, 0.025 * vol, 'bandpass', 3, 0.01); return; }
       if (surface === 'snow') {
         // Crunch: a dull compress then a short bright squeak, both slightly randomised.
         burst(0.09, 500 + Math.random() * 200, 0.06 * vol, 'lowpass', 0.7);
@@ -177,12 +237,21 @@ function updateLighting(t, dt, focus) {
   Audio_ambience(focus, dt, fp);
 }
 const tmpV = new THREE.Vector3();
+const AMB_T = { creak: 20, owl: 15 };
 function Audio_ambience(focus, dt, fp) {
   const inside = G.inside(focus.x, focus.z);
   const dFire = Math.hypot(focus.x - 8, focus.z - 1);
   const gust = WIND.gust;
-  G.Audio.set({ fire: inside ? clamp(1.4 - dFire * 0.25, 0, 1) * fp : 0, wind: (inside ? 0.35 : 0.45 + STATE.tod * 0.15) + gust * 0.55, pad: STATE.started ? 1 : 0.6, inside });
-  if (inside) G.Audio.crackle(dt, fp * clamp(1.4 - dFire * 0.25, 0, 1));
+  // The fire is a placed source now: distance and walls do the work.
+  G.Audio.set({ fire: fp, wind: (inside ? 0.35 : 0.45 + STATE.tod * 0.15) + gust * 0.55, pad: STATE.started ? 1 : 0.6, inside });
+  G.Audio.crackle(dt, fp * (dFire < 12 ? 1 : 0));
+  const cp = G.camera.position, fw = tmpV.set(0, 0, -1).applyQuaternion(G.camera.quaternion);
+  const room = inside ? (focus.x < 5 ? 'bed' : focus.x < 11 ? 'liv' : 'kit') : 'out';
+  G.Audio.spatial(cp.x, cp.y, cp.z, fw.x, fw.z, room);
+  // Small life: the house settling at night, an owl in the pines after dark.
+  AMB_T.creak -= dt; AMB_T.owl -= dt;
+  if (inside && AMB_T.creak < 0) { AMB_T.creak = 25 + Math.random() * 40; G.Audio.creak(); }
+  if (!inside && STATE.tod > 0.6 && AMB_T.owl < 0) { AMB_T.owl = 30 + Math.random() * 45; G.Audio.owl(); }
 }
 
 /* ---------- snow ---------- */
@@ -458,6 +527,7 @@ function steer(c, tx, tz, speed, dt, stopAt = 0.06) {
 }
 function placeChar(c, x, z, yaw) { c.x = x; c.z = z; c.yaw = yaw; c.yFloor = G.floorAt(x, z); c.y = c.yFloor; c.speed = 0; c.nav = null; c._prevYaw = yaw; }
 G.placeChar = placeChar;
+G.gaze = (c, pos, dur = 2.2) => { c.gaze = { x: pos[0], z: pos[2], headY: pos[1], t: dur }; };
 G.slideTo = (c, x, z, yaw, dur = 0.55) => new Promise((res) => { c.script = null; c.nav = null; c.slide = { from: { x: c.x, z: c.z }, x, z, yaw, dur, t: 0, res }; });
 // Sit down from where you stand: slide into the seat while the legs fold.
 G.sitDown = (c, x, z, yaw, seatY, dur = 0.6) => { c.seatY = seatY; c.sitTarget = 1; return G.slideTo(c, x, z, yaw, dur); };
@@ -1117,6 +1187,7 @@ function step(dt, t) {
       if (S.yaw != null) c.yaw = angDamp(c.yaw, S.yaw, 8, dt);
       if (S.t >= S.dur) { c.slide = null; if (S.yaw != null) c.yaw = S.yaw; S.res && S.res(); }
     }
+    if (c.snowyT > 0) c.snowyT -= dt * (G.onDeck(c.x, c.z) ? 1 : 0);
     c.y = c.lie ? c.lieY : damp(c.y, c.yFloor != null ? c.yFloor : G.floorAt(c.x, c.z), 14, dt);
     c.sit = damp(c.sit || 0, c.sitTarget || 0, 5, dt);
     c.tilt = damp(c.tilt || 0, c.tiltTarget || 0, 3, dt);
@@ -1126,10 +1197,13 @@ function step(dt, t) {
     // Footsteps: sound and (on snow) a footprint at each heel strike.
     if (c.stepEvent) {
       const e = c.stepEvent; c.stepEvent = null;
-      const deck = G.onDeck(e.x, e.z);
+      const deck = G.onDeck(e.x, e.z), indoors = G.inside(e.x, e.z);
+      const surf = !deck ? 'snow' : !indoors ? 'porch' : G.onRug(e.x, e.z) ? 'rug' : 'wood';
       const vol = c === PLAYER ? 1 : clamp(1.3 - Math.hypot(PARTNER.x - PLAYER.x, PARTNER.z - PLAYER.z) * 0.25, 0, 0.7);
-      if (vol > 0.02) G.Audio.step(deck ? 'wood' : 'snow', vol * clamp(c.speed / 1.5, 0.5, 1.4));
+      if (vol > 0.02) G.Audio.step(surf, vol * clamp(c.speed / 1.5, 0.5, 1.4));
       if (!deck && G.addFootprint) G.addFootprint(e.x, e.z, e.yaw, e.leg, c === PLAYER ? 1.05 : 0.9);
+      // Boots that were in the snow leave wet prints on the boards for a while after you come in.
+      if (!deck) c.snowyT = 30; else if (c.snowyT > 0 && surf !== 'rug' && G.addWetPrint) G.addWetPrint(e.x, e.z, e.yaw, e.leg, c === PLAYER ? 1.05 : 0.9, c.snowyT / 30);
     }
     // Breath shows on each exhale whenever you're out in the cold.
     const cyc = Math.floor((c.breath || 0) / (2 * Math.PI));
@@ -1138,6 +1212,11 @@ function step(dt, t) {
   PLAYER.lookAt = Math.hypot(PARTNER.x - PLAYER.x, PARTNER.z - PLAYER.z) < 3 && !PARTNER.hidden ? head(PARTNER) : null;
   // Interaction prompt
   const it = free ? nearest() : null;
+  // You look at what you're about to use; she glances at whatever you're doing.
+  if (it) PLAYER.lookAt = { x: it.pos[0], z: it.pos[2], headY: it.pos[1] };
+  if (PARTNER.gaze) { PARTNER.gaze.t -= dt; if (PARTNER.gaze.t > 0 && !PARTNER.lie && !PARTNER.hidden) PARTNER.lookAt = PARTNER.gaze; else PARTNER.gaze = null; }
+  // Outside near the cabin, now and then a clump of snow slides off the eaves.
+  if (!G.inside(PLAYER.x, PLAYER.z)) { STATE.puffT = (STATE.puffT == null ? 15 : STATE.puffT) - dt; if (STATE.puffT < 0) { STATE.puffT = 18 + Math.random() * 30; if (G.snowPuff && G.snowPuff(PLAYER)) G.Audio.flump(); } }
   const together = !!(G.Story && G.Story.together);
   const sittingFree = !!PLAYER.freeSit && !busy() && !PLAYER.rise;
   const ph = PARTNER.lie ? G.headPos(PARTNER) : PARTNER;   // in bed, talk to her face, not her feet
@@ -1271,7 +1350,7 @@ G.useKids = (on) => {
 
 /* ---------- boot ---------- */
 function boot() {
-  const tTex = performance.now(); G.buildTextures(); G.buildMaterials(); const texMs = Math.round(performance.now() - tTex);
+  const tTex = performance.now(); G.buildTextures(); G.buildMaterials(); G.applyTextureSets(); const texMs = Math.round(performance.now() - tTex);
   const T = (G.BOOT_MS = {}), mark = (k, f) => { const t0 = performance.now(); f(); T[k] = Math.round(performance.now() - t0); };
   mark('sky', G.buildSky); mark('terrain', G.buildTerrain); mark('mountains', G.buildMountains); mark('forest', G.buildForest);
   mark('path', G.buildPath); mark('cabin', G.buildCabin); mark('interior', G.buildInterior); mark('fx', G.buildFX);
@@ -1298,6 +1377,7 @@ function boot() {
   $('statsBtn').addEventListener('click', toggleStats);
   $('endClose').addEventListener('click', () => Story.closeEnd());
   initPauseUI();
+  (G.afterBuild || []).forEach((f) => { try { f(); } catch (e) { console.error('[afterBuild]', e); } });
   G.applyQuality();
   CAM.shot = titleShot; CAM.cut = true;
   // Keep the loading screen up until the character bodies are in (with a safety timeout).
@@ -1325,5 +1405,9 @@ function boot() {
     // Testing aid: run the game for `sec` seconds of game time without rendering.
     async advance(sec, dt = 1 / 30) { for (let k = 0; k < sec / dt; k++) { simulate(dt); await new Promise((r) => setTimeout(r, 0)); } }, keys, press(code) { pressed.add(code); keys.add(code); }, release(code) { keys.delete(code); }, STATE_DLG: DLG };
 }
-try { boot(); } catch (e) { console.error(e); $('loading').textContent = 'This demo needs WebGL. ' + e.message; }
+// Once every script has loaded, real assets listed in assets.js load (none by default), then the world is built around them.
+const launch = () => G.loadAssets().catch((e) => console.warn('[assets]', e)).then(() => {
+  try { boot(); } catch (e) { console.error(e); $('loading').textContent = 'This demo needs WebGL. ' + e.message; }
+});
+if (document.readyState === 'loading') addEventListener('DOMContentLoaded', launch); else launch();
 })();

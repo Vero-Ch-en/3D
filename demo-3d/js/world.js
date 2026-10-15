@@ -46,6 +46,9 @@ G.inside = (x, z) => x > CAB.x0 && x < CAB.x1 && z > CAB.z0 && z < CAB.z1;
 // On wooden floor or decking (inside, porch or its steps) rather than snow.
 G.onDeck = (x, z) => G.inside(x, z) || (x > PORCH.x0 && x < PORCH.x1 && z >= PORCH.z0 - 0.1 && z < PORCH.z1) || (x > PORCH.stepX0 && x < PORCH.stepX1 && z >= PORCH.z1 && z < PORCH.stepZ1);
 G.underRoof = (x, z) => (x > CAB.x0 - 0.5 && x < CAB.x1 + 0.5 && z > -0.5 && z < 5) || (x > ANNEX.x0 && x < ANNEX.x1 + 0.3 && z > ANNEX.z0 - 0.3 && z < ANNEX.z1 + 0.3) || (x > PORCH.x0 && x < PORCH.x1 && z > PORCH.z0 && z < 6.95);
+// Rugs muffle footsteps: [x0, z0, x1, z1].
+const RUGS = [[1.1, 2.4, 3.7, 4.0], [6.55, 1.2, 9.45, 3.2], [11.3, 0.85, 13.6, 1.55]];
+G.onRug = (x, z) => RUGS.some((r) => x > r[0] && x < r[2] && z > r[1] && z < r[3]);
 G.walkable = (x, z) => {
   if (Math.hypot(x - CLEAR.x, (z - CLEAR.z) * 0.9) < CLEAR.r) return true;
   return false;
