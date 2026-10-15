@@ -168,7 +168,7 @@ def textures(prefix, H, color, noise_seed=1):
     # Cheap blur for soft woolly variation.
     for _ in range(3):
         fuzz = (fuzz + np.roll(fuzz, 1, 0) + np.roll(fuzz, -1, 0) + np.roll(fuzz, 1, 1) + np.roll(fuzz, -1, 1)) / 5
-    shade = np.clip(0.58 + 0.5 * H + 0.04 * fuzz, 0, 1.1)
+    shade = np.clip(0.7 + 0.36 * H + 0.04 * fuzz, 0, 1.05)
     alb = np.stack([shade * color[0], shade * color[1], shade * color[2], np.ones_like(H)], -1)
     hgt = np.stack([H, H, H, np.ones_like(H)], -1)
     return _image(prefix + '_albedo', alb), _image(prefix + '_height', hgt, non_color=True)
@@ -213,8 +213,8 @@ def knit_material(name, color, kind='cable', sheen=0.8):
 
 SWEATERS = {
     # color is linear RGB
-    'partner': dict(color=(0.74, 0.64, 0.5), hem_drop=0.07, loose=0.014, drape=1.0, sleeve_over_hand=0.035,
-                    neck_front=-0.045, neck_back=-0.012, neck_side=-0.03, tile=0.15, kind='cable', name='top.partner'),
+    'partner': dict(color=(0.86, 0.79, 0.66), hem_drop=0.07, loose=0.014, drape=1.0, sleeve_over_hand=0.035,
+                    neck_front=-0.045, neck_back=-0.012, neck_side=-0.03, tile=0.13, kind='cable', name='top.partner'),
 }
 
 
@@ -476,12 +476,12 @@ def build_sweater(name, cfg=None):
     for f in bb.faces:
         c = f.calc_center_median()
         rg = classify(c)
-        if rg[0] == 'torso' and (c.z < hem_z + 0.05 or c.z > neck.z + cfg['neck_side'] - 0.01):
+        if rg[0] == 'torso' and (c.z < hem_z - 0.004 or c.z > neck.z + cfg['neck_side'] - 0.004):
             fin_ids.add(f.index)
         elif rg[0] in ('arm', 'hand'):
             s = rg[1][0]
             sh, el, wr = arms[s]
-            if (c - sh).dot((wr - sh).normalized()) > (wr - sh).length - 0.05:
+            if (c - sh).dot((wr - sh).normalized()) > (wr - sh).length + 0.005:
                 fin_ids.add(f.index)
     bb.free()
     for p in out.polygons:
