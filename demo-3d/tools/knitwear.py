@@ -181,6 +181,24 @@ def rib_height(N=512, cols=8, rows=10):
     return np.where(knit, hk, hp).astype(np.float32)
 
 
+def jersey_height(N=512, cols=24, rows=30):
+    """Fine stockinette, like sweatshirt fleece seen up close."""
+    v, u = np.mgrid[0:N, 0:N].astype(np.float32)
+    U = u / N * cols
+    V = v / N * rows
+    fx = U - np.floor(U) - 0.5
+    fy = V - np.floor(V)
+    h = np.zeros_like(fx)
+    for sgn in (-1, 1):
+        x = fx - sgn * 0.21
+        y = fy - 0.5
+        a = math.radians(28) * sgn
+        xr = x * math.cos(a) - y * math.sin(a)
+        yr = x * math.sin(a) + y * math.cos(a)
+        h = np.maximum(h, np.sqrt(np.clip(1 - (xr / 0.26) ** 2 - (yr / 0.58) ** 2, 0, 1)))
+    return (0.3 + 0.7 * h).astype(np.float32)
+
+
 def textures(prefix, H, color, noise_seed=1):
     rng = np.random.default_rng(noise_seed)
     fuzz = rng.normal(0, 1, H.shape).astype(np.float32)
@@ -201,7 +219,7 @@ def knit_material(name, color, kind='cable', sheen=0.8):
     out = nt.nodes.new('ShaderNodeOutputMaterial')
     bsdf = nt.nodes.new('ShaderNodeBsdfPrincipled')
     nt.links.new(bsdf.outputs['BSDF'], out.inputs['Surface'])
-    H = cable_knit_height() if kind == 'cable' else rib_height()
+    H = {'cable': cable_knit_height, 'rib': rib_height, 'jersey': jersey_height}[kind]()
     alb, hgt = textures(name, H, color)
     uv = nt.nodes.new('ShaderNodeUVMap')
     uv.uv_map = 'knit'
@@ -212,7 +230,7 @@ def knit_material(name, color, kind='cable', sheen=0.8):
     for t in (ta, th):
         nt.links.new(uv.outputs['UV'], t.inputs['Vector'])
     bump = nt.nodes.new('ShaderNodeBump')
-    bump.inputs['Strength'].default_value = 0.9
+    bump.inputs['Strength'].default_value = 0.9 if kind != 'jersey' else 0.35
     bump.inputs['Distance'].default_value = 0.004
     nt.links.new(th.outputs['Color'], bump.inputs['Height'])
     nt.links.new(bump.outputs['Normal'], bsdf.inputs['Normal'])
@@ -234,6 +252,8 @@ SWEATERS = {
     # color is linear RGB
     'partner': dict(color=(0.86, 0.79, 0.66), hem_drop=0.07, loose=0.014, drape=1.0, sleeve_over_hand=0.035,
                     neck_front=-0.045, neck_back=-0.012, neck_side=-0.03, tile=0.13, kind='cable', name='top.partner'),
+    'player': dict(color=(0.045, 0.045, 0.05), hem_drop=0.05, loose=0.012, drape=0.7, sleeve_over_hand=0.012,
+                   neck_front=-0.035, neck_back=-0.01, neck_side=-0.025, tile=0.06, kind='jersey', name='top.player', rib_tile=0.05),
 }
 
 
@@ -519,7 +539,7 @@ def build_sweater(name, cfg=None):
     disp.texture = tex
     disp.texture_coords = 'UV'
     disp.uv_layer = 'knit'
-    disp.strength = 0.006
+    disp.strength = 0.006 if cfg['kind'] == 'cable' else 0.0015
     disp.mid_level = 0.3
     sol = ob.modifiers.new('thickness', 'SOLIDIFY')
     sol.thickness = 0.004
@@ -581,3 +601,123 @@ def build_leggings(name, cfg=None):
         p.use_smooth = True
     ob.modifiers.new('sub', 'SUBSURF').levels = 1
     return ob
+
+
+def _region_copy(src_ob, pick, name, offset_fn, mat, solid=0.004):
+    """Copy the faces of a garment chosen by pick(center) and push them outward by offset_fn(point)."""
+    b = bmesh.new()
+    b.from_mesh(src_ob.data)
+    b.normal_update()
+    kill = [f for f in b.faces if not pick(f.calc_center_median())]
+    bmesh.ops.delete(b, geom=kill, context='FACES')
+    bmesh.ops.delete(b, geom=[v for v in b.verts if not v.link_faces], context='VERTS')
+    for v in b.verts:
+        v.co += v.normal * offset_fn(v.co)
+    me = bpy.data.meshes.new(name)
+    b.to_mesh(me)
+    b.free()
+    old = bpy.data.objects.get(name)
+    if old:
+        bpy.data.objects.remove(old, do_unlink=True)
+    ob = bpy.data.objects.new(name, me)
+    bpy.data.collections['Humans'].objects.link(ob)
+    ob.parent = src_ob.parent
+    ob['cbs_role'] = src_ob.get('cbs_role')
+    me.materials.append(mat)
+    for p in me.polygons:
+        p.use_smooth = True
+    ob.modifiers.new('sub', 'SUBSURF').levels = 1
+    so = ob.modifiers.new('thickness', 'SOLIDIFY')
+    so.thickness = solid
+    so.offset = -1
+    return ob
+
+
+def _tube(name, pts, r, mat, parent, seg=8):
+    verts, faces = [], []
+    for k, p in enumerate(pts):
+        t = (pts[min(k + 1, len(pts) - 1)] - pts[max(k - 1, 0)]).normalized()
+        a = t.orthogonal().normalized()
+        bb = t.cross(a)
+        for i in range(seg):
+            ang = 2 * math.pi * i / seg
+            verts.append(p + (a * math.cos(ang) + bb * math.sin(ang)) * r)
+        if k:
+            for i in range(seg):
+                i0, i1 = (k - 1) * seg + i, (k - 1) * seg + (i + 1) % seg
+                faces.append((i0, i1, i1 + seg, i0 + seg))
+    me = bpy.data.meshes.new(name)
+    me.from_pydata(verts, [], faces)
+    old = bpy.data.objects.get(name)
+    if old:
+        bpy.data.objects.remove(old, do_unlink=True)
+    ob = bpy.data.objects.new(name, me)
+    bpy.data.collections['Humans'].objects.link(ob)
+    ob.parent = parent
+    ob['cbs_role'] = parent.get('cbs_role')
+    me.materials.append(mat)
+    for p in me.polygons:
+        p.use_smooth = True
+    return ob
+
+
+def build_hoodie(name='player'):
+    """Hoodie: the jersey body with ribbed cuffs and hem, a hood lying on the upper back,
+    a kangaroo pocket and drawstrings."""
+    sw = build_sweater(name)
+    me, J, body = evaluated_body(name)
+    bpy.data.meshes.remove(me)
+    neck = joint(J, 'joint-neck')
+    pelvis = joint(J, 'joint-pelvis')
+    axis_y = (pelvis.y + neck.y) / 2
+    mat = bpy.data.materials[SWEATERS[name]['name']]
+    top_z = neck.z - 0.015
+
+    # Hood lying down: a shield shape across the upper back, puffed in the middle.
+    def hood_w(z):
+        t = (top_z - z) / 0.24
+        return 0.17 * (1 - t) ** 0.7 if 0 <= t <= 1 else -1
+
+    def hood_pick(c):
+        return c.y > axis_y + 0.015 and abs(c.x) < hood_w(c.z)
+
+    def hood_off(p):
+        w = max(hood_w(p.z), 1e-3)
+        across = 1 - (abs(p.x) / w) ** 2
+        down = (top_z - p.z) / 0.24
+        return 0.006 + 0.022 * max(0.0, across) * math.sin(math.pi * min(1.0, max(0.0, down)) ** 0.8)
+    hood = _region_copy(sw, hood_pick, 'hood_' + name, hood_off, mat, solid=0.005)
+    # Hood rim: the opening wraps forward around the neck, as a soft roll on top of the collar.
+    rim_pts = []
+    for i in range(29):
+        a = math.pi * (0.15 + 1.7 * i / 28)          # around the back of the neck, ends at the front sides
+        rim_pts.append(Vector((math.sin(a) * 0.088, axis_y - math.cos(a) * 0.082 + 0.006, neck.z - 0.028 - 0.02 * abs(math.cos(a)))))
+    _tube('hood_rim_' + name, rim_pts, 0.013, mat, sw.parent, seg=10)
+
+    # Kangaroo pocket on the lower front.
+    hem_z = pelvis.z - 0.005
+
+    def pocket_pick(c):
+        h = c.z - hem_z
+        return c.y < axis_y - 0.04 and 0.02 < h < 0.19 and abs(c.x) < 0.125 - 0.18 * max(0.0, h - 0.06)
+    _region_copy(sw, pocket_pick, 'pocket_' + name, lambda p: 0.004, mat, solid=0.003)
+
+    # Drawstrings hanging from the collar.
+    cord = bpy.data.materials.get('cord.' + name) or bpy.data.materials.new('cord.' + name)
+    cord.diffuse_color = (0.6, 0.58, 0.55, 1)
+    cord.use_nodes = True
+    cord.node_tree.nodes['Principled BSDF'].inputs['Base Color'].default_value = (0.55, 0.53, 0.5, 1)
+    dg = bpy.context.evaluated_depsgraph_get()
+    sme = sw.evaluated_get(dg).to_mesh()
+    surf = [sw.matrix_world @ v.co for v in sme.vertices]
+    sw.evaluated_get(dg).to_mesh_clear()
+    for sx in (-1, 1):
+        pts = []
+        for k in range(10):
+            z = neck.z - 0.05 - 0.017 * k
+            x = sx * (0.032 + 0.003 * k)
+            front = min((p for p in surf if abs(p.z - z) < 0.01 and abs(p.x - x) < 0.012), key=lambda p: p.y, default=None)
+            y = (front.y if front else axis_y - 0.12) - 0.006
+            pts.append(Vector((x, y, z)))
+        _tube(f'cord_{name}_{sx}', pts, 0.0035, cord, sw.parent)
+    return sw
