@@ -633,8 +633,9 @@ def build(spec):
                     ('kn_' + side, (lx, HIP_Y - TL, 0), (lx, ANK_Y, 0)), ('ft_' + side, (lx, ANK_Y, 0), (lx, 0.03, 0.17))])
         parts.append(lf)
 
-    head = build_head(coll, P)
-    set_material(head, skin)
+    F = FACE.get(spec['name'])
+    head = build_face_head(coll, P, F) if F else build_head(coll, P)
+    set_material(head, skin_face_material(spec['name'], spec, F) if F else skin)
     g = head.vertex_groups.new(name='head')
     g.add([v.index for v in head.data.vertices], 1.0, 'REPLACE')
     parts.append(head)
@@ -689,6 +690,8 @@ def build(spec):
     body.parent = rig
     mod = body.modifiers.new('rig', 'ARMATURE')
     mod.object = rig
+    if F:
+        build_face_and_hair(spec, coll, rig)
     # Side by side for review; the export puts the rig back at the origin.
     rig.location.x = spec.get('offset', 0.0)
     return rig, body
@@ -723,3 +726,634 @@ def build_all(export_files=False, only=None):
 
 if __name__ == '__main__' and bpy.app.background:
     print(build_all(export_files=True))
+
+
+# =====================================================================
+# Faces and hair (rendered in Blender; the game keeps its own until we swap them in)
+# =====================================================================
+FACE = {
+    'partner': dict(eye=1.08, iris=(0.33, 0.2, 0.1), iris2=(0.55, 0.38, 0.18), lids=(0.62, 0.4, 0.33), lips=(0.74, 0.4, 0.38),
+                    blush=0.38, freckles=160, hair=(0.24, 0.14, 0.08), hair_tip=(0.42, 0.27, 0.15), style='bun', tilt=0.004),
+    'player': dict(eye=1.0, iris=(0.22, 0.14, 0.08), iris2=(0.36, 0.25, 0.14), lids=(0.5, 0.32, 0.25), lips=(0.62, 0.37, 0.32),
+                   blush=0.14, freckles=0, hair=(0.08, 0.055, 0.04), hair_tip=(0.17, 0.11, 0.07), style='shaggy', tilt=0.0),
+}
+EYE = (0.031, 0.007, 0.072)     # eye centre in head space (x mirrored)
+EYE_R = 0.0122
+
+
+def sock(sockets, ident):
+    for sk in sockets:
+        if sk.identifier == ident:
+            return sk
+    return sockets[ident]
+
+
+def new_mat(name):
+    m = bpy.data.materials.get(name) or bpy.data.materials.new(name)
+    m.use_nodes = True
+    nt = m.node_tree
+    for n in list(nt.nodes):
+        nt.nodes.remove(n)
+    out = nt.nodes.new('ShaderNodeOutputMaterial')
+    bsdf = nt.nodes.new('ShaderNodeBsdfPrincipled')
+    out.location = (400, 0)
+    nt.links.new(bsdf.outputs['BSDF'], out.inputs['Surface'])
+    return m, nt, bsdf
+
+
+def image_from_array(name, arr):
+    """arr: float32 (H, W, 4), row 0 at the bottom (Blender's convention)."""
+    h, w = arr.shape[:2]
+    img = bpy.data.images.get(name)
+    if img and (img.size[0] != w or img.size[1] != h):
+        bpy.data.images.remove(img)
+        img = None
+    img = img or bpy.data.images.new(name, w, h, alpha=True)
+    img.pixels.foreach_set(arr.ravel())
+    img.update()
+    img.pack()
+    return img
+
+
+# ---------- textures painted in code ----------
+def strand_texture(name, seed):
+    """Fine hair strands; v = 1 at the root, 0 at the tip. Grey value is tinted by the material."""
+    import numpy as np
+    W, H = 256, 1024
+    rng = np.random.default_rng(seed)
+    a = np.zeros((H, W), np.float32)
+    c = np.zeros((H, W), np.float32)
+    v = np.arange(H, dtype=np.float32) / (H - 1)
+    for _ in range(420):
+        x0 = rng.uniform(4, W - 4)
+        length = rng.uniform(0.5, 1.0)
+        width = rng.uniform(0.6, 2.2)
+        bright = rng.uniform(0.45, 1.0)
+        sway = rng.normal(0, 7)
+        xs = x0 + sway * (1 - v) ** 2
+        alive = v >= 1 - length
+        fade = np.clip((v - (1 - length)) / 0.25, 0, 1)
+        for dx in range(-3, 4):
+            col = np.clip(np.round(xs + dx).astype(int), 0, W - 1)
+            wgt = np.clip(1 - np.abs(xs - np.round(xs + dx)) / width, 0, 1) * fade * alive
+            rows = np.arange(H)
+            cur = a[rows, col]
+            take = wgt > cur
+            a[rows[take], col[take]] = wgt[take]
+            c[rows[take], col[take]] = bright
+    arr = np.zeros((H, W, 4), np.float32)
+    shade = c * (0.75 + 0.25 * v[:, None])            # slightly darker toward the tips
+    arr[..., 0] = arr[..., 1] = arr[..., 2] = shade
+    arr[..., 3] = np.clip(a * 1.6, 0, 1)
+    return image_from_array(name, arr)
+
+
+FACE_BOX = (-0.08, 0.08, -0.095, 0.065)   # head-space x0, x1, y0, y1 covered by the face paint
+
+
+def face_texture(name, F, seed):
+    """Lips, blush, eyeshadow warmth and freckles, in a front-projected map (RGBA, A = how much paint)."""
+    import numpy as np
+    N = 512
+    x0, x1, y0, y1 = FACE_BOX
+    xs = np.linspace(x0, x1, N, dtype=np.float32)[None, :]
+    ys = np.linspace(y0, y1, N, dtype=np.float32)[:, None]
+    rgb = np.zeros((N, N, 3), np.float32)
+    al = np.zeros((N, N), np.float32)
+
+    def paint(mask, color, alpha):
+        m = np.clip(mask, 0, 1) * alpha
+        rgb[:] = rgb * (1 - m[..., None]) + np.array(color, np.float32) * m[..., None]
+        al[:] = np.maximum(al, m)
+    # Lips: Cupid's-bow upper lip and a fuller lower lip.
+    bow = 0.0012 * np.cos(xs / 0.0085 * np.pi) * (np.abs(xs) < 0.0085)
+    up = 1 - ((xs / 0.0165) ** 2 + ((ys - (-0.0505 + bow)) / 0.0042) ** 2)
+    lo = 1 - ((xs / 0.0152) ** 2 + ((ys + 0.0585) / 0.0052) ** 2)
+    paint(np.clip(up * 4, 0, 1), F['lips'], 0.85)
+    paint(np.clip(lo * 4, 0, 1), F['lips'], 0.9)
+    paint(np.clip(1 - ((xs / 0.013) ** 2 + ((ys + 0.054) / 0.0007) ** 2), 0, 1), [c * 0.55 for c in F['lips']], 0.7)   # mouth line
+    # Blush on the cheeks and the tip of the nose.
+    for sx in (-1, 1):
+        paint(np.exp(-((xs - sx * 0.043) ** 2 + (ys + 0.018) ** 2) / 0.00022), (0.86, 0.46, 0.42), F['blush'])
+        paint(np.exp(-((xs - sx * 0.031) ** 2 / 0.00016 + (ys - 0.016) ** 2 / 0.00002)), F['lids'], 0.32)   # warm lid crease
+    paint(np.exp(-(xs ** 2 + (ys + 0.026) ** 2) / 0.00005), (0.84, 0.46, 0.42), F['blush'] * 0.6)
+    # Freckles across the nose and upper cheeks.
+    rng = np.random.default_rng(seed)
+    for _ in range(F['freckles']):
+        fx = rng.normal(0, 0.024)
+        fy = rng.normal(-0.014, 0.008) + abs(fx) * 0.1
+        if abs(fx) < 0.008 and fy > -0.012:
+            continue
+        r2 = rng.uniform(0.35, 0.9) * 1e-6
+        paint(np.exp(-((xs - fx) ** 2 + (ys - fy) ** 2) / r2), (0.5, 0.29, 0.2), rng.uniform(0.3, 0.6))
+    arr = np.zeros((N, N, 4), np.float32)
+    arr[..., :3] = rgb
+    arr[..., 3] = al
+    return image_from_array(name, arr)
+
+
+# ---------- materials ----------
+def skin_face_material(name, spec, F):
+    m, nt, bsdf = new_mat('face.' + name)
+    bsdf.inputs['Roughness'].default_value = 0.42
+    bsdf.inputs['Subsurface Weight'].default_value = 0.2
+    bsdf.inputs['Subsurface Radius'].default_value = (1.0, 0.35, 0.2)
+    tex = nt.nodes.new('ShaderNodeTexImage')
+    tex.image = face_texture('face_paint_' + name, F, 7 if F['freckles'] else 3)
+    tex.extension = 'CLIP'
+    uv = nt.nodes.new('ShaderNodeUVMap')
+    uv.uv_map = 'face'
+    nt.links.new(uv.outputs['UV'], tex.inputs['Vector'])
+    mix = nt.nodes.new('ShaderNodeMix')
+    mix.data_type = 'RGBA'
+    sock(mix.inputs, 'A_Color').default_value = (*spec['skin'], 1)
+    nt.links.new(tex.outputs['Color'], sock(mix.inputs, 'B_Color'))
+    nt.links.new(tex.outputs['Alpha'], sock(mix.inputs, 'Factor_Float'))
+    nt.links.new(sock(mix.outputs, 'Result_Color'), bsdf.inputs['Base Color'])
+    m.diffuse_color = (*spec['skin'], 1)
+    return m
+
+
+def eye_material(name, F):
+    """Iris, pupil and sclera from the angle off the eye's forward axis (stored as UV x)."""
+    m, nt, bsdf = new_mat('eye.' + name)
+    bsdf.inputs['Roughness'].default_value = 0.06
+    if 'Coat Weight' in bsdf.inputs:
+        bsdf.inputs['Coat Weight'].default_value = 1.0
+        bsdf.inputs['Coat Roughness'].default_value = 0.02
+    uv = nt.nodes.new('ShaderNodeUVMap')
+    uv.uv_map = 'iris'
+    sep = nt.nodes.new('ShaderNodeSeparateXYZ')
+    nt.links.new(uv.outputs['UV'], sep.inputs['Vector'])
+    noise = nt.nodes.new('ShaderNodeTexNoise')
+    noise.inputs['Scale'].default_value = 60
+    tc = nt.nodes.new('ShaderNodeTexCoord')
+    nt.links.new(tc.outputs['Object'], noise.inputs['Vector'])
+    ramp = nt.nodes.new('ShaderNodeValToRGB')
+    el = ramp.color_ramp.elements
+    el[0].position, el[0].color = 0.0, (0.01, 0.01, 0.01, 1)
+    el[1].position, el[1].color = 0.05, (0.01, 0.01, 0.01, 1)
+    for pos, col in ((0.058, (*F['iris'], 1)), (0.12, (*F['iris2'], 1)), (0.155, (*[c * 0.5 for c in F['iris']], 1)),
+                     (0.17, (0.08, 0.06, 0.05, 1)), (0.2, (0.9, 0.86, 0.82, 1)), (0.5, (0.86, 0.76, 0.74, 1))):
+        e = el.new(pos)
+        e.color = col
+    nt.links.new(sep.outputs['X'], ramp.inputs['Fac'])
+    # Fibres in the iris: modulate brightness with noise.
+    mul = nt.nodes.new('ShaderNodeMix')
+    mul.data_type = 'RGBA'
+    mul.blend_type = 'MULTIPLY'
+    sock(mul.inputs, 'Factor_Float').default_value = 0.35
+    nt.links.new(ramp.outputs['Color'], sock(mul.inputs, 'A_Color'))
+    nt.links.new(noise.outputs['Color'], sock(mul.inputs, 'B_Color'))
+    nt.links.new(sock(mul.outputs, 'Result_Color'), bsdf.inputs['Base Color'])
+    m.diffuse_color = (0.9, 0.88, 0.85, 1)
+    return m
+
+
+def flat_material(name, color, rough=0.6):
+    m, nt, bsdf = new_mat(name)
+    bsdf.inputs['Base Color'].default_value = (*color, 1)
+    bsdf.inputs['Roughness'].default_value = rough
+    m.diffuse_color = (*color, 1)
+    return m
+
+
+def hair_material(name, F):
+    m, nt, bsdf = new_mat('hair.' + name)
+    tex = nt.nodes.new('ShaderNodeTexImage')
+    tex.image = strand_texture('hair_strands_' + name, 11)
+    tex.extension = 'CLIP'
+    uvn = nt.nodes.new('ShaderNodeUVMap')
+    uvn.uv_map = 'UVMap'
+    nt.links.new(uvn.outputs['UV'], tex.inputs['Vector'])
+    # Root-to-tip colour (sun-lit lighter ends), multiplied by the strand texture's grey.
+    sep = nt.nodes.new('ShaderNodeSeparateXYZ')
+    nt.links.new(uvn.outputs['UV'], sep.inputs['Vector'])
+    grad = nt.nodes.new('ShaderNodeMix')
+    grad.data_type = 'RGBA'
+    sock(grad.inputs, 'A_Color').default_value = (*F['hair_tip'], 1)
+    sock(grad.inputs, 'B_Color').default_value = (*F['hair'], 1)
+    nt.links.new(sep.outputs['Y'], sock(grad.inputs, 'Factor_Float'))
+    mul = nt.nodes.new('ShaderNodeMix')
+    mul.data_type = 'RGBA'
+    mul.blend_type = 'MULTIPLY'
+    sock(mul.inputs, 'Factor_Float').default_value = 1.0
+    nt.links.new(sock(grad.outputs, 'Result_Color'), sock(mul.inputs, 'A_Color'))
+    nt.links.new(tex.outputs['Color'], sock(mul.inputs, 'B_Color'))
+    nt.links.new(sock(mul.outputs, 'Result_Color'), bsdf.inputs['Base Color'])
+    nt.links.new(tex.outputs['Alpha'], bsdf.inputs['Alpha'])
+    bsdf.inputs['Roughness'].default_value = 0.42
+    if 'Sheen Weight' in bsdf.inputs:
+        bsdf.inputs['Sheen Weight'].default_value = 0.3
+    for attr, val in (('surface_render_method', 'DITHERED'), ('blend_method', 'HASHED')):
+        if hasattr(m, attr):
+            try:
+                setattr(m, attr, val)
+            except Exception:
+                pass
+    m.use_backface_culling = False
+    m.diffuse_color = (*F['hair'], 1)
+    return m
+
+
+# ---------- face geometry ----------
+def build_face_head(coll, P, F):
+    """Higher-resolution head with the same skull as before, plus lips, nostrils and a face-paint UV map."""
+    import bmesh
+    me = bpy.data.meshes.new('head')
+    ob = bpy.data.objects.new('head', me)
+    coll.objects.link(ob)
+    bm = bmesh.new()
+    bmesh.ops.create_uvsphere(bm, u_segments=96, v_segments=72, radius=1.0)
+    bm.to_mesh(me)
+    bm.free()
+    hx, hy, hz = HEAD
+    cx, cy, cz = 0.0, 0.02, -0.005
+    rx, ry, rz = 0.077, 0.098, 0.094
+    jaw = P['jaw']
+    fem = P['fem']
+
+    def shape(x, y, z):
+        x, y, z = x * rx + cx, y * ry + cy, z * rz + cz
+        ly = y - cy
+        t = smoothstep(0.0, -ry, ly)
+        x *= 1 - (1 - jaw) * t - 0.12 * t * t
+        if z > 0:
+            z *= 1 - 0.05 * t * t
+            z += 0.012 * gauss((ly + 0.088) ** 2, 0.0004) * gauss(x * x, 0.0008)          # chin
+        if z < -0.02:
+            z *= 1.03
+        front = z > 0.03
+        if front:
+            z += (0.003 if fem else 0.005) * gauss((y - 0.03) ** 2, 0.00012) * gauss(x * x, 0.004)   # brow
+            for sd in (-1, 1):
+                ex = sd * EYE[0]
+                z -= 0.0095 * gauss((x - ex) ** 2 + (y - EYE[1]) ** 2, 0.00019)               # eye socket
+                z += (0.006 if fem else 0.004) * gauss((x - sd * 0.045) ** 2 / 0.0004 + (y + 0.014) ** 2 / 0.0003, 1)   # cheeks
+                z -= 0.0015 * gauss((x - sd * 0.02) ** 2 / 0.0002 + (y + 0.04) ** 2 / 0.00015, 1)   # beside the mouth
+        if z > 0.05:
+            ns = 0.9 if fem else 1.0
+            ridge = 0.014 * ns * smoothstep(0.024, -0.024, y) * smoothstep(-0.037, -0.027, y)
+            z += ridge * gauss(x * x, 2 * 0.0072 ** 2)
+            z += 0.0065 * ns * math.exp(-(x * x) / (2 * 0.0085 ** 2) - ((y + 0.026) ** 2) / (2 * 0.0065 ** 2))   # nose tip
+            for sd in (-1, 1):
+                z += 0.0028 * math.exp(-((x - sd * 0.0105) ** 2) / 0.00002 - ((y + 0.03) ** 2) / 0.00003)    # nostril wings
+                z -= 0.002 * math.exp(-((x - sd * 0.0065) ** 2) / 0.000008 - ((y + 0.0335) ** 2) / 0.000008)  # nostrils
+            z -= 0.0012 * math.exp(-(x * x) / 0.00001 - ((y + 0.043) ** 2) / 0.00002)                       # philtrum
+            lips = 1.15 if fem else 0.95
+            z += 0.0045 * lips * math.exp(-(x * x) / 0.00022 - ((y + 0.05) ** 2) / 0.000014)                # upper lip
+            z += 0.0055 * lips * math.exp(-(x * x) / 0.0002 - ((y + 0.0585) ** 2) / 0.00002)                 # lower lip
+            z -= 0.0018 * math.exp(-(x * x) / 0.00018 - ((y + 0.0542) ** 2) / 0.0000015)                      # mouth line
+            z -= 0.0018 * math.exp(-(x * x) / 0.0003 - ((y + 0.067) ** 2) / 0.00002)                          # below the lip
+        return x + hx, y + hy, z + hz
+    for v in me.vertices:
+        gx, gy, gz = v.co.x, v.co.z, -v.co.y
+        v.co = B(*shape(gx, gy, gz))
+    # Front-projected UVs for the face paint.
+    x0, x1, y0, y1 = FACE_BOX
+    uv = me.uv_layers.new(name='face')
+    for loop in me.loops:
+        gx, gy, gz = G(me.vertices[loop.vertex_index].co)
+        if gz - hz > 0.0:
+            uv.data[loop.index].uv = ((gx - hx - x0) / (x1 - x0), (gy - hy - y0) / (y1 - y0))
+        else:
+            uv.data[loop.index].uv = (-1, -1)
+    parts = [ob]
+    for sd in (-1, 1):
+        parts.append(loft('ear', coll, [
+            (hz - 0.022, hx + sd * 0.074, hy + 0.0, 0.006, 0.006, 0.006, 2.0),
+            (hz - 0.016, hx + sd * 0.077, hy + 0.003, 0.008, 0.026, 0.02, 2.0),
+            (hz - 0.006, hx + sd * 0.078, hy + 0.002, 0.007, 0.024, 0.021, 2.0),
+            (hz + 0.001, hx + sd * 0.075, hy - 0.002, 0.005, 0.016, 0.016, 2.0),
+        ], seg=14, axis='z', sub=1))
+    head = join(parts, 'head')
+    for p in head.data.polygons:
+        p.use_smooth = True
+    return head
+
+
+def eye_frame(sd, F):
+    """Eye centre and the almond-shaped opening (half-width, upper and lower height) in head space."""
+    hx, hy, hz = HEAD
+    c = Vector((hx + sd * EYE[0], hy + EYE[1], hz + EYE[2]))
+    e = F['eye']
+    return c, 0.0122 * e, 0.0066 * e, 0.0044 * e
+
+
+def build_eyes(coll, F):
+    import bmesh
+    objs = []
+    for sd in (-1, 1):
+        c, ax, up, lo = eye_frame(sd, F)
+        R = EYE_R * F['eye']
+        me = bpy.data.meshes.new('eye')
+        ob = bpy.data.objects.new('eye', me)
+        coll.objects.link(ob)
+        bm = bmesh.new()
+        bmesh.ops.create_uvsphere(bm, u_segments=32, v_segments=24, radius=R)
+        bm.to_mesh(me)
+        bm.free()
+        # Pole forward (game +z), then the iris coordinate: angle off forward / pi.
+        uvl = me.uv_layers.new(name='iris')
+        for v in me.vertices:
+            gx, gy, gz = v.co.x, v.co.y, v.co.z          # sphere local: treat its z as "forward"
+            v.co = B(c.x + gx, c.y + gy, c.z + gz)
+        for loop in me.loops:
+            gx, gy, gz = G(me.vertices[loop.vertex_index].co)
+            d = Vector((gx - c.x, gy - c.y, gz - c.z)).normalized()
+            uvl.data[loop.index].uv = (math.acos(max(-1.0, min(1.0, d.z))) / math.pi, 0.5)
+        for p in me.polygons:
+            p.use_smooth = True
+        objs.append(ob)
+    return objs
+
+
+def build_lids(coll, F):
+    """Lids: a shell over each eye with an almond opening cut out; lashes along the upper rim."""
+    import bmesh
+    lids, lashes = [], []
+    tilt = F['tilt']
+    for sd in (-1, 1):
+        c, ax, up, lo = eye_frame(sd, F)
+        R = EYE_R * F['eye'] * 1.1
+        bm = bmesh.new()
+        bmesh.ops.create_uvsphere(bm, u_segments=48, v_segments=32, radius=R)
+        kill = []
+        for f in bm.faces:
+            p = f.calc_center_median()
+            lx, ly, lz = p.x, p.y, p.z
+            if lz < -0.25 * R:
+                kill.append(f)
+                continue
+            u = lx * sd                                   # + toward the outer corner
+            k = max(0.0, 1 - (u / ax) ** 2)
+            top = up * k ** 0.6 + tilt * (u / ax)
+            bot = -lo * k ** 0.8 + tilt * 0.4 * (u / ax)
+            if lz > 0 and abs(u) < ax and bot < ly < top:
+                kill.append(f)
+        bmesh.ops.delete(bm, geom=kill, context='FACES')
+        me = bpy.data.meshes.new('lid')
+        bm.to_mesh(me)
+        bm.free()
+        ob = bpy.data.objects.new('lid', me)
+        coll.objects.link(ob)
+        for v in me.vertices:
+            v.co = B(c.x + v.co.x, c.y + v.co.y, c.z + v.co.z)
+        for p in me.polygons:
+            p.use_smooth = True
+        lids.append(ob)
+        # Upper lashes: a strip along the top of the opening, longer and lifted at the outer corner.
+        verts, faces, n = [], [], 18
+        for i in range(n + 1):
+            u = -0.9 * ax + 1.85 * ax * i / n
+            k = max(0.0, 1 - (u / ax) ** 2)
+            y = up * k ** 0.6 + tilt * (u / ax)
+            zr = math.sqrt(max(R * R - u * u - y * y, 0)) + 0.0003
+            base = Vector((c.x + sd * u, c.y + y, c.z + zr))
+            L = 0.0022 + 0.0022 * smoothstep(-0.2, 1.0, u / ax)
+            tip = base + Vector((sd * 0.0012 * (u / ax), L * 0.9, L * 0.7))
+            verts += [B(*base), B(*tip)]
+            if i:
+                a = 2 * (i - 1)
+                faces.append((a, a + 2, a + 3, a + 1))
+        me = bpy.data.meshes.new('lash')
+        me.from_pydata(verts, [], faces)
+        lo_ = bpy.data.objects.new('lash', me)
+        coll.objects.link(lo_)
+        lashes.append(lo_)
+    return lids, lashes
+
+
+def build_brows(coll, F, P):
+    hx, hy, hz = HEAD
+    objs = []
+    for sd in (-1, 1):
+        verts, faces, n = [], [], 14
+        for i in range(n + 1):
+            t = i / n
+            x = 0.012 + 0.042 * t
+            y = 0.027 + 0.007 * math.sin(min(1.0, t * 1.25) * math.pi * 0.85) - 0.004 * t
+            z = math.sqrt(max(0.0, 1 - (x / 0.077) ** 2 - ((y - 0.02) / 0.098) ** 2)) * 0.094 - 0.005 + 0.004
+            w = (0.0045 if P['fem'] else 0.0062) * (1 - 0.7 * t)
+            verts += [B(hx + sd * x, hy + y + w * 0.5, hz + z), B(hx + sd * x, hy + y - w * 0.5, hz + z + 0.0005)]
+            if i:
+                a = 2 * (i - 1)
+                faces.append((a, a + 2, a + 3, a + 1))
+        me = bpy.data.meshes.new('brow')
+        me.from_pydata(verts, [], faces)
+        ob = bpy.data.objects.new('brow', me)
+        coll.objects.link(ob)
+        objs.append(ob)
+    return objs
+
+
+# ---------- hair ----------
+SKULL = (Vector((0.0, 0.02, -0.005)), Vector((0.082, 0.103, 0.099)))
+
+
+def skull_normal(p):
+    c, r = SKULL
+    d = p - c
+    return Vector((d.x / r.x ** 2, d.y / r.y ** 2, d.z / r.z ** 2)).normalized()
+
+
+def push_out(p, margin):
+    c, r = SKULL
+    d = p - c
+    e = math.sqrt((d.x / (r.x * margin)) ** 2 + (d.y / (r.y * margin)) ** 2 + (d.z / (r.z * margin)) ** 2)
+    if e < 1:
+        p[:] = c + d / e
+
+
+def on_skull(theta, phi):
+    c, r = SKULL
+    return Vector((c.x + r.x * math.cos(phi) * math.sin(theta), c.y + r.y * math.sin(phi), c.z + r.z * math.cos(phi) * math.cos(theta)))
+
+
+class Cards:
+    """Accumulates hair cards (strips with UV v = 1 at root) in head space."""
+
+    def __init__(self, rng):
+        self.P, self.F, self.UV = [], [], []
+        self.r = rng
+
+    def card(self, p0, d0, L, w0, grav=0.3, curl=0.15, layer=0, wave=0.0, hug=1.08, segs=9, lift=0.0, pull=None):
+        r = self.r
+        pts, dirs = [p0.copy()], []
+        d = d0.normalized()
+        q = p0.copy()
+        ph = r.random() * 6.28
+        for k in range(segs):
+            dirs.append(d.copy())
+            q = q + d * (L / segs)
+            push_out(q, 1.012 + layer * 0.007)
+            c, rr = SKULL
+            dd = q - c
+            e = math.sqrt((dd.x / rr.x) ** 2 + (dd.y / rr.y) ** 2 + (dd.z / rr.z) ** 2)
+            lim = hug + layer * 0.025
+            if e > lim and q.y > c.y - 0.05:      # keep the upper hair close to the head
+                q = c + dd * (lim / e)
+            if wave:
+                q = q + Vector((math.sin(ph + k * 1.3) * wave, 0, math.cos(ph + k * 1.1) * wave * 0.6))
+            pts.append(q.copy())
+            nd = d + Vector((0, -grav, 0)) + Vector(((r.random() - 0.5) * curl, (r.random() - 0.5) * curl * 0.5 + lift, (r.random() - 0.5) * curl))
+            if pull is not None:
+                nd = nd + (pull - q).normalized() * 0.6
+            d = nd.normalized()
+        dirs.append(d.copy())
+        base = len(self.P)
+        for k, p in enumerate(pts):
+            t = k / segs
+            n = skull_normal(p) if (p - SKULL[0]).length < 0.17 else Vector((p.x, 0, p.z)).normalized()
+            side = dirs[k].cross(n)
+            if side.length < 1e-6:
+                side = Vector((1, 0, 0))
+            side.normalize()
+            w = w0 * (1 - 0.55 * t)
+            for s in (-0.5, 0.5):
+                self.P.append(p + side * (s * w) + n * (0.0015 * layer))
+                self.UV.append((s + 0.5, 1 - t))
+            if k:
+                a = base + (k - 1) * 2
+                self.F.append((a, a + 2, a + 3, a + 1))
+
+    def mesh(self, coll, name):
+        hx, hy, hz = HEAD
+        me = bpy.data.meshes.new(name)
+        me.from_pydata([B(p.x + hx, p.y + hy, p.z + hz) for p in self.P], [], self.F)
+        uv = me.uv_layers.new(name='UVMap')
+        for loop in me.loops:
+            uv.data[loop.index].uv = self.UV[loop.vertex_index]
+        for p in me.polygons:
+            p.use_smooth = True
+        ob = bpy.data.objects.new(name, me)
+        coll.objects.link(ob)
+        return ob
+
+
+def comb(p, n, crown, front_bias=0.0):
+    t = p - crown
+    t = t - n * t.dot(n)
+    if t.length < 1e-6:
+        t = Vector((0, -1, 0))
+    t.normalize()
+    return t * 0.9 + n * 0.3 + Vector((0, -0.25, front_bias))
+
+
+def hair_bun(coll, F, seed=5):
+    """Loose, messy updo: hair swept up into a bun high at the back, wavy face-framing strands, wispy bangs."""
+    import random
+    r = random.Random(seed)
+    C = Cards(r)
+    bun = Vector((0.0, 0.075, -0.098))
+    for layer in range(4):
+        for _ in range(150):
+            th, ph = (r.random() * 2 - 1) * math.pi, -0.55 + r.random() * 2.05
+            front = math.cos(th) > 0.45
+            if front and ph < 0.5:
+                continue
+            if abs(math.sin(th)) > 0.82 and ph < 0.05 and math.cos(th) > -0.25:
+                continue      # keep the ears clear
+            p = on_skull(th, ph)
+            to = (bun - p)
+            dist = to.length
+            d = to.normalized() + skull_normal(p) * 0.2
+            C.card(p, d, dist * (0.95 + r.random() * 0.15), 0.026 + r.random() * 0.012, grav=0.02, curl=0.12, layer=layer,
+                   hug=1.06, pull=bun)
+    # The bun: cards wound round and round, loose loops poking out.
+    for i in range(70):
+        a = r.random() * 6.28
+        b = r.random() * 3.14
+        rad = 0.028 + r.random() * 0.016
+        p = bun + Vector((math.cos(a) * math.sin(b) * rad, math.cos(b) * rad * 0.85, math.sin(a) * math.sin(b) * rad))
+        d = Vector((-math.sin(a), (r.random() - 0.5) * 0.8, math.cos(a)))
+        C.card(p, d, 0.06 + r.random() * 0.07, 0.024, grav=-0.05, curl=0.75, layer=2, hug=3.0, pull=bun + Vector((0, 0.01, 0)))
+    for i in range(16):      # flyaway loops escaping the bun
+        a = r.random() * 6.28
+        p = bun + Vector((math.cos(a) * 0.03, 0.02 + r.random() * 0.02, math.sin(a) * 0.03))
+        C.card(p, Vector((math.cos(a), 0.6, math.sin(a))), 0.05 + r.random() * 0.04, 0.008, grav=0.25, curl=1.1, layer=3, hug=3.0)
+    # Face-framing strands: from the temples down past the cheeks to the jaw, wavy.
+    for sd in (-1, 1):
+        for j in range(9):
+            th = sd * (0.62 + j * 0.06 + r.random() * 0.04)
+            p = on_skull(th, 0.42 + j * 0.03 + r.random() * 0.04)
+            d = Vector((sd * 0.12, -1, 0.3))
+            C.card(p, d, 0.16 + r.random() * 0.07, 0.016 + r.random() * 0.008, grav=0.12, curl=0.2, layer=3,
+                   wave=0.0045, hug=1.6, segs=12)
+    # Wispy bangs, parted slightly off centre, falling to the brows and curving aside.
+    for j in range(14):
+        u = (r.random() - 0.45) * 1.1
+        p = on_skull(u, 0.72 + r.random() * 0.08)
+        sd = 1 if u > 0.05 else -1
+        C.card(p, Vector((sd * 0.5, -0.8, 0.55)), 0.06 + r.random() * 0.04, 0.012, grav=0.18, curl=0.3, layer=3, hug=1.16, wave=0.002)
+    # Nape tendrils and a few flyaways over the crown.
+    for sd in (-1, 1):
+        for j in range(3):
+            p = on_skull(sd * (2.3 + j * 0.15), -0.35)
+            C.card(p, Vector((sd * 0.1, -1, -0.3)), 0.07 + r.random() * 0.05, 0.01, grav=0.2, curl=0.3, layer=3, wave=0.003, hug=1.5)
+    for j in range(12):
+        p = on_skull((r.random() * 2 - 1) * 2.0, 0.9 + r.random() * 0.4)
+        C.card(p, skull_normal(p) + Vector((r.random() - 0.5, 0.3, r.random() - 0.5)), 0.04 + r.random() * 0.05, 0.006,
+               grav=0.25, curl=1.2, layer=3, hug=2.0)
+    return C.mesh(coll, 'hair')
+
+
+def hair_shaggy(coll, F, seed=9):
+    """Thick, messy, shaggy hair: fringe over the forehead to the brows, over the tops of the ears, to the nape."""
+    import random
+    r = random.Random(seed)
+    C = Cards(r)
+    crown = Vector((0.0, 0.12, -0.04))
+    for layer in range(5):
+        for _ in range(170):
+            th, ph = (r.random() * 2 - 1) * math.pi, -0.5 + r.random() * 2.0
+            front = math.cos(th) > 0.5
+            if front and ph < 0.52:
+                continue
+            if abs(math.sin(th)) > 0.85 and ph < -0.12 and math.cos(th) > -0.2:
+                continue
+            p = on_skull(th, ph)
+            n = skull_normal(p)
+            d = comb(p, n, crown, 0.35 if front else 0.0)
+            if front:
+                d = d + Vector((math.sin(th) * 0.4, -0.7, 0.55))     # fringe falls forward and down
+            L = (0.075 + r.random() * 0.03) if front else (0.07 + r.random() * 0.06 + (0.03 if ph < 0.2 else 0))
+            C.card(p, d, L, 0.022 + r.random() * 0.012, grav=0.32, curl=0.32, layer=layer, hug=1.1, wave=0.0015)
+    # Chunky clumps on top for the messy, slept-on look.
+    for j in range(40):
+        p = on_skull((r.random() * 2 - 1) * 2.4, 0.7 + r.random() * 0.6)
+        d = skull_normal(p) * 0.4 + Vector((r.random() - 0.5, 0.1, r.random() * 0.6))
+        C.card(p, d, 0.05 + r.random() * 0.04, 0.02, grav=0.35, curl=0.6, layer=4, hug=1.2)
+    return C.mesh(coll, 'hair')
+
+
+def build_face_and_hair(spec, coll, rig):
+    """Separate object 'face_<name>': eyes, lids, lashes, brows and hair, skinned to the head bone."""
+    F = FACE[spec['name']]
+    name = spec['name']
+    skin = bpy.data.materials.get('skin.' + name)
+    eye_m = eye_material(name, F)
+    lash_m = flat_material('lash.' + name, (0.02, 0.015, 0.012), 0.7)
+    brow_m = flat_material('brow.' + name, tuple(c * 0.9 for c in F['hair']), 0.8)
+    hair_m = hair_material(name, F)
+    parts = []
+    eyes = build_eyes(coll, F)
+    for e in eyes:
+        e.data.materials.append(eye_m)
+    lids, lashes = build_lids(coll, F)
+    for o in lids:
+        o.data.materials.append(skin)
+    for o in lashes:
+        o.data.materials.append(lash_m)
+    brows = build_brows(coll, F, spec)
+    for o in brows:
+        o.data.materials.append(brow_m)
+    hair = hair_bun(coll, F) if F['style'] == 'bun' else hair_shaggy(coll, F)
+    hair.data.materials.append(hair_m)
+    face = join(eyes + lids + lashes + brows + [hair], 'face_' + name)
+    g = face.vertex_groups.new(name='head')
+    g.add([v.index for v in face.data.vertices], 1.0, 'REPLACE')
+    face.parent = rig
+    mod = face.modifiers.new('rig', 'ARMATURE')
+    mod.object = rig
+    return face
