@@ -542,11 +542,11 @@ def sleeve_shape(P, s, outfit):
 SPECS = [
     dict(name='partner', fem=True, outfit='sweater', offset=0.5,
          hip=0.172, glute=0.112, waist=0.122, chest=0.136, bust=0.012, trap=0.11, neck=0.05, shX=0.16, legX=0.088,
-         muscle=0.92, hand=0.93, thigh=1.0, calf=0.95, foot=0.92, jaw=0.75,
+         face_len=0.88, muscle=0.92, hand=0.93, thigh=1.0, calf=0.95, foot=0.92, jaw=0.8,
          skin=(0.80, 0.52, 0.40), top=(0.80, 0.72, 0.60), legs=(0.035, 0.03, 0.03), socks=(0.79, 0.72, 0.62)),
     dict(name='player', fem=False, outfit='hoodie', offset=-0.5,
          hip=0.158, glute=0.1, waist=0.142, chest=0.158, bust=0.0, trap=0.13, neck=0.056, shX=0.19, legX=0.086,
-         muscle=1.05, hand=1.06, thigh=0.98, calf=1.0, foot=1.05, jaw=0.82,
+         face_len=0.95, muscle=1.05, hand=1.06, thigh=0.98, calf=1.0, foot=1.05, jaw=0.82,
          skin=(0.69, 0.42, 0.30), top=(0.11, 0.11, 0.12), legs=(0.03, 0.03, 0.035), socks=(0.03, 0.025, 0.02)),
 ]
 
@@ -733,11 +733,11 @@ if __name__ == '__main__' and bpy.app.background:
 # =====================================================================
 FACE = {
     'partner': dict(eye=1.08, iris=(0.33, 0.2, 0.1), iris2=(0.55, 0.38, 0.18), lids=(0.62, 0.4, 0.33), lips=(0.74, 0.4, 0.38),
-                    blush=0.38, freckles=160, hair=(0.24, 0.14, 0.08), hair_tip=(0.42, 0.27, 0.15), style='bun', tilt=0.004),
+                    blush=0.38, freckles=160, hair=(0.075, 0.036, 0.018), hair_tip=(0.2, 0.1, 0.045), style='bun', tilt=0.004),
     'player': dict(eye=1.0, iris=(0.22, 0.14, 0.08), iris2=(0.36, 0.25, 0.14), lids=(0.5, 0.32, 0.25), lips=(0.62, 0.37, 0.32),
-                   blush=0.14, freckles=0, hair=(0.08, 0.055, 0.04), hair_tip=(0.17, 0.11, 0.07), style='shaggy', tilt=0.0),
+                   blush=0.14, freckles=0, hair=(0.022, 0.014, 0.01), hair_tip=(0.06, 0.036, 0.022), style='shaggy', tilt=0.0),
 }
-EYE = (0.031, 0.007, 0.072)     # eye centre in head space (x mirrored)
+EYE = (0.031, 0.007, 0.0615)    # eye centre in head space (x mirrored); cornea about level with the cheeks
 EYE_R = 0.0122
 
 
@@ -973,6 +973,8 @@ def build_face_head(coll, P, F):
     jaw = P['jaw']
     fem = P['fem']
 
+    flen = P.get('face_len', 1.0)
+
     def shape(x, y, z):
         x, y, z = x * rx + cx, y * ry + cy, z * rz + cz
         ly = y - cy
@@ -981,6 +983,8 @@ def build_face_head(coll, P, F):
         if z > 0:
             z *= 1 - 0.05 * t * t
             z += 0.012 * gauss((ly + 0.088) ** 2, 0.0004) * gauss(x * x, 0.0008)          # chin
+        if y < EYE[1]:
+            y = EYE[1] + (y - EYE[1]) * flen    # shorter lower face reads younger
         if z < -0.02:
             z *= 1.03
         front = z > 0.03
@@ -988,11 +992,11 @@ def build_face_head(coll, P, F):
             z += (0.003 if fem else 0.005) * gauss((y - 0.03) ** 2, 0.00012) * gauss(x * x, 0.004)   # brow
             for sd in (-1, 1):
                 ex = sd * EYE[0]
-                z -= 0.0095 * gauss((x - ex) ** 2 + (y - EYE[1]) ** 2, 0.00019)               # eye socket
+                z -= 0.008 * gauss((x - ex) ** 2 / 1.3 + (y - EYE[1]) ** 2, 0.00026)          # eye socket
                 z += (0.006 if fem else 0.004) * gauss((x - sd * 0.045) ** 2 / 0.0004 + (y + 0.014) ** 2 / 0.0003, 1)   # cheeks
                 z -= 0.0015 * gauss((x - sd * 0.02) ** 2 / 0.0002 + (y + 0.04) ** 2 / 0.00015, 1)   # beside the mouth
         if z > 0.05:
-            ns = 0.9 if fem else 1.0
+            ns = 0.78 if fem else 0.95
             ridge = 0.014 * ns * smoothstep(0.024, -0.024, y) * smoothstep(-0.037, -0.027, y)
             z += ridge * gauss(x * x, 2 * 0.0072 ** 2)
             z += 0.0065 * ns * math.exp(-(x * x) / (2 * 0.0085 ** 2) - ((y + 0.026) ** 2) / (2 * 0.0065 ** 2))   # nose tip
@@ -1037,7 +1041,7 @@ def eye_frame(sd, F):
     hx, hy, hz = HEAD
     c = Vector((hx + sd * EYE[0], hy + EYE[1], hz + EYE[2]))
     e = F['eye']
-    return c, 0.0122 * e, 0.0066 * e, 0.0044 * e
+    return c, 0.0126 * e, 0.0074 * e, 0.0052 * e
 
 
 def build_eyes(coll, F):
@@ -1075,7 +1079,7 @@ def build_lids(coll, F):
     tilt = F['tilt']
     for sd in (-1, 1):
         c, ax, up, lo = eye_frame(sd, F)
-        R = EYE_R * F['eye'] * 1.1
+        R = EYE_R * F['eye'] * 1.06
         bm = bmesh.new()
         bmesh.ops.create_uvsphere(bm, u_segments=48, v_segments=32, radius=R)
         kill = []
@@ -1110,7 +1114,7 @@ def build_lids(coll, F):
             y = up * k ** 0.6 + tilt * (u / ax)
             zr = math.sqrt(max(R * R - u * u - y * y, 0)) + 0.0003
             base = Vector((c.x + sd * u, c.y + y, c.z + zr))
-            L = 0.0022 + 0.0022 * smoothstep(-0.2, 1.0, u / ax)
+            L = 0.0016 + 0.0018 * smoothstep(-0.2, 1.0, u / ax)
             tip = base + Vector((sd * 0.0012 * (u / ax), L * 0.9, L * 0.7))
             verts += [B(*base), B(*tip)]
             if i:
@@ -1274,12 +1278,12 @@ def hair_bun(coll, F, seed=5):
         C.card(p, Vector((math.cos(a), 0.6, math.sin(a))), 0.05 + r.random() * 0.04, 0.008, grav=0.25, curl=1.1, layer=3, hug=3.0)
     # Face-framing strands: from the temples down past the cheeks to the jaw, wavy.
     for sd in (-1, 1):
-        for j in range(9):
-            th = sd * (0.62 + j * 0.06 + r.random() * 0.04)
-            p = on_skull(th, 0.42 + j * 0.03 + r.random() * 0.04)
-            d = Vector((sd * 0.12, -1, 0.3))
-            C.card(p, d, 0.16 + r.random() * 0.07, 0.016 + r.random() * 0.008, grav=0.12, curl=0.2, layer=3,
-                   wave=0.0045, hug=1.6, segs=12)
+        for j in range(5):
+            th = sd * (0.78 + j * 0.07 + r.random() * 0.05)
+            p = on_skull(th, 0.36 + j * 0.05 + r.random() * 0.05)
+            d = Vector((sd * 0.25, -1, 0.35))
+            C.card(p, d, 0.11 + r.random() * 0.06, 0.014 + r.random() * 0.006, grav=0.1, curl=0.35, layer=3,
+                   wave=0.006, hug=1.5, segs=12)
     # Wispy bangs, parted slightly off centre, falling to the brows and curving aside.
     for j in range(14):
         u = (r.random() - 0.45) * 1.1
@@ -1327,6 +1331,34 @@ def hair_shaggy(coll, F, seed=9):
     return C.mesh(coll, 'hair')
 
 
+def build_scalp(coll, F):
+    """Hair-coloured cap under the cards so no skin shows through at partings and the hairline."""
+    import bmesh
+    c, r = SKULL
+    bm = bmesh.new()
+    bmesh.ops.create_uvsphere(bm, u_segments=48, v_segments=32, radius=1.0)
+    kill = []
+    for f in bm.faces:
+        p = f.calc_center_median()       # unit sphere; treat its z as forward
+        x, y, z = p.x * r.x * 0.995 + c.x, p.y * r.y * 0.995 + c.y, p.z * r.z * 0.995 + c.z
+        front = z > 0.035
+        side = abs(x) > 0.05 and z > -0.03
+        if (front and y < 0.06 - 0.25 * abs(x)) or (side and y < 0.0) or y < -0.055:
+            kill.append(f)
+    bmesh.ops.delete(bm, geom=kill, context='FACES')
+    me = bpy.data.meshes.new('scalp')
+    bm.to_mesh(me)
+    bm.free()
+    hx, hy, hz = HEAD
+    for v in me.vertices:
+        v.co = B(v.co.x * r.x * 0.995 + c.x + hx, v.co.y * r.y * 0.995 + c.y + hy, v.co.z * r.z * 0.995 + c.z + hz)
+    for p in me.polygons:
+        p.use_smooth = True
+    ob = bpy.data.objects.new('scalp', me)
+    coll.objects.link(ob)
+    return ob
+
+
 def build_face_and_hair(spec, coll, rig):
     """Separate object 'face_<name>': eyes, lids, lashes, brows and hair, skinned to the head bone."""
     F = FACE[spec['name']]
@@ -1334,7 +1366,8 @@ def build_face_and_hair(spec, coll, rig):
     skin = bpy.data.materials.get('skin.' + name)
     eye_m = eye_material(name, F)
     lash_m = flat_material('lash.' + name, (0.02, 0.015, 0.012), 0.7)
-    brow_m = flat_material('brow.' + name, tuple(c * 0.9 for c in F['hair']), 0.8)
+    brow_m = flat_material('brow.' + name, tuple(0.55 * a + 0.45 * b for a, b in zip(F['hair_tip'], spec['skin'])), 0.85)
+    scalp_m = flat_material('scalp.' + name, F['hair'], 0.7)
     hair_m = hair_material(name, F)
     parts = []
     eyes = build_eyes(coll, F)
@@ -1350,7 +1383,9 @@ def build_face_and_hair(spec, coll, rig):
         o.data.materials.append(brow_m)
     hair = hair_bun(coll, F) if F['style'] == 'bun' else hair_shaggy(coll, F)
     hair.data.materials.append(hair_m)
-    face = join(eyes + lids + lashes + brows + [hair], 'face_' + name)
+    scalp = build_scalp(coll, F)
+    scalp.data.materials.append(scalp_m)
+    face = join(eyes + lids + lashes + brows + [scalp, hair], 'face_' + name)
     g = face.vertex_groups.new(name='head')
     g.add([v.index for v in face.data.vertices], 1.0, 'REPLACE')
     face.parent = rig
