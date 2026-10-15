@@ -61,7 +61,7 @@
   #subs::after { content: "E \2192"; display: block; margin-top: 8px; font: 500 10px var(--mono); letter-spacing: 0.2em; color: var(--ink-dim); }
   @media (pointer: coarse) { #subs::after { content: "tap \2192"; } }
 
-  #bubble { position: fixed; transform: translate(-50%, -100%); background: rgba(16,12,12,0.62); color: var(--ink); font-size: 13px; font-weight: 500; padding: 6px 11px; border-radius: 10px; max-width: 240px; text-align: center; opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 11; backdrop-filter: blur(4px); }
+  #bubble { position: fixed; left: 0; top: 0; transform: translate(-50%, -100%); will-change: transform; background: rgba(16,12,12,0.62); color: var(--ink); font-size: 13px; font-weight: 500; padding: 6px 11px; border-radius: 10px; max-width: 240px; text-align: center; opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 11; backdrop-filter: blur(4px); }
   #bubble.show { opacity: 1; }
 
   #endcard { position: fixed; inset: 0; display: flex; align-items: flex-end; justify-content: center; text-align: center; padding: 0 16px 12vh; background: linear-gradient(180deg, rgba(4,6,14,0) 40%, rgba(4,6,14,0.7)); opacity: 0; pointer-events: none; transition: opacity 2.5s; z-index: 18; }

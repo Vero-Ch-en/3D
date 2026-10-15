@@ -901,8 +901,8 @@ function bubble(dt) {
   if (!c.bark || !STATE.started) { el.classList.remove('show'); return; }
   const v = G.headPos(c).add(new THREE.Vector3(0, 0.3, 0)).project(G.camera);
   if (v.z > 1) { el.classList.remove('show'); return; }
-  el.textContent = c.bark.text;
-  el.style.left = ((v.x + 1) / 2 * innerWidth) + 'px'; el.style.top = ((1 - v.y) / 2 * innerHeight) + 'px';
+  if (el.textContent !== c.bark.text) el.textContent = c.bark.text;   // avoid re-laying out the bubble every frame
+  el.style.transform = `translate(${((v.x + 1) / 2 * innerWidth).toFixed(1)}px, ${((1 - v.y) / 2 * innerHeight).toFixed(1)}px) translate(-50%, -100%)`;
   el.classList.add('show');
 }
 
