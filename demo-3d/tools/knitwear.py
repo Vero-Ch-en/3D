@@ -569,7 +569,7 @@ def build_leggings(name, cfg=None):
         # Near the hips or a leg bone; hands hanging at hip height are excluded.
         if abs(p.x) < 0.2 and p.z > pelvis.z - 0.12:
             return abs(p.x) < 0.19
-        return any((p - seg_closest(p, a, k)[0]).length < 0.12 or (p - seg_closest(p, k, f)[0]).length < 0.09 for a, k, f in legs)
+        return any((p - seg_closest(p, a, k)[0]).length < 0.16 or (p - seg_closest(p, k, f)[0]).length < 0.11 for a, k, f in legs)
     inside = [v.index for v in me.vertices if v.index in body and ank_z + cfg['ankle'] < v.co.z < top and on_leg(v.co)]
     hide_covered(name, inside, me)
     kill = [f for f in b.faces if not all(v.index in body and ank_z + cfg['ankle'] < v.co.z < top and on_leg(v.co) for v in f.verts)]
@@ -595,7 +595,7 @@ def build_leggings(name, cfg=None):
     bsdf.inputs['Base Color'].default_value = (*cfg['color'], 1)
     bsdf.inputs['Roughness'].default_value = 0.7
     if 'Sheen Weight' in bsdf.inputs:
-        bsdf.inputs['Sheen Weight'].default_value = 0.4
+        bsdf.inputs['Sheen Weight'].default_value = 0.15
     m.diffuse_color = (*cfg['color'], 1)
     out.materials.append(m)
     for p in out.polygons:
