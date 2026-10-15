@@ -407,7 +407,8 @@ def build_sweater(name, cfg=None):
             dirn = (wr - el).normalized()
             role, steps = 'cuff', [(dirn * 0.012, -0.002), (dirn * 0.01, -0.004)]
         ring = loop
-        for off, radial in steps:
+        level = min(vv.co.z for vv in verts) - cfg['hem_drop']    # the hem hangs level, not following the hips
+        for step_i, (off, radial) in enumerate(steps):
             res = bmesh.ops.extrude_edge_only(b, edges=ring)
             nv = [g for g in res['geom'] if isinstance(g, bmesh.types.BMVert)]
             ring = [g for g in res['geom'] if isinstance(g, bmesh.types.BMEdge) and g.is_boundary]
@@ -417,6 +418,8 @@ def build_sweater(name, cfg=None):
                 if role != 'cuff':
                     d.z = 0
                 vv.co += off + (d.normalized() * radial if d.length > 1e-6 else Vector())
+                if role == 'hem':
+                    vv.co.z = level + (cfg['hem_drop'] * 0.35 if step_i == 0 else 0.0)
 
     out = bpy.data.meshes.new('sweater_' + name)
     b.to_mesh(out)
@@ -501,4 +504,53 @@ def build_sweater(name, cfg=None):
     sol = ob.modifiers.new('thickness', 'SOLIDIFY')
     sol.thickness = 0.004
     sol.offset = -1
+    return ob
+
+
+LEGWEAR = {
+    'partner': dict(color=(0.03, 0.028, 0.03), top=0.08, ankle=0.06, offset=0.0025, name='legs.partner'),
+}
+
+
+def build_leggings(name, cfg=None):
+    """Snug leggings from the body surface: waist to just above the ankle."""
+    cfg = cfg or LEGWEAR[name]
+    me, J, body = evaluated_body(name)
+    pelvis = joint(J, 'joint-pelvis')
+    ank = [joint(J, f'joint-{s}-foot-1', f'joint-{s}-ankle') for s in ('l', 'r')]
+    ank_z = max(a.z for a in ank if a is not None) if any(ank) else 0.08
+    top = pelvis.z + cfg['top']
+    b = bmesh.new()
+    b.from_mesh(me)
+    kill = [f for f in b.faces if not all(v.index in body and ank_z + cfg['ankle'] < v.co.z < top for v in f.verts)]
+    bmesh.ops.delete(b, geom=kill, context='FACES')
+    bmesh.ops.delete(b, geom=[v for v in b.verts if not v.link_faces], context='VERTS')
+    bmesh.ops.smooth_laplacian_vert(b, verts=list(b.verts), lambda_factor=0.4, lambda_border=0.0, use_x=True, use_y=True, use_z=True,
+                                    preserve_volume=True)
+    b.normal_update()
+    for v in b.verts:
+        v.co += v.normal * cfg['offset']
+    out = bpy.data.meshes.new('leggings_' + name)
+    b.to_mesh(out)
+    b.free()
+    bpy.data.meshes.remove(me)
+    ob = bpy.data.objects.get('leggings_' + name)
+    if ob:
+        bpy.data.objects.remove(ob, do_unlink=True)
+    ob = bpy.data.objects.new('leggings_' + name, out)
+    bpy.data.collections['Humans'].objects.link(ob)
+    ob.parent = bpy.data.objects['human_' + name]
+    ob['cbs_role'] = name
+    m = bpy.data.materials.get(cfg['name']) or bpy.data.materials.new(cfg['name'])
+    m.use_nodes = True
+    bsdf = m.node_tree.nodes.get('Principled BSDF')
+    bsdf.inputs['Base Color'].default_value = (*cfg['color'], 1)
+    bsdf.inputs['Roughness'].default_value = 0.7
+    if 'Sheen Weight' in bsdf.inputs:
+        bsdf.inputs['Sheen Weight'].default_value = 0.4
+    m.diffuse_color = (*cfg['color'], 1)
+    out.materials.append(m)
+    for p in out.polygons:
+        p.use_smooth = True
+    ob.modifiers.new('sub', 'SUBSURF').levels = 1
     return ob
