@@ -1,7 +1,7 @@
 'use strict';
 /* =========================================================================
  * Story, Act I ("Shared Life"), ported from the 2D game:
- * prologue (the lantern fair, as children) → the birthday morning in the
+ * prologue (the lantern fair, as children) → a snowed-in morning in the
  * cabin → (the walk: next stage) → the evening at home.
  * Also: hidden relationship values, memories, the scrapbook, checkpoints,
  * the house's small interactions, Partner's own habits and Together.
@@ -156,7 +156,7 @@ const REACT = {
   armchair: { lines: ['That blanket and I have an understanding.', 'Your chair. My blanket. A fair arrangement.'] },
   ctable: { lines: ['I’ll clear those. Eventually. In a broad sense.', 'The spoon mug is mine. I was making a point.'] },
   kettle: { lines: ['Is one of those for me? Say it is.', 'Two sugars, please. And not a word to anyone.'] },
-  ksink: { lines: ['The spoon is innocent. I was testing the honey.', 'Leave the washing up. It’s your birthday. I’ll do it. Later.'] },
+  ksink: { lines: ['The spoon is innocent. I was testing the honey.', 'Leave the washing up. It’s a snow day. I’ll do it. Later.'] },
   toaster: { lines: ['Not the toaster. We agreed. After last time.', 'The toaster and I are no longer speaking.'] },
   fridge: { lines: ['Anything new in there?', 'The lemon is mine. I have plans for it.', 'Please close the door, Partner. You’re heating the snow.'] },
   ktable: { lines: ['Don’t open the card. It says “not yet”. That means you.', 'I tidied that table. Briefly.'] },
@@ -185,7 +185,7 @@ function react(id) {
 // Bedroom
 inter('bed', [2.4, 0.5, 2.55], 1.25, () => (morning() && PARTNER.lie ? 'Lie back down' : 'Bed'), async () => {
   if (morning() && PARTNER.lie) { await Story.morningCuddle(); S.pSpoke = true; return; }
-  await N(cyc('bed', ['(The bed. Her side and your side exist in theory. In practice, it is all her side.)', '(You straighten the duvet. It will not survive the night.)', '(Not yet. There’s too much birthday left.)']));
+  await N(cyc('bed', ['(The bed. Her side and your side exist in theory. In practice, it is all her side.)', '(You straighten the duvet. It will not survive the night.)', '(Not yet. There’s too much day left.)']));
 });
 inter('wardrobe', [4.3, 1, 1.05], 0.9, 'Wardrobe', () => N(cyc('wardrobe', ['(Your grey jumper should be in here. It is not. It is in {P}’s possession now, permanently.)', '(Half the hangers are empty. The other half hold jumpers neither of you has worn since a wedding.)', '(A shoebox labelled “IMPORTANT”. It contains one shoe.)'])));
 inter('chest', [3.6, 0.5, 3.6], 0.8, 'Blanket chest', () => N(cyc('chest', ['(Spare blankets, and a hot-water bottle shaped like a sheep. His name is Kevin, apparently.)', '(Kevin the sheep is lukewarm, and somehow disapproving.)'])));
@@ -230,7 +230,7 @@ inter('cushion', [9.2, 0.6, 2.5], 0.6, 'Under the cushions', async () => {
 inter('armchair', [6.0, 0.6, 2.45], 0.75, 'Armchair', () => N(cyc('armchair', ['(The armchair. Technically yours. {P}’s blanket lives on it.)', '(The blanket smells of her. You fold it. Badly.)'])));
 inter('frontdoor', [6.5, 1, 4.15], 0.8, 'Front door', async () => {
   if (morning()) {
-    if (!S.flags.breakfastDone) { await N('(Breakfast first. Birthday law, apparently.)'); if (canHear() && !PARTNER.lie) await Pt('Not without breakfast, Partner. I won’t allow it.'); return; }
+    if (!S.flags.breakfastDone) { await N('(Breakfast first. Snow-day law, apparently.)'); if (canHear() && !PARTNER.lie) await Pt('Not without breakfast, Partner. I won’t allow it.'); return; }
     S.flags.leaveHouse = true; return;
   }
   return N('(The front door. Somebody has hung a sprig of pine on it.)');
@@ -256,12 +256,12 @@ inter('fridge', [14.45, 1, 1.05], 0.75, 'Fridge', async () => {
   if (n === 1) { S.flags.knowsPancakes = true; return N('(Eggs. Milk. Butter. A sad lemon. Pancakes are possible.)'); }
   if (n === 2) return N('(Still eggs. Still milk. The lemon is still sad.)');
   if (n === 3) { if (canHear()) return Pt('It won’t grow new food if you keep checking, Partner.'); return N('(Cold air. Comforting, somehow.)'); }
-  if (n === 5 && canHear()) return Pt('Are you waiting for it to wish you a happy birthday? I could write it on something.');
+  if (n === 5 && canHear()) return Pt('Are you waiting for it to say good morning? I could write it on something.');
   return N('(The fridge hums. It has nothing new to say.)');
 });
 inter('ktable', [13.0, 0.8, 2.95], 1.3, () => (morning() && S.flags.pancakesMade && !S.flags.breakfastDone ? 'Sit down for breakfast' : 'Kitchen table'), async () => {
   if (morning() && S.flags.pancakesMade && !S.flags.breakfastDone) { await Story.breakfast(); S.pSpoke = true; return; }
-  await N(cyc('ktable', ['(The table. Mostly used for piling things on.)', '(A pile of post, a bowl of keys, and a birthday card, face down. It’s addressed to you. On the envelope: “not yet”.)']));
+  await N(cyc('ktable', ['(The table. Mostly used for piling things on.)', '(A pile of post, a bowl of keys, and an envelope, face down, addressed to you. On the back, in her handwriting: “not yet”.)']));
 });
 inter('cupboard', [11.45, 1, 3.75], 0.7, 'Snack cupboard', async () => {
   await N('({P}’s snack cupboard. A note on the door: “Property of me. Not Partner’s.”)');
@@ -273,7 +273,7 @@ inter('cupboard', [11.45, 1, 3.75], 0.7, 'Snack cupboard', async () => {
 inter('kwin', [13.0, 1.3, 4.05], 0.75, 'Window', () => N(morning() ? cyc('kwin', ['(The clearing, white and blue and perfectly still. Somebody has drawn a heart in the snow on the porch rail.)', '(The heart is still there. So is a smaller, crosser one beside it.)']) : '(Your reflection, and the snow behind it.)'));
 inter('ewin', [14.6, 1.3, 2.1], 0.6, 'Window', () => N(cyc('ewin', ['(The study’s roof, sloping away under a fat roll of snow.)', '(The study’s little window has a curtain drawn across it. It didn’t yesterday.)'])));
 inter('study', [14.6, 1, 3.85], 0.7, 'Study door', async () => {
-  if (PARTNER.hidden) { G.bark(['Not now, Partner!', 'Birthday business. Please go away. Lovingly.', 'I can hear you breathing on the door.', 'The sign says “private”. I wrote it myself.'], 2.6); S.pSpoke = true; return; }
+  if (PARTNER.hidden) { G.bark(['Not now, Partner!', 'Private business. Please go away. Lovingly.', 'I can hear you breathing on the door.', 'The sign says “private”. I wrote it myself.'], 2.6); S.pSpoke = true; return; }
   await N(cyc('study', ['(Locked. A sign on it, in marker: “PRIVATE”.)', '(Still locked. Beneath the sign, smaller: “this means you, Partner”.)']));
 });
 
@@ -284,7 +284,7 @@ G.SMART = [
   { id: 'basil', spot: { x: 9.85, z: 3.72 }, yaw: 0.8, dur: [4, 7], look: { x: 10.4, y: 0.7, z: 4.2 }, lines: ['You’re doing wonderfully, Basil.', 'Don’t tell Partner, Basil, but you’re my favourite.'] },
   { id: 'books', spot: { x: 6.2, z: 0.95 }, yaw: Math.PI, dur: [5, 9], look: { x: 6.15, y: 1.2, z: 0.2 }, lines: ['I am reading this one. I have been reading it for a year.', 'Who owns six copies of the same cookbook? We do, apparently.'] },
   { id: 'fridge', spot: { x: 14.35, z: 1.22 }, yaw: Math.PI, dur: [3, 5], look: { x: 14.5, y: 1.1, z: 0.4 }, lines: ['*rustling* …nothing. I was looking at nothing.', '*takes a single grape*', 'We need cheese. Spiritually.'] },
-  { id: 'study', spot: { x: 14.5, z: 3.85 }, yaw: Math.PI / 2, dur: [12, 22], hide: true, exit: { x: 14.45, z: 3.85, yaw: -Math.PI / 2 }, line: 'Birthday business. Please don’t follow me.', cond: () => morning() && !S.flags.pancakesMade },
+  { id: 'study', spot: { x: 14.5, z: 3.85 }, yaw: Math.PI / 2, dur: [12, 22], hide: true, exit: { x: 14.45, z: 3.85, yaw: -Math.PI / 2 }, line: 'Private business. Please don’t follow me.', cond: () => morning() && !S.flags.pancakesMade },
   { id: 'bwin', spot: { x: 2.4, z: 4.05 }, yaw: 0, dur: [4, 6], look: { x: 2.4, y: 1.4, z: 7 }, lines: ['Good morning, Gerald.', 'Gerald’s back. Hello, Gerald.'] },
   { id: 'kwin', spot: { x: 13.0, z: 4.1 }, yaw: 0, dur: [4, 6], look: { x: 13, y: 1.4, z: 8 }, lines: ['It’s so white out there. As if someone had tidied the world away.', 'Somebody drew a heart on the porch rail. It was me. Please don’t look.'] },
 ];
@@ -327,7 +327,7 @@ const ABOUT = {
   study: async () => {
     await Pt('You were looking at the study door.');
     const c = await choose(['“What’s in there?”', '“I wasn’t.”', '“I’ll wait.”']);
-    if (c === 0) await Pt('Things. Private things. Birthday-shaped things. That is all you may know.');
+    if (c === 0) await Pt('Things. Private things. Things for later. That is all you may know.');
     if (c === 1) await Pt('You were. You had your curious face on. It’s very obvious.');
     if (c === 2) { addBond(0.3); await Pt('…Thank you. It will be worth it. I hope.'); }
   },
@@ -359,7 +359,7 @@ const ROOM = {
   kitchen: [
     { id: 'r_kit1', when: () => morning() && !S.flags.pancakesMade, run: async () => { await Pt('Are we having pancakes, or are we simply standing in the kitchen together?'); await Y('Is there a difference?'); await Pt('About four pancakes’ difference.'); } },
     { id: 'r_kit2', when: () => S.flags.pancakesMade, run: async () => { await Pt('The kitchen smells wonderful. You’ve outdone yourself.'); await Y('Even the burnt one?'); await Pt('Especially the burnt one. It has character.'); } },
-    { id: 'r_kit3', run: async () => { await Pt('I like this kitchen best in the morning. It feels new.'); await Y('It’s the same kitchen.'); await Pt('Then it’s you that’s new. Another year. Look at you.'); } },
+    { id: 'r_kit3', run: async () => { await Pt('I like this kitchen best in the morning. It feels new.'); await Y('It’s the same kitchen.'); await Pt('Then it’s the snow. Everything looks new under snow.'); } },
   ],
   porch: [
     { id: 'r_por1', when: () => morning(), run: async () => { await Pt('It’s so quiet out here in the mornings.'); await Y('Apart from Gerald.'); await Pt('Gerald is part of the quiet.'); } },
@@ -373,15 +373,16 @@ const ROOM = {
 const DAY = {
   morning: [
     { id: 'gift', run: async () => {
-      await Pt('What would you like for your birthday?');
+      await Pt('If you could have anything at all today, what would it be?');
       const c = await choose(['“Pancakes.”', '“You.”', '“To know what’s in the study.”']);
-      if (c === 0) await Pt('Pancakes aren’t a present, Partner. They’re a way of life.');
-      if (c === 1) { addBond(0.5); await Pt('Oh, honestly. …You already have me. That isn’t a present. That’s a standing arrangement.'); }
+      if (c === 0) await Pt('Pancakes aren’t a wish, Partner. They’re a way of life.');
+      if (c === 1) { addBond(0.5); await Pt('Oh, honestly. …You already have me. That isn’t a wish. That’s a standing arrangement.'); }
       if (c === 2) await Pt('A good try. The answer is still “private”.');
     } },
     { id: 'dream', run: async () => { await Pt('I dreamt we were children again, and you were already this tall.'); await Y('That sounds unsettling.'); await Pt('It was. You couldn’t fit on the sledge.'); } },
   ],
   evening: [
+    { id: 'secret', when: () => STATE.cakeDone, run: async () => { await Pt('I nearly told you this morning. Twice.'); await Y('Told me what?'); await Pt('That I hadn’t forgotten. The pancakes very nearly broke me.'); } },
     { id: 'fair', run: async () => { await Pt('Do you remember the winter fair? Where we met?'); await Y('Vaguely.'); await Pt('Same. Vaguely is my favourite way to remember things.'); } },
   ],
   any: [
@@ -406,7 +407,7 @@ async function talk() {
   if ((PLAYER.sit || 0) > 0.5 && (PARTNER.sit || 0) > 0.5 && !S.talked.s_sofa) { S.talked.s_sofa = true; await ABOUT.sofa(); return; }
   const roomT = (ROOM[here] || []).find((x) => !S.talked[x.id] && (!x.when || x.when()));
   if (roomT) { S.talked[roomT.id] = true; await roomT.run(); return; }
-  const dayT = (DAY[ch()] || []).concat(DAY.any).find((x) => !S.talked[x.id]);
+  const dayT = (DAY[ch()] || []).concat(DAY.any).find((x) => !S.talked[x.id] && (!x.when || x.when()));
   if (dayT) { S.talked[dayT.id] = true; await dayT.run(); return; }
   await Pt(pick(SMALL[here] || SMALL.living));
 }
@@ -437,7 +438,7 @@ async function together() {
   switch (id) {
     case 'hug': {
       S.mem.hugs++; S.mem.affection++; addBond(S.mem.hugs < 6 ? 0.35 : 0.08);
-      await G.hug('hug', S.mem.hugs === 1 ? 'Oh. Hello. A birthday hug. Accepted.' : ['Mm. Squashed. Very nice.', 'You’re so warm. It hardly seems fair.', 'You may stop. Please don’t stop.', '*rests her cheek against your shoulder*', 'A very good hug. Ten out of ten.']);
+      await G.hug('hug', S.mem.hugs === 1 ? 'Oh. Hello. A snow-day hug. Accepted.' : ['Mm. Squashed. Very nice.', 'You’re so warm. It hardly seems fair.', 'You may stop. Please don’t stop.', '*rests her cheek against your shoulder*', 'A very good hug. Ten out of ten.']);
       return;
     }
     case 'hand': {
@@ -454,7 +455,7 @@ async function together() {
     }
     case 'kiss': {
       S.mem.kisses++; S.mem.affection++; addBond(S.mem.kisses < 5 ? 0.35 : 0.05);
-      const line = p.lie ? ['Mm. Good morning to you too.', '…Again. For warmth.'] : ['Well. Good morning to you too.', 'A birthday kiss. Noted.', 'Again? Greedy, Partner.', '*a small, flustered noise*', 'You can’t simply do that. …Do it again.'];
+      const line = p.lie ? ['Mm. Good morning to you too.', '…Again. For warmth.'] : ['Well. Good morning to you too.', 'A good-morning kiss. Noted.', 'Again? Greedy, Partner.', '*a small, flustered noise*', 'You can’t simply do that. …Do it again.'];
       if (seated || !(await G.hug('kiss', line))) G.bark(line, 2.4);
       return;
     }
@@ -498,8 +499,8 @@ Object.assign(Story, {
     await N('(You climb back in. She doesn’t open her eyes. She simply shifts until she’s against you again.)', { shot: 'keep' });
     PARTNER.lidsClosed = true;
     await P('I knew you’d come back.', { shot: 'keep' });
-    await Y('It’s my birthday. I may do as I please.', { shot: 'keep' });
-    await P('Mm. Ten more minutes, Partner. Birthday rules.', { shot: 'keep' });
+    await Y('It’s a snow day. Nobody is going anywhere.', { shot: 'keep' });
+    await P('Mm. Ten more minutes, Partner. Snow-day rules.', { shot: 'keep' });
     addBond(1); S.mem.affection++;
     await G.fade(true); await wait(0.8); await G.fade(false);
     await N('(It is not ten minutes.)', { shot: 'keep' });
@@ -558,14 +559,14 @@ Object.assign(Story, {
     if (s === 0) { bite(); await P('*chewing* …What? It looked lonely.', { shot: 'keep' }); S.mem.foodStolen++; addBond(0.3); }
     else if (s === 1) {
       addRivalry(1);
-      await P('Fork violence! On your own birthday, Partner!', { shot: 'keep' });
+      await P('Fork violence! At the breakfast table, Partner!', { shot: 'keep' });
       await N('(You look away for one second. One.)', { shot: 'keep' });
       bite();
       await P('Mine now. Thank you.', { shot: 'keep' });
       S.mem.foodStolen++;
-    } else { bite(); await P('…You are unbearably kind. Happy birthday, Partner.', { shot: 'keep' }); S.mem.foodShared++; addBond(1); }
-    addScrap('pancakes', q === 'burnt' ? 'Birthday pancakes. Structurally ambitious. Somebody stole a bite anyway.' : 'Birthday pancakes. Somebody stole a bite. (It was {P}.)');
-    await P('Now. A birthday walk. The meadow, the hill, the lake. I have planned this extensively.', { shot: 'keep' });
+    } else { bite(); await P('…You are unbearably kind. Thank you, Partner.', { shot: 'keep' }); S.mem.foodShared++; addBond(1); }
+    addScrap('pancakes', q === 'burnt' ? 'Snow-day pancakes. Structurally ambitious. Somebody stole a bite anyway.' : 'Snow-day pancakes. Somebody stole a bite. (It was {P}.)');
+    await P('Now. A walk. The meadow, the hill, the lake, all under fresh snow. I have planned this extensively.', { shot: 'keep' });
     await Y('Since when?', { shot: 'keep' });
     await P('Since about four minutes ago. Boots, please.', { shot: 'keep' });
     await G.cutTo(() => {
@@ -651,7 +652,7 @@ CH.morning = async () => {
   f.style.transition = 'opacity 2.2s'; f.classList.remove('on'); wait(2.4).then(() => { f.style.transition = ''; f.style.background = ''; });
   await G.UI.act('I', 'Shared Life', { white: false });
   G.setShot(bedCloseShot(), false);
-  await N('(Morning. Warm. Someone is breathing, very softly, against your neck.)', { shot: 'keep' });
+  await N('(The first real snow of the winter came in the night. Morning. Warm. Someone is breathing, very softly, against your neck.)', { shot: 'keep' });
   await P('…Mm. Don’t move, Partner. You’re warm.', { shot: 'keep' });
   await Y('You have taken the entire blanket.', { shot: 'keep' });
   PARTNER.lidsClosed = false;
@@ -664,28 +665,28 @@ CH.morning = async () => {
     PARTNER.lidsClosed = true;
     await N('(You stay. She settles into your side as though she were measured for it.)', { shot: 'keep' });
     await P('Good. That was the correct answer.', { shot: 'keep' });
-    await P('Happy birthday, by the way.', { shot: 'keep' });
+    await P('It snowed all night, by the way. We are officially snowed in.', { shot: 'keep' });
     await Y('You said that into my shoulder.', { shot: 'keep' });
-    await P('Your shoulder may consider itself congratulated as well.', { shot: 'keep' });
+    await P('Then your shoulder may consider itself informed.', { shot: 'keep' });
     PARTNER.lidsClosed = false;
   } else if (c === 1) {
     addRivalry(1);
     await slideBlanket(-1);
     await N('(One heroic tug. The blanket is yours. Briefly.)', { shot: 'keep' });
-    await P('Theft. On your own birthday. I’m shocked, Partner.', { shot: 'keep' });
+    await P('Theft. First thing in the morning. I’m shocked, Partner.', { shot: 'keep' });
     await slideBlanket(0.35);
     await N('(It is back on her side within four seconds. You did not see how.)', { shot: 'keep' });
-    await P('Happy birthday, all the same. Thief.', { shot: 'keep' });
+    await P('Good morning, all the same. Thief.', { shot: 'keep' });
     addScrap('blanket', 'The Great Blanket Robbery. (Lasted four seconds.)');
   } else {
     await N('(You begin to get up. A pillow meets the back of your head.)', { shot: 'keep' });
     await P('Traitor.', { shot: 'keep' });
-    await P('…Happy birthday, traitor.', { shot: 'keep' });
+    await P('…Good morning, traitor.', { shot: 'keep' });
   }
   await Y('Good morning, {gremlin}.', { shot: 'keep' });
-  await P('On birthdays, the birthday person makes breakfast. I believe that’s the law.', { shot: 'keep' });
-  await Y('I don’t believe that’s the law.', { shot: 'keep' });
-  await P('Then it is now. …Pancakes, please. I’ll be up in a minute.', { shot: 'keep' });
+  await P('On snow days, whoever wakes first makes breakfast. I believe that’s the law.', { shot: 'keep' });
+  await Y('You woke up first.', { shot: 'keep' });
+  await P('I have no recollection of that. …Pancakes, please. I’ll be up in a minute.', { shot: 'keep' });
   await G.cutTo(() => {
     G.standAt(PLAYER, 1.1, 1.9, Math.PI / 2);
     G.shapeBed({ R: true }, c === 1 ? 0.35 : 0);
@@ -712,7 +713,7 @@ CH.morning = async () => {
   await until(() => S.flags.breakfastDone);
   G.setHold(false);
   PARTNER.lead = { x: 6.45, z: 7.95, waitLines: ['Boots, Partner. The walk awaits.', 'Do come along, Partner.', 'The day isn’t getting any younger. Nor are you.'] };
-  G.bark('Boots, please! It’s time for the birthday walk.', 2.8);
+  G.bark('Boots, please! The snow won’t wait.', 2.8);
   await until(() => S.flags.leaveHouse || (PLAYER.z > 6.9 && Math.abs(PLAYER.x - 6.5) < 2.2));
   STATE.noControl = true;
   PARTNER.lead = null;
@@ -728,7 +729,7 @@ async function slideBlanket(to) {
 CH.walk = async () => {
   STATE.busy = true;
   const f = G.$('fade'); f.style.transition = 'opacity 1.6s'; f.classList.add('on'); await wait(1.7); f.style.transition = '';
-  await G.UI.card(['The birthday walk.', 'The meadow, the hill, the frozen lake —', 'and the long way home.'], { hold: 4.6, stagger: 0.9 });
+  await G.UI.card(['The walk.', 'The meadow, the hill, the frozen lake —', 'and the long way home.'], { hold: 4.6, stagger: 0.9 });
   return go('evening');
 };
 CH.evening = async () => {

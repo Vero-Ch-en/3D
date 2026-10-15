@@ -835,7 +835,7 @@ const Story = (G.Story = {
     await wait(1.4);
     await G.say('partner', 'Look. Every window’s still glowing. We left all the lights on.', { shot: 'keep', auto: 4.2 });
     await G.say('player', 'You left all the lights on.', { shot: 'keep', auto: 2.6 });
-    await G.say('partner', 'We did. And since it’s your birthday, the cabin is mine for the evening. Those are the rules.', { shot: 'keep', auto: 4.2 });
+    await G.say('partner', 'We did. I like coming home to a lit house. It feels like someone’s waiting for us.', { shot: 'keep', auto: 4.2 });
     await until(() => !PLAYER.script);
     STATE.sceneShot = false; STATE.busy = false;
     PARTNER.mode = 'follow';
@@ -852,7 +852,10 @@ const Story = (G.Story = {
     await walkTo(PARTNER, cx + 0.55, cz - 0.68, 1.3, 0);   // off-centre: right in front of the fire she'd be blown out by its light
     PARTNER.mode = 'follow'; STATE.busy = false;
     const cakeShot = () => { const p = new THREE.Vector3(cx + 0.55, 0.78, cz + 0.7), l = new THREE.Vector3(cx, 0.62, cz); return { pos: p, look: l, fov: 34, focus: p.distanceTo(l), aperture: 0.03 }; };
-    await G.say(null, '(Five candles. Somebody counted very carefully.)', { shot: cakeShot });
+    await G.say(null, '(A cake. Five candles. Somebody counted very carefully.)', { shot: cakeShot });
+    await G.say('partner', 'You thought I’d forgotten. Admit it.');
+    await G.say('player', 'You didn’t say a word all day.');
+    await G.say('partner', 'That was the hardest thing I have ever done, Partner.');
     // The snow globe on the mantle doubles as a music box.
     const tune = G.Audio.birthday();
     await G.say(null, '(She winds the snow globe on the mantle. It plays the birthday song, a little slow, and she hums along, off-key and completely sure of herself.)', { shot: cakeShot, auto: Math.max(5, tune + 0.4) });
@@ -1145,7 +1148,7 @@ function step(dt, t) {
   if (it && lab && hit('KeyE', 'Space', 'Enter')) { pressed.clear(); it.act(); }
   else if (nearP && hit('KeyQ', 'KeyF')) { pressed.clear(); if (together) G.Story.together(); else hug(); }
   if (hit('KeyN')) G.cycleTime();
-  if (STATE.watchDoor && G.inside(PLAYER.x, PLAYER.z)) { STATE.watchDoor = false; bark('Cake first. Then the sofa. Then the stars. I’ve made a schedule.', 4); }
+  if (STATE.watchDoor && G.inside(PLAYER.x, PLAYER.z)) { STATE.watchDoor = false; bark('Close your eyes. …No, open them. Look at the table.', 4); }
   if (STATE.watchDoor && PLAYER.z < 8.5 && !STATE.porchBark) { STATE.porchBark = true; bark('Inside, please. I can no longer feel my nose.', 3); }
   ambientBarks(dt);
 }
