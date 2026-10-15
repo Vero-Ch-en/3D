@@ -16,6 +16,17 @@
     // What they call each other in the 3D game.
     callPlayer: 'Partner',
     callPartner: 'Partner',
+    // The card at the end of the 3D game.
+    closing: {
+      heading: 'Here’s to another winter.',
+      full: [
+        'A small world full of ordinary things, because the ordinary things are where they keep finding each other.',
+        'Stolen blankets. Disputed races. Pancakes that go missing when you look away for one second.',
+        'Neither of them remembers exactly how it started. They are still glad it did.',
+        'Here’s to another year of choosing each other on purpose.',
+      ],
+      signature: '',
+    },
     birthday: {
       heading: 'Happy birthday.',
       short: 'Whichever ending you found: happy birthday. I am so glad you exist.',
@@ -29,5 +40,5 @@
     },
   };
   const given = window.CBS_CONFIG || {};
-  window.CBS_CONFIG = Object.assign({}, defaults, given, { birthday: Object.assign({}, defaults.birthday, given.birthday || {}) });
+  window.CBS_CONFIG = Object.assign({}, defaults, given, { birthday: Object.assign({}, defaults.birthday, given.birthday || {}), closing: Object.assign({}, defaults.closing, given.closing || {}) });
 })();

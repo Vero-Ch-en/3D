@@ -382,8 +382,8 @@ const DAY = {
     { id: 'dream', run: async () => { await Pt('I dreamt we were children again, and you were already this tall.'); await Y('That sounds unsettling.'); await Pt('It was. You couldn’t fit on the sledge.'); } },
   ],
   evening: [
-    { id: 'secret', when: () => STATE.cakeDone, run: async () => { await Pt('I nearly told you this morning. Twice.'); await Y('Told me what?'); await Pt('That I hadn’t forgotten. The pancakes very nearly broke me.'); } },
-    { id: 'fair', run: async () => { await Pt('Do you remember the winter fair? Where we met?'); await Y('Vaguely.'); await Pt('Same. Vaguely is my favourite way to remember things.'); } },
+    { id: 'secret', when: () => STATE.cakeDone, run: async () => { await Pt('I nearly said something this morning. Twice.'); await Y('About what day it is?'); await Pt('About what day it is. The pancakes very nearly broke me.'); } },
+    { id: 'fair', run: async () => { await Pt('Do you remember the winter fair? It was the first snow then, too.'); await Y('Vaguely.'); await Pt('Same. Vaguely is my favourite way to remember things.'); } },
   ],
   any: [
     { id: 'size', run: async () => { await Pt('Why are you so tall, Partner?'); await Y('Why are you so small?'); await Pt('Concentrated.'); } },

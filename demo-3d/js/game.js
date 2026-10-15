@@ -77,11 +77,12 @@ G.Audio = (() => {
       }
     },
     blow() { burst(0.7, 1200, 0.12, 'highpass', 0.7); },
-    // "Happy Birthday to You" (Hill sisters, public domain) as a soft music box.
-    birthday() {
+    // The snow globe's tune: a short original waltz, played like a music box winding down.
+    musicBox() {
       if (!ctx) return 0;
-      const G4 = 392, A4 = 440, B4 = 493.9, C5 = 523.3, D5 = 587.3, E5 = 659.3, F5 = 698.5, G5 = 784;
-      const b = 0.42, N = [[G4, 0.75], [G4, 0.25], [A4, 1], [G4, 1], [C5, 1], [B4, 2], [G4, 0.75], [G4, 0.25], [A4, 1], [G4, 1], [D5, 1], [C5, 2], [G4, 0.75], [G4, 0.25], [G5, 1], [E5, 1], [C5, 1], [B4, 1], [A4, 2], [F5, 0.75], [F5, 0.25], [E5, 1], [C5, 1], [D5, 1], [C5, 3]];
+      const C5 = 523.3, D5 = 587.3, E5 = 659.3, F5 = 698.5, G5 = 784, A5 = 880, B4 = 493.9, A4 = 440, G4 = 392;
+      const b = 0.4, N = [[E5, 1], [G5, 1], [A5, 1], [G5, 2], [E5, 1], [D5, 1], [E5, 1], [C5, 3], [D5, 1], [E5, 1], [F5, 1], [E5, 2], [D5, 1], [B4, 1], [D5, 1], [G4, 3],
+        [E5, 1], [G5, 1], [A5, 1], [G5, 2], [E5, 1], [F5, 1], [E5, 1], [D5, 2], [A4, 1], [B4, 1], [D5, 1], [C5, 3.5]];
       let at = 0.1; for (const [f, d] of N) { bell(f, at); at += d * b; }
       return at;
     },
@@ -852,19 +853,20 @@ const Story = (G.Story = {
     await walkTo(PARTNER, cx + 0.55, cz - 0.68, 1.3, 0);   // off-centre: right in front of the fire she'd be blown out by its light
     PARTNER.mode = 'follow'; STATE.busy = false;
     const cakeShot = () => { const p = new THREE.Vector3(cx + 0.55, 0.78, cz + 0.7), l = new THREE.Vector3(cx, 0.62, cz); return { pos: p, look: l, fov: 34, focus: p.distanceTo(l), aperture: 0.03 }; };
-    await G.say(null, '(A cake. Five candles. Somebody counted very carefully.)', { shot: cakeShot });
-    await G.say('partner', 'You thought I’d forgotten. Admit it.');
+    await G.say(null, '(A cake. Five candles: one for every first snow in this cabin. Somebody counted very carefully.)', { shot: cakeShot });
+    await G.say('partner', 'You thought I’d forgotten what day it is. Admit it.');
     await G.say('player', 'You didn’t say a word all day.');
     await G.say('partner', 'That was the hardest thing I have ever done, Partner.');
     // The snow globe on the mantle doubles as a music box.
-    const tune = G.Audio.birthday();
-    await G.say(null, '(She winds the snow globe on the mantle. It plays the birthday song, a little slow, and she hums along, off-key and completely sure of herself.)', { shot: cakeShot, auto: Math.max(5, tune + 0.4) });
+    const tune = G.Audio.musicBox();
+    await G.say(null, '(She winds the snow globe on the mantle. It plays its little tune, a touch slow, and she hums along, off-key and completely sure of herself.)', { shot: cakeShot, auto: Math.max(5, tune + 0.4) });
     await G.say('partner', 'Wait. Make a wish first. A proper one. Not a sensible one.');
     await G.say('player', 'What counts as sensible?');
     await G.say('partner', '“More sleep.” “A new kettle.” Anything you’d be willing to say out loud.');
     G.Audio.blow(); G.CAKE.lit = false;
     await G.say(null, '(You blow them out. All five, first try.)', { shot: cakeShot });
-    await G.say('partner', 'Happy birthday, {giant}.');
+    await G.say('partner', 'Happy first snow, {giant}.');
+    await G.say('player', 'Happy first snow.');
     STATE.cakeDone = true;
   },
   async cuddle() {
@@ -914,9 +916,9 @@ const Story = (G.Story = {
     await wait(2.5);
     await G.say(null, '(The sun goes, and then all at once there are more stars than sky.)', { shot: 'keep' });
     PARTNER.tiltTarget = -0.25;
-    await G.say('partner', 'Pick a star. That one is yours. Happy birthday.', { shot: 'keep' });
+    await G.say('partner', 'Pick a star. That one is yours. For this year.', { shot: 'keep' });
     await G.say('player', 'Which one, {gremlin}?', { shot: 'keep' });
-    await G.say('partner', 'The bright one, naturally. I wouldn’t give you a dim one on your birthday.', { shot: 'keep' });
+    await G.say('partner', 'The bright one, naturally. I wouldn’t give you a dim one tonight.', { shot: 'keep' });
     await wait(1.5);
     showEndcard();
     document.body.classList.remove('playing');
@@ -937,8 +939,8 @@ const Story = (G.Story = {
   },
 });
 function showEndcard() {
-  const B = G.CFG.birthday || {};
-  $('endHeading').textContent = G.fmt(B.heading || 'Happy birthday.');
+  const B = G.CFG.closing || {};
+  $('endHeading').textContent = G.fmt(B.heading || 'Here’s to another winter.');
   const msg = $('endMsg');
   msg.textContent = '';
   const lines = (B.full && B.full.length ? B.full : [B.short || '']).filter(Boolean);
@@ -1054,7 +1056,7 @@ const BARKS = [
   { id: 'stars', when: (o) => o.out && STATE.tod > 0.8 && o.idle > 6, text: 'There are so many. Someone has rather overdone it.' },
   { id: 'run', when: (o) => o.out && AMBIENT.runT > 2.2, text: 'No running in the snow, Partner! …Very well. Wait for me.' },
   { id: 'fire', when: (o) => o.nearFire && o.idle > 6, text: 'I could stay here until spring, I think.' },
-  { id: 'cake', when: (o) => STATE.cakeDone && o.inside && o.idle > 10, text: 'Would a second slice be too early? It’s your birthday. You decide.' },
+  { id: 'cake', when: (o) => STATE.cakeDone && o.inside && o.idle > 10, text: 'Would a second slice be too early? I say nothing is too early on a first snow.' },
   { id: 'cold', when: (o) => o.out && STATE.tod > 0.4 && o.idle > 14, text: 'My toes have formally resigned. Shall we go in soon?' },
 ];
 function ambientBarks(dt) {
