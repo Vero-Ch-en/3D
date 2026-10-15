@@ -549,6 +549,7 @@ def build_sweater(name, cfg=None):
 
 LEGWEAR = {
     'partner': dict(color=(0.03, 0.028, 0.03), top=0.08, ankle=0.06, offset=0.003, name='legs.partner'),
+    'player': dict(color=(0.022, 0.024, 0.03), top=0.06, ankle=0.02, offset=0.009, name='legs.player'),   # dark relaxed trousers
 }
 
 
