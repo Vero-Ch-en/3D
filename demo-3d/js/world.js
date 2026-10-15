@@ -40,6 +40,8 @@ G.floorAt = (x, z) => {
   return terrainH(x, z);
 };
 G.inside = (x, z) => x > CAB.x0 && x < CAB.x1 && z > CAB.z0 && z < CAB.z1;
+// On wooden floor or decking (inside, porch or its steps) rather than snow.
+G.onDeck = (x, z) => G.inside(x, z) || (x > PORCH.x0 && x < PORCH.x1 && z >= PORCH.z0 - 0.1 && z < PORCH.z1) || (x > PORCH.stepX0 && x < PORCH.stepX1 && z >= PORCH.z1 && z < PORCH.stepZ1);
 G.underRoof = (x, z) => (x > CAB.x0 - 0.5 && x < CAB.x1 + 0.5 && z > -0.5 && z < 5) || (x > PORCH.x0 && x < PORCH.x1 && z > PORCH.z0 && z < 6.95);
 G.walkable = (x, z) => {
   if (Math.hypot(x - CLEAR.x, (z - CLEAR.z) * 0.9) < CLEAR.r) return true;
@@ -69,7 +71,30 @@ G.buildTerrain = () => {
   }
   const pg = new THREE.BufferGeometry();
   pg.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); pg.setAttribute('uv', new THREE.Float32BufferAttribute(UV, 2)); pg.setIndex(I); pg.computeVertexNormals();
-  const pathMat = G.std({ color: '#dfe5ee', roughness: 0.85, normalMap: TX.snowN, normalScale: new THREE.Vector2(1.2, 1.2), transparent: true, opacity: 0.85, env: 0.6 });
+  // Packed snow with old boot prints and soft edges that fade into the fresh snow either side.
+  const pathTex = (bump) => G.canvasTex(0, null, { w: 256, h: 512, srgb: !bump, draw: (ctx, w, h) => {
+    const r = G.seeded(bump ? 5 : 5);
+    const img = ctx.createImageData(w, h);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const u = x / w, v = y / h, edge = G.smooth(0, 0.28, Math.min(u, 1 - u));
+      const n = fbm(u * 6, v * 10, 3) * 0.5 + fbm(u * 40, v * 60, 2) * 0.2;
+      const i = (y * w + x) * 4;
+      if (bump) { const g = 150 + n * 60; img.data[i] = img.data[i + 1] = img.data[i + 2] = g; img.data[i + 3] = 255; }
+      else { const t = 0.9 + n * 0.08; img.data[i] = 222 * t; img.data[i + 1] = 228 * t; img.data[i + 2] = 238 * t; img.data[i + 3] = 255 * edge * (0.75 + n * 0.2); }
+    }
+    ctx.putImageData(img, 0, 0);
+    // Boot prints: two loose lanes, slightly darker and pressed in.
+    for (let k = 0; k < 46; k++) {
+      const lane = k % 2 ? 0.36 : 0.64, x = (lane + (r() - 0.5) * 0.14) * w, y = r() * h, a = (r() - 0.5) * 0.5;
+      ctx.save(); ctx.translate(x, y); ctx.rotate(a);
+      ctx.fillStyle = bump ? 'rgba(70,70,70,0.75)' : 'rgba(150,165,190,0.32)';
+      // Texture is ~111 px/m across and 256 px/m along the path, so a 28 cm boot is ~70 px long.
+      ctx.beginPath(); ctx.ellipse(0, -14, 6, 22, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(0, 24, 5, 13, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+  } });
+  const pathMat = G.std({ map: pathTex(false), bumpMap: pathTex(true), bumpScale: 0.012, roughness: 0.8, transparent: true, depthWrite: false, env: 0.6 });
   pathMat.polygonOffset = true; pathMat.polygonOffsetFactor = -2;
   G.add(new THREE.Mesh(pg, pathMat), world, false, true);
   // Frozen lake.
@@ -219,6 +244,19 @@ function pineGeometry(seed) {
 G.buildForest = () => {
   const r = G.seeded(31);
   const mat = G.std({ vertexColors: true, roughness: 0.9, env: 0.5 });
+  // Gentle sway in the wind: the crown moves more than the trunk, each tree on its own phase.
+  G.SWAY = { uTime: { value: 0 }, uGust: { value: 0 } };
+  mat.onBeforeCompile = (sh) => {
+    sh.uniforms.uSwayT = G.SWAY.uTime; sh.uniforms.uGust = G.SWAY.uGust;
+    sh.vertexShader = 'uniform float uSwayT; uniform float uGust;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
+      #ifdef USE_INSTANCING
+        float ph = instanceMatrix[3].x * 0.37 + instanceMatrix[3].z * 0.23;
+        float bend = position.y * position.y * (0.004 + uGust * 0.012);
+        transformed.x += sin(uSwayT * 1.1 + ph) * bend + bend * uGust * 0.6;
+        transformed.z += cos(uSwayT * 0.83 + ph * 1.7) * bend * 0.6;
+      #endif`);
+  };
+  mat.customProgramCacheKey = () => 'pine-sway';
   const variants = [pineGeometry(3), pineGeometry(17), pineGeometry(42)];
   const lists = [[], [], []];
   const want = Math.round(520 * G.Q.trees);
@@ -245,9 +283,11 @@ G.buildForest = () => {
     world.add(im);
   });
   // Snow-covered shrubs and drifts.
-  const shrubG = new THREE.IcosahedronGeometry(1, 2);
+  // Indexed sphere so vertex normals are shared and the drifts read as soft, rounded snow
+  // (an icosahedron is non-indexed, which gave every face its own normal: faceted "rocks").
+  const shrubG = new THREE.SphereGeometry(1, 22, 14);
   const sp = shrubG.attributes.position;
-  for (let i = 0; i < sp.count; i++) { const k = 1 + G.simplex.noise(sp.getX(i) * 2, sp.getZ(i) * 2 + sp.getY(i)) * 0.18; sp.setXYZ(i, sp.getX(i) * k, sp.getY(i) * k, sp.getZ(i) * k); }
+  for (let i = 0; i < sp.count; i++) { const x = sp.getX(i), y = sp.getY(i), z = sp.getZ(i); const k = 1 + G.simplex.noise(x * 1.6, z * 1.6 + y) * 0.14; sp.setXYZ(i, x * k, y < 0 ? y * 0.3 : y * k, z * k); }
   shrubG.computeVertexNormals();
   const drifts = [];
   for (let i = 0; i < 160; i++) {
@@ -454,7 +494,7 @@ G.buildCabin = () => {
     G.box(PORCH.stepX1 - PORCH.stepX0 - 0.1, 0.05, 0.2, MAT.snow, (PORCH.stepX0 + PORCH.stepX1) / 2 + (i - 1) * 0.15, y + 0.02, z - 0.05, { r: 0.02 });
   }
   const posts = [3.5, 5.8, 7.2, 9.3, 11.3];
-  for (const x of posts) { G.box(0.18, 2.45, 0.18, MAT.darkWood, x, 1.22, PORCH.z1 - 0.12, { coll: true }); }
+  for (const x of posts) { G.box(0.18, 2.45, 0.18, MAT.darkWood, x, 1.22, PORCH.z1 - 0.12, { coll: true, cam: true }); }  // cam: keeps the lens from parking behind a post
   const railMat = MAT.darkWood;
   const railSeg = (a, b, z) => {
     G.box(b - a, 0.08, 0.1, railMat, (a + b) / 2, 0.95, z);

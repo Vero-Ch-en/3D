@@ -300,36 +300,95 @@ G.retarget = (root) => {
 };
 
 /* ---------- animation ---------- */
+/* Poses blended on top of the base idle/walk for the arms:
+ * [shoulder x (forward −), shoulder z (inward +), elbow x (bend −), shoulder twist (about the upper arm)]. */
+const ARM_POSES = (G.ARM_POSES = {
+  cold: [-0.5, 0.3, -1.65, -0.85],   // arms wrapped around yourself
+  warm: [-1.0, 0.18, -0.45, -0.25],  // hands held out to the fire
+  pockets: [-0.18, 0.22, -1.05, -0.55], // hands tucked into the hoodie pocket
+});
 G.animate = (c, dt, t) => {
   const u = c.m.userData, k = u.k, { lerp: L, clamp, damp } = G;
   c.m.position.set(c.x, c.y, c.z);
-  c.m.rotation.y = c.yaw;
+  // Lean into turns: roll about the character's own forward axis, scaled by speed.
+  const prevYaw = c._prevYaw == null ? c.yaw : c._prevYaw;
+  let dy = c.yaw - prevYaw; while (dy > Math.PI) dy -= 2 * Math.PI; while (dy < -Math.PI) dy += 2 * Math.PI;
+  c._prevYaw = c.yaw;
   const sp = clamp(c.speed / 1.6, 0, 2);
+  c.turnLean = damp(c.turnLean || 0, clamp((dy / Math.max(dt, 1e-3)) * sp * 0.05, -0.1, 0.1), 6, dt);
+  c.m.rotation.set(0, c.yaw, -c.turnLean);
+  const prevPh = c.phase;
   c.phase += dt * (4.0 + sp * 3.0) * Math.min(1, sp * 2);
   const ph = c.phase, w = Math.min(1, sp);
-  const sit = c.sit || 0;
+  const sit = c.sit || 0, idle = (1 - w) * (1 - sit);
+  // Foot plants (heel strike when a leg is fully forward) drive footstep sounds and footprints.
+  const plant = (p) => Math.floor((p - 1.5 * Math.PI) / Math.PI);
+  if (w > 0.25 && sit < 0.1 && plant(ph) !== plant(prevPh)) {
+    const leg = ((plant(ph) % 2) + 2) % 2, lx = (leg ? 1 : -1) * 0.09 * k, fz = 0.22 * w;
+    const cy = Math.cos(c.yaw), sy = Math.sin(c.yaw);
+    c.stepEvent = { leg, x: c.x + lx * cy + fz * sy, z: c.z - lx * sy + fz * cy, yaw: c.yaw };
+  }
+  // Idle weight shift: hips drift over one foot then the other every few seconds.
+  const shift = Math.sin(t * 0.45 + (c.seedT || 0)) * idle;
   u.legs.forEach((Lg, i) => {
-    const p = ph + (i ? Math.PI : 0);
-    Lg.th.rotation.set(L(Math.sin(p) * 0.55 * w, -1.5, sit), 0, 0);
-    Lg.kn.rotation.x = L(Math.max(0, -Math.sin(p + 0.6)) * 1.0 * w + 0.03, 1.55, sit);
-    Lg.ft.rotation.x = L(Math.sin(p) * 0.2 * w, -0.05, sit);
+    const p = ph + (i ? Math.PI : 0), s = i ? 1 : -1;
+    const bend = Math.max(0, s * shift) * 0.09;   // the unloaded leg softens at the knee
+    Lg.th.rotation.set(L(Math.sin(p) * 0.55 * w - bend * 0.5, -1.5, sit), 0, L(-s * 0.02 * idle, 0, sit));
+    Lg.kn.rotation.x = L(Math.max(0, -Math.sin(p + 0.6)) * 1.0 * w + 0.03 + bend, 1.55, sit);
+    Lg.ft.rotation.x = L(Math.sin(p) * 0.2 * w - bend * 0.5, -0.05, sit);
   });
-  u.hips.position.y = L(u.hipY, (c.seatY || 0.6) - c.y + 0.03, sit) - Math.abs(Math.sin(ph)) * 0.03 * w;
-  u.hips.rotation.y = Math.sin(ph) * 0.1 * w;
+  u.hips.position.y = L(u.hipY, (c.seatY || 0.6) - c.y + 0.03, sit) - Math.abs(Math.sin(ph)) * 0.03 * w - Math.abs(shift) * 0.006;
+  u.hips.position.x = shift * 0.018 * k;
+  u.hips.rotation.set(0, Math.sin(ph) * 0.1 * w, -shift * 0.035);
   u.spine.rotation.y = -Math.sin(ph) * 0.15 * w;
+  u.spine.rotation.z = shift * 0.045;
   u.spine.rotation.x = 0.04 * w * (sp > 1.2 ? 2.5 : 1) - sit * 0.08 + (c.lean || 0);
-  const br = Math.sin(t * 1.5 + c.x) * 0.01;
+  // Breathing: a slow chest rise, quicker after running.
+  c.breathRate = damp(c.breathRate || 1.8, sp > 1.2 ? 3.4 : 1.8, 0.6, dt);   // ~3.5 s per breath at rest
+  c.breath = (c.breath || 0) + dt * c.breathRate;
+  const br = Math.sin(c.breath) * 0.012;
   u.chest.scale.set(1 + br, 1 + br * 0.4, 1 + br);
+  u.chest.rotation.x = -br * 1.2;
+  // Arm poses fade in and out instead of popping.
+  const pw = c.poseW || (c.poseW = {});
+  const want = c.forcePose || c.pose;
+  for (const name in ARM_POSES) pw[name] = damp(pw[name] || 0, want === name ? 1 : 0, 4, dt);
   u.arms.forEach((A, i) => {
     const s = i ? 1 : -1, p = ph + (i ? 0 : Math.PI);
-    let sx = Math.sin(p) * 0.45 * w, sz = s * (0.07 + 0.012 * Math.sin(t * 1.5)), ex = -0.12 - 0.3 * w;
+    const swing = Math.sin(p);
+    // Relaxed hang: slight forward set and soft elbows; the forearm bends more on the forward swing.
+    let sx = swing * 0.45 * w - 0.06 * idle + Math.sin(c.breath) * 0.015 * idle;
+    let sz = s * (0.08 + 0.01 * Math.sin(c.breath)) + s * shift * (i ? -0.02 : 0.02);
+    let ex = -0.22 * idle - (0.25 + Math.max(0, -swing) * 0.35) * w, sy = 0;
     if (sit > 0.5) { sx = -0.3; ex = -0.75; sz = s * 0.1; }
+    for (const name in ARM_POSES) {
+      const wgt = pw[name] * (1 - sit) * (name === 'warm' ? idle : 1);
+      if (wgt < 0.001) continue;
+      const P = ARM_POSES[name];
+      // On this rig +s rolls the arm in toward the body (−s spreads it, as the hug does).
+      sx = L(sx, P[0] + (name === 'cold' ? Math.sin(t * 31 + i) * 0.012 : 0), wgt); sz = L(sz, s * P[1], wgt); ex = L(ex, P[2], wgt); sy = L(sy, s * P[3], wgt);
+    }
     if (c.pose === 'chin') { if (i === (c.chinSide || 0)) { sx = -1.6; sz = s * -0.35; ex = -2.3; } }
-    if (c.hug > 0) { sx = L(sx, -1.3, c.hug); sz = L(sz, -s * 0.6, c.hug); ex = L(ex, -1.4, c.hug); }
+    if (c.hug > 0) {
+      // [forward, spread, elbow, twist]; the taller one wraps lower so their arms go around, not over.
+      const hp = c.hugPose || [-1.3, 0.6, -1.4, 0];
+      sx = L(sx, hp[0], c.hug); sz = L(sz, -s * hp[1], c.hug); ex = L(ex, hp[2], c.hug); sy = L(sy, s * hp[3], c.hug);
+    }
     if (c.hold && i === c.holdSide) { sx = -0.2; sz = s * 0.32; ex = -0.2; }
-    A.sh.rotation.set(sx, 0, sz); A.el.rotation.set(ex, 0, 0);
+    A.sh.rotation.set(sx, sy, sz); A.el.rotation.set(ex, 0, 0);
   });
-  const tgt = c.lookAt;
+  // Blinks on a natural, irregular rhythm (sometimes a double blink).
+  c.blinkT = (c.blinkT == null ? Math.random() * 3 : c.blinkT) - dt;
+  if (c.blinkT < -0.13) c.blinkT = Math.random() < 0.15 ? 0.18 : 2 + Math.random() * 4.5;
+  const shut = c.lidsClosed || c.blinkT < 0;
+  if (u.lids) u.lids.forEach((ld) => { ld.position.y = (shut ? 0.0085 : 0.0135) * k; ld.scale.y = (shut ? 0.0125 : 0.0072) * k; });
+  // With nothing to look at, glance around now and then.
+  let tgt = c.lookAt;
+  if (!tgt && idle > 0.5 && !c.lockHead) {
+    c.glanceT = (c.glanceT || 0) - dt;
+    if (c.glanceT <= 0) { c.glanceT = 2.5 + Math.random() * 4; c.glance = Math.random() < 0.35 ? 0 : (Math.random() - 0.5) * 1.6; c.glanceUp = (Math.random() - 0.4) * 0.5; }
+    if (c.glance) { const a = c.yaw + c.glance; tgt = { x: c.x + Math.sin(a) * 3, z: c.z + Math.cos(a) * 3, headY: c.y + u.H * 0.93 + (c.glanceUp || 0) * 3 }; }
+  }
   if (tgt) {
     const dx = tgt.x - c.x, dz = tgt.z - c.z;
     let a = Math.atan2(dx, dz) - c.yaw; while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI;

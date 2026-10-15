@@ -6,32 +6,77 @@
 (() => {
 const { $, clamp, lerp, damp, rand, MAT } = G;
 const STATE = (G.STATE = { started: false, tod: 0, todTarget: 0, cuddled: false, cakeDone: false, porchDone: false, busy: false });
+// Wind: a slow gust value (0..1) shared by snowfall, tree sway and the wind sound.
+const WIND = (G.WIND = { gust: 0.3, drift: 0, t: 0 });
+function updateWind(dt) {
+  WIND.t += dt;
+  const n = G.simplex.noise(WIND.t * 0.06, 3.1) * 0.7 + G.simplex.noise(WIND.t * 0.23, 7.7) * 0.3;
+  WIND.gust = clamp(0.35 + n * 0.65, 0, 1);
+  WIND.drift += dt * (0.08 + WIND.gust * 0.55);
+  if (G.SWAY) { G.SWAY.uTime.value = WIND.t; G.SWAY.uGust.value = WIND.gust; }
+}
 const angDamp = (a, b, k, dt) => { let d = b - a; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; return a + d * (1 - Math.exp(-k * dt)); };
 
 /* =====================================================================
  * Audio (procedural)
  * ===================================================================== */
 G.Audio = (() => {
-  let ctx = null, master, fireG, windG, padG, pad = [];
-  const noise = () => { const b = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate); const d = b.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; const s = ctx.createBufferSource(); s.buffer = b; s.loop = true; return s; };
+  let ctx = null, master, fireG, windG, windF, outF, padG, pad = [], noiseBuf = null, chordI = 0, nextChord = 0;
+  const noise = () => {
+    if (!noiseBuf) { noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate); const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; }
+    const s = ctx.createBufferSource(); s.buffer = noiseBuf; s.loop = true; return s;
+  };
+  // A slow progression (Cmaj7 · Am9 · Fmaj7 · G6) so the ambience breathes instead of droning.
+  const CHORDS = [[130.8, 164.8, 196.0, 246.9], [110.0, 164.8, 196.0, 246.9], [87.3, 174.6, 220.0, 329.6], [98.0, 146.8, 196.0, 329.6]];
   function start() {
     if (ctx) { if (ctx.state === 'suspended') ctx.resume(); return; }
     const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
     ctx = new AC(); master = ctx.createGain(); master.gain.value = 0.7; master.connect(ctx.destination);
+    // Outdoor bus: muffled through the walls when you're inside.
+    outF = ctx.createBiquadFilter(); outF.type = 'lowpass'; outF.frequency.value = 9000; outF.connect(master);
     const f = noise(), ff = ctx.createBiquadFilter(); ff.type = 'lowpass'; ff.frequency.value = 220; fireG = ctx.createGain(); fireG.gain.value = 0; f.connect(ff); ff.connect(fireG); fireG.connect(master); f.start();
-    const w = noise(), wf = ctx.createBiquadFilter(); wf.type = 'bandpass'; wf.frequency.value = 400; wf.Q.value = 0.5; windG = ctx.createGain(); windG.gain.value = 0.05; w.connect(wf); wf.connect(windG); windG.connect(master); w.start();
+    const w = noise(); windF = ctx.createBiquadFilter(); windF.type = 'bandpass'; windF.frequency.value = 400; windF.Q.value = 0.6; windG = ctx.createGain(); windG.gain.value = 0.05; w.connect(windF); windF.connect(windG); windG.connect(outF); w.start();
     padG = ctx.createGain(); padG.gain.value = 0.04; const pf = ctx.createBiquadFilter(); pf.type = 'lowpass'; pf.frequency.value = 900; pf.connect(padG); padG.connect(master);
-    [130.8, 164.8, 196.0, 246.9].forEach((fr) => { const o = ctx.createOscillator(); o.type = 'triangle'; o.frequency.value = fr; o.connect(pf); o.start(); pad.push(o); });
+    CHORDS[0].forEach((fr, i) => { const o = ctx.createOscillator(); o.type = 'triangle'; o.frequency.value = fr; o.detune.value = (i - 1.5) * 3; o.connect(pf); o.start(); pad.push(o); });
+    nextChord = ctx.currentTime + 9;
   }
-  const tone = (f, d, v = 0.06, when = 0) => { if (!ctx) return; const t = ctx.currentTime + when; const o = ctx.createOscillator(); o.frequency.value = f; const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(v, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + d + 0.2); o.connect(g); g.connect(master); o.start(t); o.stop(t + d + 0.3); };
-  const burst = (dur, freq, vol, type = 'bandpass', q = 1) => { if (!ctx) return; const t = ctx.currentTime; const s = noise(); const bf = ctx.createBiquadFilter(); bf.type = type; bf.frequency.value = freq; bf.Q.value = q; const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(vol, t + 0.006); g.gain.exponentialRampToValueAtTime(0.0001, t + dur); s.connect(bf); bf.connect(g); g.connect(master); s.start(t, Math.random()); s.stop(t + dur + 0.05); };
+  const tone = (f, d, v = 0.06, when = 0, dest) => { if (!ctx) return; const t = ctx.currentTime + when; const o = ctx.createOscillator(); o.frequency.value = f; const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(v, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + d + 0.2); o.connect(g); g.connect(dest || master); o.start(t); o.stop(t + d + 0.3); };
+  const burst = (dur, freq, vol, type = 'bandpass', q = 1, when = 0, dest) => { if (!ctx) return; const t = ctx.currentTime + when; const s = noise(); const bf = ctx.createBiquadFilter(); bf.type = type; bf.frequency.value = freq; bf.Q.value = q; const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(vol, t + 0.006); g.gain.exponentialRampToValueAtTime(0.0001, t + dur); s.connect(bf); bf.connect(g); g.connect(dest || master); s.start(t, Math.random() * 1.5); s.stop(t + dur + 0.05); };
+  // Music-box note: a bright fundamental with a quickly decaying metallic partial.
+  const bell = (f, when, v = 0.05) => { tone(f, 1.1, v, when); tone(f * 4.2, 0.12, v * 0.25, when); tone(f * 2, 0.5, v * 0.3, when); };
   return {
     start, tone,
-    set(o) { if (!ctx) return; const t = ctx.currentTime; if (o.fire != null) fireG.gain.setTargetAtTime(o.fire * 0.22, t, 0.6); if (o.wind != null) windG.gain.setTargetAtTime(o.wind * 0.1, t, 1.2); if (o.pad != null) padG.gain.setTargetAtTime(o.pad * 0.04, t, 1.5); },
+    set(o) {
+      if (!ctx) return; const t = ctx.currentTime;
+      if (o.fire != null) fireG.gain.setTargetAtTime(o.fire * 0.22, t, 0.6);
+      if (o.wind != null) { windG.gain.setTargetAtTime(o.wind * 0.1, t, 0.8); windF.frequency.setTargetAtTime(320 + o.wind * 380, t, 0.8); }
+      if (o.pad != null) padG.gain.setTargetAtTime(o.pad * 0.04, t, 1.5);
+      if (o.inside != null) outF.frequency.setTargetAtTime(o.inside ? 650 : 9000, t, 0.35);
+      if (t > nextChord) { chordI = (chordI + 1) % CHORDS.length; CHORDS[chordI].forEach((fr, i) => pad[i].frequency.setTargetAtTime(fr, t, 1.8)); nextChord = t + 9 + Math.random() * 3; }
+    },
     click() { tone(1800, 0.01, 0.03); },
     crackle(dt, level) { if (ctx && Math.random() < dt * 10 * level) burst(0.04, 1500 + Math.random() * 2500, 0.1 * Math.random(), 'bandpass', 2); },
-    step(surface) { if (surface === 'snow') burst(0.13, 2400, 0.05, 'highpass', 0.7); else burst(0.06, 300, 0.07, 'bandpass', 1.4); },
+    step(surface, vol = 1) {
+      if (!ctx) return;
+      if (surface === 'snow') {
+        // Crunch: a dull compress then a short bright squeak, both slightly randomised.
+        burst(0.09, 500 + Math.random() * 200, 0.06 * vol, 'lowpass', 0.7);
+        burst(0.12 + Math.random() * 0.05, 2600 + Math.random() * 1400, 0.045 * vol, 'bandpass', 0.9, 0.025);
+      } else {
+        burst(0.07, 240 + Math.random() * 60, 0.09 * vol, 'lowpass', 1.2);
+        if (Math.random() < 0.18) { const t = ctx.currentTime + 0.04; const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.setValueAtTime(170, t); o.frequency.linearRampToValueAtTime(120 + Math.random() * 40, t + 0.22); const bf = ctx.createBiquadFilter(); bf.type = 'bandpass'; bf.frequency.value = 900; bf.Q.value = 6; const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.012 * vol, t + 0.05); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.26); o.connect(bf); bf.connect(g); g.connect(master); o.start(t); o.stop(t + 0.3); }
+      }
+    },
     blow() { burst(0.7, 1200, 0.12, 'highpass', 0.7); },
+    // "Happy Birthday to You" (Hill sisters, public domain) as a soft music box.
+    birthday() {
+      if (!ctx) return 0;
+      const G4 = 392, A4 = 440, B4 = 493.9, C5 = 523.3, D5 = 587.3, E5 = 659.3, F5 = 698.5, G5 = 784;
+      const b = 0.42, N = [[G4, 0.75], [G4, 0.25], [A4, 1], [G4, 1], [C5, 1], [B4, 2], [G4, 0.75], [G4, 0.25], [A4, 1], [G4, 1], [D5, 1], [C5, 2], [G4, 0.75], [G4, 0.25], [G5, 1], [E5, 1], [C5, 1], [B4, 1], [A4, 2], [F5, 0.75], [F5, 0.25], [E5, 1], [C5, 1], [D5, 1], [C5, 3]];
+      let at = 0.1; for (const [f, d] of N) { bell(f, at); at += d * b; }
+      return at;
+    },
+    chime() { bell(1046.5, 0, 0.03); bell(1568, 0.09, 0.025); },
   };
 })();
 
@@ -94,26 +139,30 @@ const tmpV = new THREE.Vector3();
 function Audio_ambience(focus, dt, fp) {
   const inside = G.inside(focus.x, focus.z);
   const dFire = Math.hypot(focus.x - 8, focus.z - 1);
-  G.Audio.set({ fire: inside ? clamp(1.4 - dFire * 0.25, 0, 1) * fp : 0, wind: inside ? 0.15 : 0.6 + STATE.tod * 0.2, pad: 1 });
+  const gust = WIND.gust;
+  G.Audio.set({ fire: inside ? clamp(1.4 - dFire * 0.25, 0, 1) * fp : 0, wind: (inside ? 0.35 : 0.45 + STATE.tod * 0.15) + gust * 0.55, pad: STATE.started ? 1 : 0.6, inside });
   if (inside) G.Audio.crackle(dt, fp * clamp(1.4 - dFire * 0.25, 0, 1));
 }
 
 /* ---------- snow ---------- */
 let SNOW;
+const SNOW_DAY = new THREE.Color('#ffe2d0'), SNOW_NIGHT = new THREE.Color('#c8d4ff');
+const SMOKE_DAY = new THREE.Color('#c4a8b0'), SMOKE_NIGHT = new THREE.Color('#3a4058');
 function snowSystem(n) {
   const pos = new Float32Array(n * 3), spd = new Float32Array(n);
   for (let i = 0; i < n; i++) { pos[i * 3] = rand(-18, 18); pos[i * 3 + 1] = rand(0, 12); pos[i * 3 + 2] = rand(-18, 18); spd[i] = rand(0.3, 0.8); }
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('spd', new THREE.BufferAttribute(spd, 1));
   const mat = new THREE.ShaderMaterial({
     transparent: true, depthWrite: false,
-    uniforms: { uTime: { value: 0 }, uCenter: { value: new THREE.Vector3() }, uPx: { value: 1 }, uLight: { value: new THREE.Color('#ffd6c0') } },
+    uniforms: { uTime: { value: 0 }, uDrift: { value: 0 }, uGust: { value: 0 }, uCenter: { value: new THREE.Vector3() }, uPx: { value: 1 }, uLight: { value: new THREE.Color('#ffd6c0') } },
     vertexShader: `
-      attribute float spd; uniform float uTime; uniform vec3 uCenter; uniform float uPx; varying float vA;
+      attribute float spd; uniform float uTime; uniform float uDrift; uniform float uGust; uniform vec3 uCenter; uniform float uPx; varying float vA;
       void main(){
         vec3 p = position;
         p.y = mod(p.y - uTime * spd, 12.0);
-        p.x += sin(uTime * 0.6 + position.z) * 0.3 + uTime * 0.15;
-        p.z += cos(uTime * 0.45 + position.x) * 0.25;
+        float sw = 0.25 + uGust * 0.35;
+        p.x += sin(uTime * 0.6 + position.z) * sw + uDrift * (0.8 + spd * 0.5);
+        p.z += cos(uTime * 0.45 + position.x) * sw * 0.8 - uDrift * 0.25;
         p.x = mod(p.x - uCenter.x + 18.0, 36.0) - 18.0 + uCenter.x;
         p.z = mod(p.z - uCenter.z + 18.0, 36.0) - 18.0 + uCenter.z;
         p.y += uCenter.y - 3.0;
@@ -141,10 +190,11 @@ function updateSmoke(dt) {
   for (const p of SMOKE) {
     p.age += dt; if (p.age > p.life) p.age -= p.life;
     const k = p.age / p.life;
-    p.s.position.set(G.CHIMNEY.x + k * 3.5 + Math.sin(p.age * 0.7 + p.age) * 0.5, G.CHIMNEY.y + k * 5, G.CHIMNEY.z - k * 1.2);
+    const blow = 2.5 + WIND.gust * 3;   // smoke leans further over in a gust
+    p.s.position.set(G.CHIMNEY.x + k * blow + Math.sin(p.age * 0.7 + p.age) * 0.5, G.CHIMNEY.y + k * (5.5 - WIND.gust * 1.5), G.CHIMNEY.z - k * 1.2);
     p.s.scale.setScalar(0.5 + k * 2.6);
-    p.s.material.opacity = Math.sin(k * Math.PI) * 0.07;
-    p.s.material.color.set(STATE.tod > 0.5 ? '#3a4058' : '#c4a8b0');
+    p.s.material.opacity = Math.sin(k * Math.PI) * 0.07 * (G.FIRE.on ? 1 : 0.15);
+    p.s.material.color.copy(SMOKE_DAY).lerp(SMOKE_NIGHT, STATE.tod);
   }
 }
 
@@ -380,8 +430,10 @@ function clampToWalls(target, desired) {
 const SHOTS = {
   follow(t) {
     const p = PLAYER, inside = G.inside(p.x, p.z) || G.underRoof(p.x, p.z);
-    const dist = (inside ? 1.75 : 2.9) * CAM.zoom, height = inside ? 1.58 : 1.72;
-    const tgt = new THREE.Vector3(p.x, p.y + height - (p.sit || 0) * 0.45, p.z);
+    // Running pulls the camera back a little and widens the lens; walking adds a faint step rhythm.
+    const dist = (inside ? 1.75 : 2.9) * CAM.zoom * (1 + CAM.run * (inside ? 0.06 : 0.16)), height = inside ? 1.58 : 1.72;
+    const bob = Math.sin(p.phase * 2) * 0.01 * clamp(p.speed / 1.5, 0, 1.5);
+    const tgt = new THREE.Vector3(p.x, p.y + height - (p.sit || 0) * 0.45 + bob, p.z);
     const right = new THREE.Vector3(Math.cos(CAM.yaw), 0, -Math.sin(CAM.yaw));
     tgt.addScaledVector(right, inside ? 0.32 : 0.42);
     const pitch = CAM.pitch + (inside ? 0.06 : 0);
@@ -390,15 +442,16 @@ const SHOTS = {
     pos.y = Math.max(pos.y, G.floorAt(pos.x, pos.z) + 0.35);
     if (G.inside(pos.x, pos.z)) pos.y = Math.min(pos.y, G.CAB.wallH - 0.15);
     const lookAhead = new THREE.Vector3(Math.sin(p.yaw), 0, Math.cos(p.yaw)).multiplyScalar(p.speed * 0.25);
-    return { pos, look: tgt.clone().add(lookAhead), fov: inside ? 50 : 46, focus: pos.distanceTo(tgt) + 0.2, aperture: 0.0025 };
+    return { pos, look: tgt.clone().add(lookAhead), fov: (inside ? 50 : 46) + CAM.run * 5, focus: pos.distanceTo(tgt) + 0.2, aperture: 0.0025 };
   },
   ots(subject, fg, side0 = 1) {
     // Over the foreground character's shoulder, framing the subject's face.
     const hs = G.headPos(subject), hf = G.headPos(fg);
     const d = new THREE.Vector3(hs.x - hf.x, 0, hs.z - hf.z); const dist = Math.max(0.5, d.length()); d.normalize();
     const side = new THREE.Vector3(d.z, 0, -d.x);
-    for (const sgn of [side0, -side0]) for (const back of [0.75, 0.5, 0.32]) {
-      const pos = hf.clone().addScaledVector(d, -back).addScaledVector(side, sgn * 0.3); pos.y = hf.y + 0.02;
+    // A little wider and further back than a tight OTS, so the near shoulder frames rather than blocks.
+    for (const sgn of [side0, -side0]) for (const back of [0.9, 0.6, 0.36]) {
+      const pos = hf.clone().addScaledVector(d, -back).addScaledVector(side, sgn * 0.4); pos.y = hf.y + 0.04;
       if (!blocked(hs, pos)) return { pos, look: hs.clone().add(new THREE.Vector3(0, -0.02, 0)), fov: 30, focus: pos.distanceTo(hs), aperture: 0.016 };
     }
     return SHOTS.twoShot();
@@ -428,6 +481,7 @@ G.SHOTS = SHOTS;
 let handT = 0;
 function updateCamera(dt, t) {
   const c = CAM;
+  c.run = damp(c.run || 0, clamp((PLAYER.speed - 1.6) / 1.4, 0, 1), 2.5, dt);
   if (G.keys.has('KeyZ') || G.keys.has('Comma')) { c.yaw += dt * 1.6; c.lastDrag = t; }
   if (G.keys.has('KeyC') || G.keys.has('Period')) { c.yaw -= dt * 1.6; c.lastDrag = t; }
   let s;
@@ -439,7 +493,9 @@ function updateCamera(dt, t) {
     c.idle = PLAYER.speed < 0.1 ? c.idle + dt : 0;
     s = SHOTS.follow(t);
     const dP = Math.hypot(PARTNER.x - PLAYER.x, PARTNER.z - PLAYER.z);
-    if (c.idle > 2.2 && t - c.lastDrag > 4 && dP < 3.2 && dP > 0.6 && PARTNER.sit < 0.5) {
+    // Only when she's actually turned toward you; otherwise this framed the back of her head.
+    const faces = (Math.sin(PARTNER.yaw) * (PLAYER.x - PARTNER.x) + Math.cos(PARTNER.yaw) * (PLAYER.z - PARTNER.z)) / Math.max(dP, 1e-3);
+    if (c.idle > 2.2 && t - c.lastDrag > 4 && dP < 3.2 && dP > 0.6 && PARTNER.sit < 0.5 && faces > 0.5 && PARTNER.pose !== 'warm') {
       const o = SHOTS.ots(PARTNER, PLAYER, 1), k = G.smooth(2.2, 4.5, c.idle);
       s = { pos: s.pos.clone().lerp(o.pos, k), look: s.look.clone().lerp(o.look, k), fov: lerp(s.fov, o.fov + 8, k), focus: lerp(s.focus, o.focus, k), aperture: lerp(s.aperture, o.aperture * 0.8, k) };
     }
@@ -473,7 +529,7 @@ addEventListener('blur', () => keys.clear());
 const hit = (...c) => c.some((k) => pressed.has(k));
 let drag = null;
 G.canvas.addEventListener('pointerdown', (e) => { drag = { id: e.pointerId, x: e.clientX, y: e.clientY }; try { G.canvas.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ } G.Audio.start(); });
-G.canvas.addEventListener('pointermove', (e) => { if (!drag || drag.id !== e.pointerId || CAM.shot) return; CAM.yaw -= (e.clientX - drag.x) * 0.006; CAM.pitch = clamp(CAM.pitch + (e.clientY - drag.y) * 0.004, -0.2, 0.85); drag.x = e.clientX; drag.y = e.clientY; CAM.lastDrag = performance.now() / 1000; });
+G.canvas.addEventListener('pointermove', (e) => { if (!drag || drag.id !== e.pointerId || CAM.shot) return; CAM.yaw -= (e.clientX - drag.x) * 0.006; CAM.pitch = clamp(CAM.pitch + (e.clientY - drag.y) * 0.004, -0.2, 0.85); drag.x = e.clientX; drag.y = e.clientY; CAM.lastDrag = G.simT; });
 G.canvas.addEventListener('pointerup', () => { drag = null; });
 G.canvas.addEventListener('wheel', (e) => { e.preventDefault(); CAM.zoom = clamp(CAM.zoom * (e.deltaY > 0 ? 1.1 : 0.9), 0.6, 1.8); }, { passive: false });
 const stick = { x: 0, y: 0, on: false };
@@ -525,9 +581,14 @@ function updateDialogue(dt) {
 $('subs').addEventListener('pointerdown', (e) => { e.preventDefault(); DLG.click = true; });
 function bark(text, dur = 2.6) { PARTNER.bark = { text, t: dur }; }
 function hint(text, dur = 5) { const h = $('hint'); h.textContent = text; h.classList.add('show'); clearTimeout(hint._t); hint._t = setTimeout(() => h.classList.remove('show'), dur * 1000); }
-const wait = (s) => new Promise((r) => setTimeout(r, s * 1000));
+// Waits run on the game clock, so a scene pauses with the tab instead of racing ahead of the dialogue.
+const TIMERS = [];
+const wait = (s) => new Promise((r) => TIMERS.push({ t: s, r }));
+const until = async (fn) => { while (!fn()) await wait(0.1); };
+function tickTimers(dt) { for (let i = TIMERS.length - 1; i >= 0; i--) if ((TIMERS[i].t -= dt) <= 0) { const r = TIMERS[i].r; TIMERS.splice(i, 1); r(); } }
 // Fade to black, run the setup, fade back in: a cinematic cut that also skips fiddly walking.
-async function cutTo(setup) { $('fade').classList.add('on'); await wait(0.65); setup(); CAM.cut = true; await wait(0.15); $('fade').classList.remove('on'); }
+async function cutTo(setup, hold = 0.15) { $('fade').classList.add('on'); await wait(0.65); setup(); CAM.cut = true; await wait(hold); $('fade').classList.remove('on'); }
+G.cutTo = cutTo; G.wait = wait;
 
 /* =====================================================================
  * Partner
@@ -537,7 +598,8 @@ function partnerAI(dt, t) {
   if (p.bark) { p.bark.t -= dt; if (p.bark.t <= 0) p.bark = null; }
   if (p.script) {
     const s = p.script;
-    if (steer(p, s.x, s.z, s.speed || 1.2, dt, 0.08)) { p.script = null; if (s.yaw != null) p.yaw = s.yaw; s.res && s.res(); }
+    s.t = (s.t || 0) + dt;
+    if (steer(p, s.x, s.z, s.speed || 1.2, dt, 0.08) || s.t > 12) { p.script = null; p.speed = 0; s.res && s.res(); }
     p.lookAt = null;
     return;
   }
@@ -549,13 +611,26 @@ function partnerAI(dt, t) {
     { const o = nearestOpen(...cellOf(tx, tz), 6); if (o && Math.hypot(cellPos(o[0], o[1]).x - PLAYER.x, cellPos(o[0], o[1]).z - PLAYER.z) < 1.6) { const q = cellPos(o[0], o[1]); tx = q.x; tz = q.z; } else { tx = PLAYER.x; tz = PLAYER.z; } }
     const d = Math.hypot(PLAYER.x - p.x, PLAYER.z - p.z);
     if (d > 1.15 || (p.speed > 0.05 && Math.hypot(tx - p.x, tz - p.z) > 0.25)) steer(p, tx, tz, clamp(d * 1.1, 0.8, PLAYER.speed > 2 ? 3.0 : 1.65), dt, 0.2);
-    else { p.speed = damp(p.speed, 0, 8, dt); p.yaw = angDamp(p.yaw, Math.atan2(PLAYER.x - p.x, PLAYER.z - p.z), 2, dt); }
+    else {
+      p.speed = damp(p.speed, 0, 8, dt);
+      // Warming her hands: turn to the fire, and only glance back at you now and then.
+      const fire = p.pose === 'warm';
+      p.yaw = angDamp(p.yaw, fire ? Math.atan2(FIRE_AT.x - p.x, FIRE_AT.z - p.z) : Math.atan2(PLAYER.x - p.x, PLAYER.z - p.z), fire ? 3 : 2, dt);
+      if (fire) { p.lookAt = Math.sin(t * 0.4) > 0.6 ? head(PLAYER) : null; return; }
+    }
     // Lost entirely (no route for a few seconds and far behind): catch up quietly behind the player.
     if (p.nav && p.nav.fail > 3 && d > 6) { const o = nearestOpen(...cellOf(PLAYER.x - Math.sin(PLAYER.yaw) * 1.2, PLAYER.z - Math.cos(PLAYER.yaw) * 1.2), 8); if (o) { const q = cellPos(o[0], o[1]); placeChar(p, q.x, q.z, PLAYER.yaw); p.nav = null; } }
     p.lookAt = head(PLAYER);
   }
 }
-const walkTo = (c, x, z, speed, yaw) => new Promise((res) => { c.script = { x, z, speed, yaw, res }; });
+// Scripted walk. An unreachable target (inside furniture) is moved to the nearest open spot, and a
+// walk that still can't finish gives up after a while, so a story beat can never hang on it.
+const walkTo = (c, x, z, speed, yaw) => new Promise((res) => {
+  if (!NAV.open) buildNav();
+  const cell = cellOf(x, z);
+  if (!isOpen(cell[0], cell[1])) { const o = nearestOpen(cell[0], cell[1], 10); if (o) { const q = cellPos(o[0], o[1]); x = q.x; z = q.z; } }
+  c.script = { x, z, speed, yaw, res, t: 0 };
+});
 G.walkTo = walkTo;
 
 /* =====================================================================
@@ -569,10 +644,11 @@ const Story = (G.Story = {
     PLAYER.script = { x: G.pathX(19) + 0.35, z: 19, speed: 1.05 };
     PARTNER.script = { x: G.pathX(18.6) - 0.45, z: 18.6, speed: 1.05 };
     setShot(() => SHOTS.rearPair(2.6, 0.15, 12, 46));
+    await wait(1.4);
     await G.say('partner', 'Look. Every window’s still glowing. We left all the lights on.', { shot: 'keep', auto: 4.2 });
     await G.say('player', 'You left all the lights on.', { shot: 'keep', auto: 2.6 });
     await G.say('partner', 'We did. It’s your birthday, so the cabin’s mine now. Those are the rules.', { shot: 'keep', auto: 4.2 });
-    await new Promise((r) => { const chk = () => (!PLAYER.script ? r() : setTimeout(chk, 100)); chk(); });
+    await until(() => !PLAYER.script);
     STATE.sceneShot = false; STATE.busy = false;
     PARTNER.mode = 'follow';
     releaseCamera();
@@ -584,10 +660,14 @@ const Story = (G.Story = {
     STATE.busy = true;
     PARTNER.mode = 'script';
     const cx = G.CAKE.g.position.x, cz = G.CAKE.g.position.z;
-    await walkTo(PARTNER, cx + 0.15, cz + 0.85, 1.3, Math.PI);
+    // Across the table from the sofa side, between table and hearth, so the candles light her face.
+    await walkTo(PARTNER, cx + 0.55, cz - 0.68, 1.3, 0);   // off-centre: right in front of the fire she'd be blown out by its light
     PARTNER.mode = 'follow'; STATE.busy = false;
     const cakeShot = () => { const p = new THREE.Vector3(cx + 0.55, 0.78, cz + 0.7), l = new THREE.Vector3(cx, 0.62, cz); return { pos: p, look: l, fov: 34, focus: p.distanceTo(l), aperture: 0.03 }; };
     await G.say(null, '(Five candles. Somebody counted very carefully.)', { shot: cakeShot });
+    // The snow globe on the mantle doubles as a music box.
+    const tune = G.Audio.birthday();
+    await G.say(null, '(She winds the snow globe on the mantle. It plays the birthday song, a little slow, and she hums along, off-key and completely sure of herself.)', { shot: cakeShot, auto: Math.max(5, tune + 0.4) });
     await G.say('partner', 'Wait. Make a wish first. A good one. Not a boring one.');
     await G.say('player', 'What counts as boring?');
     await G.say('partner', '“More sleep.” “A new kettle.” Anything you’d actually say out loud.');
@@ -614,13 +694,18 @@ const Story = (G.Story = {
     await G.say('player', 'I have to move eventually.', { shot: 'keep' });
     await G.say('partner', 'Eventually is a whole word away.', { shot: 'keep' });
     await wait(1.5);
-    PARTNER.tiltTarget = 0; PARTNER.leanTarget = 0; PARTNER.lidsClosed = false;
-    bl.visible = false;
-    for (const c of [PLAYER, PARTNER]) { c.sitTarget = 0; c.z = S.z - 0.75; }
-    PARTNER.x = S.x - 0.6;
-    PARTNER.mode = 'follow';
-    STATE.cuddled = true; STATE.busy = false; STATE.sceneShot = false;
-    releaseCamera();
+    // Stand up off-screen at either end of the sofa: the gap between sofa and coffee table is
+    // too narrow to stand in, so placing people there left them inside the table.
+    await cutTo(() => {
+      PARTNER.tiltTarget = PARTNER.tilt = 0; PARTNER.leanTarget = PARTNER.lean = 0; PARTNER.lidsClosed = false;
+      bl.visible = false;
+      placeChar(PLAYER, S.x + 1.55, S.z - 0.1, -Math.PI / 2 - 0.4);
+      placeChar(PARTNER, S.x - 1.55, S.z - 0.1, Math.PI / 2 + 0.4);
+      for (const c of [PLAYER, PARTNER]) { c.sitTarget = c.sit = 0; }
+      PARTNER.mode = 'follow'; PARTNER.nav = null;
+      STATE.cuddled = true; STATE.busy = false; STATE.sceneShot = false;
+      releaseCamera(); CAM.cut = true;
+    }, 0.3);
     hint('The bench on the porch has the best view of the sky.', 6);
   },
   async porch() {
@@ -646,24 +731,33 @@ const Story = (G.Story = {
   },
   closeEnd() {
     $('endcard').classList.remove('show');
-    PARTNER.tiltTarget = 0;
-    for (const c of [PLAYER, PARTNER]) { c.sitTarget = 0; c.z = G.BENCH.z + 0.55; }
-    PARTNER.mode = 'follow'; STATE.busy = false; STATE.sceneShot = false;
-    releaseCamera();
+    cutTo(() => {
+      PARTNER.tiltTarget = PARTNER.tilt = 0;
+      const B = G.BENCH;
+      placeChar(PLAYER, B.x + 0.38, B.z + 0.6, 0.15); placeChar(PARTNER, B.x - 0.42, B.z + 0.62, -0.1);
+      for (const c of [PLAYER, PARTNER]) { c.sitTarget = c.sit = 0; }
+      PARTNER.mode = 'follow'; PARTNER.nav = null; STATE.busy = false; STATE.sceneShot = false;
+      releaseCamera(); CAM.cut = true;
+    }, 0.3);
   },
 });
 async function hug() {
   if (busy() || Math.hypot(PARTNER.x - PLAYER.x, PARTNER.z - PLAYER.z) > 1.4 || PARTNER.sit > 0.2) return;
   STATE.busy = true;
   const a = Math.atan2(PARTNER.x - PLAYER.x, PARTNER.z - PLAYER.z);
-  PLAYER.yaw = a; PARTNER.yaw = a + Math.PI; PARTNER.speed = 0;
+  PARTNER.speed = 0; PARTNER.nav = null;
+  // Step in toward each other over a few frames instead of snapping, then settle out of any wall.
   const mx = (PLAYER.x + PARTNER.x) / 2, mz = (PLAYER.z + PARTNER.z) / 2;
-  PARTNER.x = mx + Math.sin(a) * 0.17; PARTNER.z = mz + Math.cos(a) * 0.17; PLAYER.x = mx - Math.sin(a) * 0.17; PLAYER.z = mz - Math.cos(a) * 0.17;
+  STATE.hugIn = { p: [mx - Math.sin(a) * 0.17, mz - Math.cos(a) * 0.17], q: [mx + Math.sin(a) * 0.17, mz + Math.cos(a) * 0.17], yaw: a };
   STATE.hugging = true; PARTNER.lidsClosed = true; PARTNER.tiltTarget = -0.2;
-  setShot(() => { const m = G.headPos(PARTNER); const side = new THREE.Vector3(Math.cos(a), 0, -Math.sin(a)); const pos = m.clone().addScaledVector(side, 0.9).add(new THREE.Vector3(Math.sin(a) * 0.5, -0.12, Math.cos(a) * 0.5)); return { pos, look: m, fov: 32, focus: pos.distanceTo(m), aperture: 0.018 }; });
+  // Side-on to the hug, favouring her face; try both sides and a closer fallback so walls never block it.
+  const side = new THREE.Vector3(Math.cos(a), 0, -Math.sin(a)), fwd = new THREE.Vector3(Math.sin(a), 0, Math.cos(a));
+  const camAt = (o) => { const m = G.headPos(PARTNER).add(new THREE.Vector3(0, -0.08, 0)); const pos = m.clone().addScaledVector(side, o[0] * o[2]).addScaledVector(fwd, o[1]); pos.y = m.y - 0.1; return { pos, look: m, fov: 34, focus: pos.distanceTo(m), aperture: 0.016 }; };
+  const pick = [[1, 0.55, 1.25], [-1, 0.55, 1.25], [1, 0.35, 0.9], [-1, 0.35, 0.9]].find((o) => { const c = camAt(o); return !blocked(c.look, c.pos); });
+  if (pick) setShot(() => camAt(pick));
   bark(['Mm. Hi.', 'You’re so warm. It’s unfair.', 'Ten out of ten hug.'][Math.floor(Math.random() * 3)]);
   await wait(2.6);
-  STATE.hugging = false; PARTNER.lidsClosed = false; PARTNER.tiltTarget = 0; STATE.busy = false;
+  STATE.hugging = false; STATE.hugIn = null; PARTNER.lidsClosed = false; PARTNER.tiltTarget = 0; STATE.busy = false;
   releaseCamera();
 }
 
@@ -681,7 +775,45 @@ function nearest() {
   }
   return best;
 }
-let stepT = 0;
+/* Small idle behaviours: warm hands at the fire, hug yourself in the cold, hands in pockets. */
+const FIRE_AT = { x: 8.0, z: 0.6 };   // the fire itself (inside the hearth), so 'face the fire' points at it
+function ambientPoses(dt) {
+  for (const c of [PLAYER, PARTNER]) {
+    const out = !G.inside(c.x, c.z) && !G.underRoof(c.x, c.z);
+    c.idleT = c.speed < 0.15 ? (c.idleT || 0) + dt : 0;
+    const toFire = Math.atan2(FIRE_AT.x - c.x, FIRE_AT.z - c.z);
+    let facing = toFire - c.yaw; while (facing > Math.PI) facing -= 2 * Math.PI; while (facing < -Math.PI) facing += 2 * Math.PI;
+    const nearFire = G.FIRE.on && G.inside(c.x, c.z) && Math.hypot(c.x - FIRE_AT.x, c.z - FIRE_AT.z) < 2.2;
+    let pose = null;
+    if (STATE.hugging || (c.sit || 0) > 0.2 || c.script) pose = null;
+    else if (nearFire && c === PARTNER && c.idleT > 1.2 && !busy()) pose = 'warm';   // not mid-conversation
+    else if (nearFire && c === PLAYER && c.idleT > 2.5 && Math.abs(facing) < 1.0) pose = 'warm';
+    else if (out && c === PARTNER && (STATE.tod > 0.35 || c.idleT > 5)) pose = 'cold';
+    else if (out && c === PLAYER && c.idleT > 3.5) pose = 'pockets';
+    c.pose = pose;
+  }
+}
+/* Partner talks a little on her own, rarely and only when nothing else is happening. */
+const AMBIENT = { cd: 20, used: new Set(), runT: 0 };
+const BARKS = [
+  { id: 'nose', when: (o) => o.out && STATE.tod > 0.6 && o.idle > 5, text: 'Your nose has gone pink. It’s very cute. Don’t fix it.' },
+  { id: 'listen', when: (o) => o.out && o.idle > 9, text: 'Shh. Listen. You can hear the snow landing.' },
+  { id: 'stars', when: (o) => o.out && STATE.tod > 0.8 && o.idle > 6, text: 'There are so many. Somebody really overdid it.' },
+  { id: 'run', when: (o) => o.out && AMBIENT.runT > 2.2, text: 'No running in the snow! …Fine. Wait for me!' },
+  { id: 'fire', when: (o) => o.nearFire && o.idle > 6, text: 'I could stay right here until spring.' },
+  { id: 'cake', when: (o) => STATE.cakeDone && o.inside && o.idle > 10, text: 'Is it too early for a second slice? It’s your birthday. You decide.' },
+  { id: 'cold', when: (o) => o.out && STATE.tod > 0.4 && o.idle > 14, text: 'Okay, my toes have officially resigned. Inside soon?' },
+];
+function ambientBarks(dt) {
+  const out = !G.inside(PLAYER.x, PLAYER.z) && !G.underRoof(PLAYER.x, PLAYER.z);
+  AMBIENT.runT = PLAYER.speed > 2.4 ? AMBIENT.runT + dt : 0;
+  AMBIENT.cd -= dt;
+  if (AMBIENT.cd > 0 || busy() || PARTNER.bark || STATE.watchDoor || (PARTNER.sit || 0) > 0.2) return;
+  if (Math.hypot(PARTNER.x - PLAYER.x, PARTNER.z - PLAYER.z) > 4.5) return;
+  const o = { out, inside: G.inside(PLAYER.x, PLAYER.z), idle: PLAYER.idleT || 0, nearFire: PARTNER.pose === 'warm' };
+  const b = BARKS.find((x) => !AMBIENT.used.has(x.id) && x.when(o));
+  if (b) { AMBIENT.used.add(b.id); bark(b.text, 4); AMBIENT.cd = 28 + Math.random() * 20; }
+}
 function step(dt, t) {
   updateDialogue(dt);
   let ix = (keys.has('KeyD') || keys.has('ArrowRight') ? 1 : 0) - (keys.has('KeyA') || keys.has('ArrowLeft') ? 1 : 0);
@@ -692,7 +824,8 @@ function step(dt, t) {
   const l = Math.hypot(ix, iy);
   if (PLAYER.script) {
     const s = PLAYER.script;
-    if (steer(PLAYER, s.x, s.z, s.speed || 1.2, dt, 0.08)) { PLAYER.script = null; s.res && s.res(); }
+    s.t = (s.t || 0) + dt;
+    if (steer(PLAYER, s.x, s.z, s.speed || 1.2, dt, 0.08) || s.t > 20) { PLAYER.script = null; s.res && s.res(); }
   } else {
     const run = keys.has('ShiftLeft') || keys.has('ShiftRight') || (stick.on && l > 0.95);
     const target = l > 0.05 ? (run ? 3.1 : 1.5) * Math.min(1, l) : 0;
@@ -704,6 +837,16 @@ function step(dt, t) {
     if (PLAYER.speed > 0.01) moveChar(PLAYER, Math.sin(PLAYER.yaw) * PLAYER.speed * dt, Math.cos(PLAYER.yaw) * PLAYER.speed * dt);
   }
   partnerAI(dt, t);
+  if (STATE.hugIn) {
+    const H = STATE.hugIn, kk = 1 - Math.exp(-8 * dt);
+    for (const [c, p, y] of [[PLAYER, H.p, H.yaw], [PARTNER, H.q, H.yaw + Math.PI]]) { moveChar(c, (p[0] - c.x) * kk, (p[1] - c.z) * kk); c.yaw = angDamp(c.yaw, y, 10, dt); c.speed = 0; }
+  }
+  // Personal space: she eases out of you rather than overlapping, except when you're hugging or seated together.
+  if (!STATE.hugging && !STATE.hugIn && (PARTNER.sit || 0) < 0.2 && (PLAYER.sit || 0) < 0.2) {
+    const dx = PARTNER.x - PLAYER.x, dz = PARTNER.z - PLAYER.z, d = Math.hypot(dx, dz), min = 0.5;
+    if (d < min) { const push = (min - d) * Math.min(1, dt * 8), ux = d > 1e-3 ? dx / d : 1, uz = d > 1e-3 ? dz / d : 0; moveChar(PARTNER, ux * push, uz * push); }
+  }
+  ambientPoses(dt);
   for (const c of [PLAYER, PARTNER]) {
     c.y = damp(c.y, c.yFloor != null ? c.yFloor : G.floorAt(c.x, c.z), 14, dt);
     c.sit = damp(c.sit || 0, c.sitTarget || 0, 5, dt);
@@ -711,12 +854,19 @@ function step(dt, t) {
     c.lean = damp(c.lean || 0, c.leanTarget || 0, 3, dt);
     c.hug = damp(c.hug || 0, STATE.hugging ? 1 : 0, 7, dt);
     G.animate(c, dt, t);
-    const lids = c.m.userData.lids;
-    if (lids) { const blink = (Math.sin(t * 0.9 + c.x * 3) > 0.995) || c.lidsClosed; lids.forEach((ld) => { ld.position.y = (blink ? 0.0085 : 0.0135) * c.m.userData.k; ld.scale.y = (blink ? 0.0125 : 0.0072) * c.m.userData.k; }); }
+    // Footsteps: sound and (on snow) a footprint at each heel strike.
+    if (c.stepEvent) {
+      const e = c.stepEvent; c.stepEvent = null;
+      const deck = G.onDeck(e.x, e.z);
+      const vol = c === PLAYER ? 1 : clamp(1.3 - Math.hypot(PARTNER.x - PLAYER.x, PARTNER.z - PLAYER.z) * 0.25, 0, 0.7);
+      if (vol > 0.02) G.Audio.step(deck ? 'wood' : 'snow', vol * clamp(c.speed / 1.5, 0.5, 1.4));
+      if (!deck && G.addFootprint) G.addFootprint(e.x, e.z, e.yaw, e.leg, c === PLAYER ? 1.05 : 0.9);
+    }
+    // Breath shows on each exhale whenever you're out in the cold.
+    const cyc = Math.floor((c.breath || 0) / (2 * Math.PI));
+    if (cyc !== c._cyc) { c._cyc = cyc; if (!G.inside(c.x, c.z)) G.breathe(c, c.speed > 2 ? 1.3 : 1); }
   }
   PLAYER.lookAt = Math.hypot(PARTNER.x - PLAYER.x, PARTNER.z - PLAYER.z) < 3 ? head(PARTNER) : null;
-  // Footsteps
-  if (PLAYER.speed > 0.4) { stepT -= dt * PLAYER.speed / 1.5; if (stepT <= 0) { stepT = 0.42; G.Audio.step(G.inside(PLAYER.x, PLAYER.z) || PLAYER.yFloor > -0.05 ? 'wood' : 'snow'); } }
   // Interaction prompt
   const it = free ? nearest() : null;
   const nearP = free && Math.hypot(PARTNER.x - PLAYER.x, PARTNER.z - PLAYER.z) < 1.4 && PARTNER.sit < 0.2;
@@ -729,6 +879,7 @@ function step(dt, t) {
   if (hit('KeyN')) STATE.todTarget = STATE.todTarget > 0.5 ? 0 : 1;
   if (STATE.watchDoor && G.inside(PLAYER.x, PLAYER.z)) { STATE.watchDoor = false; bark('Cake first. Then the sofa. Then the stars. I made a schedule.', 4); }
   if (STATE.watchDoor && PLAYER.z < 8.5 && !STATE.porchBark) { STATE.porchBark = true; bark('Inside, inside. My nose has stopped working.', 3); }
+  ambientBarks(dt);
 }
 function bubble(dt) {
   const el = $('bubble'), c = PARTNER;
@@ -759,33 +910,42 @@ function stats() {
 
 /* ---------- loop ---------- */
 let last = performance.now();
-function frame(now) {
-  requestAnimationFrame(frame);
-  const dt = Math.min(0.05, (now - last) / 1000); last = now;
-  const t = now / 1000;
-  fpsAcc += dt; fpsN++; if (fpsAcc > 0.5) { fps = fpsN / fpsAcc; fpsAcc = 0; fpsN = 0; stats(); }
+G.simT = 0;   // game clock: sum of (capped) frame steps, so everything pauses together with the tab
+function simulate(dt) {
+  G.simT += dt;
+  const t = G.simT;
+  tickTimers(dt);
   if (STATE.started) step(dt, t);
-  else { for (const c of [PLAYER, PARTNER]) G.animate(c, dt, t); }
-  if (!STATE.started) { CAM.shot = titleShot; }
+  else { for (const c of [PLAYER, PARTNER]) G.animate(c, dt, t); CAM.shot = titleShot; }
   updateCamera(dt, t);
   const focus = STATE.started ? new THREE.Vector3(PLAYER.x, PLAYER.y + 1, PLAYER.z) : new THREE.Vector3(6.5, 1, 8);
   updateLighting(t, dt, focus);
-  if (SNOW) { SNOW.material.uniforms.uTime.value = t; SNOW.material.uniforms.uCenter.value.copy(G.camera.position); SNOW.material.uniforms.uLight.value.set(STATE.tod > 0.5 ? '#c8d4ff' : '#ffe2d0'); }
+  updateWind(dt);
+  if (SNOW) { const U = SNOW.material.uniforms; U.uTime.value = t; U.uDrift.value = WIND.drift; U.uGust.value = WIND.gust; U.uCenter.value.copy(G.camera.position); U.uLight.value.copy(SNOW_DAY).lerp(SNOW_NIGHT, STATE.tod); }
   updateSmoke(dt);
+  G.updateFX(dt, t);
   grade.uniforms.uTime.value = t;
+  pressed.clear();
+}
+function frame(now) {
+  requestAnimationFrame(frame);
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  fpsAcc += dt; fpsN++; if (fpsAcc > 0.5) { fps = fpsN / fpsAcc; fpsAcc = 0; fpsN = 0; stats(); }
+  // Input pressed this frame must survive until simulate() reads it.
+  simulate(dt);
   composer.render(dt);
   bubble(dt);
-  pressed.clear();
 }
 
 /* ---------- boot ---------- */
 function boot() {
   G.buildTextures(); G.buildMaterials();
-  G.buildSky(); G.buildTerrain(); G.buildMountains(); G.buildForest(); G.buildPath(); G.buildCabin(); G.buildInterior();
+  G.buildSky(); G.buildTerrain(); G.buildMountains(); G.buildForest(); G.buildPath(); G.buildCabin(); G.buildInterior(); G.buildFX();
   SNOW = snowSystem(4500); smokeSystem();
   PLAYER.m = G.makeHuman({ height: 1.84, skin: '#d9ab8e', outfit: 'hoodie', top: '#3f4146', legs: '#25272c', hair: '#1e140f', hairStyle: 'shaggy', socks: '#2f2b28', seed: 11 });
   PARTNER.m = G.makeHuman({ height: 1.6, fem: true, skin: '#e8bfa4', outfit: 'sweater', legs: '#2c2626', hair: '#5e3a26', hairStyle: 'bun', socks: '#e6dccd', eyes: '#4a3020', lips: '#c47a70', seed: 23 });
   placeChar(PLAYER, G.pathX(27) + 0.35, 27, Math.PI); placeChar(PARTNER, G.pathX(27) - 0.45, 26.6, Math.PI);
+  PLAYER.hugPose = [-0.95, 0.25, -1.3, -0.7];   // he's taller: arms around her back rather than over her head
   buildNav();
   G.attachBlenderBody(PLAYER.m, 'player'); G.attachBlenderBody(PARTNER.m, 'partner');
   buildPost();
@@ -796,14 +956,23 @@ function boot() {
   G.applyQuality();
   CAM.shot = titleShot; CAM.cut = true;
   $('loading').classList.add('done');
-  $('begin').addEventListener('click', () => {
+  $('begin').addEventListener('click', async () => {
+    if (STATE.started || $('begin').disabled) return;
+    $('begin').disabled = true;
     G.Audio.start();
+    // Dip to black under the title, let the title dissolve, then open on the walk home.
+    $('fade').classList.add('on');
+    await wait(0.7);
     $('title').classList.add('hide');
     STATE.started = true;
     Story.intro();
+    await wait(0.9);
+    $('fade').classList.remove('on');
   });
   requestAnimationFrame(frame);
-  window.DEMO = { G, STATE, PLAYER, PARTNER, CAM, SHOTS, Story, skipIntro() { $('title').classList.add('hide'); STATE.started = true; DLG.q.length = 0; if (DLG.cur) { const r = DLG.cur.res; DLG.cur = null; } STATE.busy = false; STATE.sceneShot = false; PLAYER.script = null; PARTNER.script = null; STATE.watchDoor = false; placeChar(PLAYER, 6.5, 8.5, Math.PI); placeChar(PARTNER, 5.8, 8.8, Math.PI); PARTNER.mode = 'follow'; releaseCamera(); CAM.cut = true; }, setQ(q) { G.qName = q; G.applyQuality(); }, placeChar, simPartner(dt, n) { for (let i = 0; i < n; i++) partnerAI(dt, 0); } };
+  window.DEMO = { G, STATE, PLAYER, PARTNER, CAM, SHOTS, Story, skipIntro() { $('title').classList.add('hide'); STATE.started = true; DLG.q.length = 0; if (DLG.cur) { const r = DLG.cur.res; DLG.cur = null; } STATE.busy = false; STATE.sceneShot = false; PLAYER.script = null; PARTNER.script = null; STATE.watchDoor = false; placeChar(PLAYER, 6.5, 8.5, Math.PI); placeChar(PARTNER, 5.8, 8.8, Math.PI); PARTNER.mode = 'follow'; releaseCamera(); CAM.cut = true; }, setQ(q) { G.qName = q; G.applyQuality(); }, placeChar, simPartner(dt, n) { for (let i = 0; i < n; i++) partnerAI(dt, 0); },
+    // Testing aid: run the game for `sec` seconds of game time without rendering.
+    async advance(sec, dt = 1 / 30) { for (let k = 0; k < sec / dt; k++) { simulate(dt); await new Promise((r) => setTimeout(r, 0)); } }, keys, press(code) { pressed.add(code); keys.add(code); }, release(code) { keys.delete(code); }, STATE_DLG: DLG };
 }
 try { boot(); } catch (e) { console.error(e); $('loading').textContent = 'This demo needs WebGL. ' + e.message; }
 })();
