@@ -72,6 +72,26 @@ def smoothstep(a, b, x):
     return t * t * (3 - 2 * t)
 
 
+def hide_covered(name, idx, me, rings=2):
+    """Hide body skin under a garment (minus a margin at its edges) with a masked vertex group.
+    Stops skin poking through cloth, and is geometry the game never has to draw."""
+    bm = bpy.data.objects['human_' + name]
+    nbr = {}
+    for e in me.edges:
+        a, b = e.vertices
+        nbr.setdefault(a, []).append(b)
+        nbr.setdefault(b, []).append(a)
+    inner = set(idx)
+    for _ in range(rings):
+        inner = {i for i in inner if all(j in inner for j in nbr.get(i, ()))}
+    g = bm.vertex_groups.get('cbs_covered') or bm.vertex_groups.new(name='cbs_covered')
+    g.add(list(inner), 1.0, 'REPLACE')
+    m = bm.modifiers.get('cbs_hide_covered') or bm.modifiers.new('cbs_hide_covered', 'MASK')
+    m.vertex_group = 'cbs_covered'
+    m.invert_vertex_group = True
+    return len(inner)
+
+
 # ---------------------------------------------------------------- knit textures
 
 
@@ -273,6 +293,7 @@ def build_sweater(name, cfg=None):
             return r[1][1] < cfg['sleeve_over_hand']
         return False
 
+    hide_covered(name, [i for i in region if keep(i) and region[i][0] != 'hand'], me)
     b = bmesh.new()
     b.from_mesh(me)
     b.verts.ensure_lookup_table()
@@ -508,7 +529,7 @@ def build_sweater(name, cfg=None):
 
 
 LEGWEAR = {
-    'partner': dict(color=(0.03, 0.028, 0.03), top=0.08, ankle=0.06, offset=0.0025, name='legs.partner'),
+    'partner': dict(color=(0.03, 0.028, 0.03), top=0.08, ankle=0.06, offset=0.003, name='legs.partner'),
 }
 
 
@@ -529,11 +550,11 @@ def build_leggings(name, cfg=None):
         if abs(p.x) < 0.2 and p.z > pelvis.z - 0.12:
             return abs(p.x) < 0.19
         return any((p - seg_closest(p, a, k)[0]).length < 0.12 or (p - seg_closest(p, k, f)[0]).length < 0.09 for a, k, f in legs)
+    inside = [v.index for v in me.vertices if v.index in body and ank_z + cfg['ankle'] < v.co.z < top and on_leg(v.co)]
+    hide_covered(name, inside, me)
     kill = [f for f in b.faces if not all(v.index in body and ank_z + cfg['ankle'] < v.co.z < top and on_leg(v.co) for v in f.verts)]
     bmesh.ops.delete(b, geom=kill, context='FACES')
     bmesh.ops.delete(b, geom=[v for v in b.verts if not v.link_faces], context='VERTS')
-    bmesh.ops.smooth_laplacian_vert(b, verts=list(b.verts), lambda_factor=0.4, lambda_border=0.0, use_x=True, use_y=True, use_z=True,
-                                    preserve_volume=True)
     b.normal_update()
     for v in b.verts:
         v.co += v.normal * cfg['offset']
