@@ -21,16 +21,15 @@ from mathutils import Vector
 def evaluated_body(name):
     """World-space coordinates of the basemesh with shape keys, plus the joint centres."""
     bm = bpy.data.objects['human_' + name]
-    mask = bm.modifiers.get('Hide helpers')
-    old = mask.show_viewport if mask else None
-    if mask:
-        mask.show_viewport = False
+    masks = [(m, m.show_viewport) for m in bm.modifiers if m.type == 'MASK']   # keep every vertex so indices match
+    for m, _ in masks:
+        m.show_viewport = False
     dg = bpy.context.evaluated_depsgraph_get()
     dg.update()
     ev = bm.evaluated_get(dg)
     me = bpy.data.meshes.new_from_object(ev, preserve_all_data_layers=True, depsgraph=dg)
-    if mask:
-        mask.show_viewport = old
+    for m, old in masks:
+        m.show_viewport = old
     me.transform(bm.matrix_world)
     idx = {g.index: g.name for g in bm.vertex_groups}
     acc, body = {}, set()
