@@ -19,7 +19,7 @@ from mathutils import Vector
 
 
 def evaluated_body(name):
-    """World-space coordinates of the basemesh with shape keys, plus the joint centres."""
+    """Local-space mesh of the basemesh with shape keys applied, plus the joint centres."""
     bm = bpy.data.objects['human_' + name]
     masks = [(m, m.show_viewport) for m in bm.modifiers if m.type == 'MASK']   # keep every vertex so indices match
     for m, _ in masks:
@@ -30,7 +30,7 @@ def evaluated_body(name):
     me = bpy.data.meshes.new_from_object(ev, preserve_all_data_layers=True, depsgraph=dg)
     for m, old in masks:
         m.show_viewport = old
-    me.transform(bm.matrix_world)
+    # Garments are parented to the body, so everything is built in the body's local space.
     idx = {g.index: g.name for g in bm.vertex_groups}
     acc, body = {}, set()
     for v in bm.data.vertices:
@@ -710,7 +710,7 @@ def build_hoodie(name='player'):
     cord.node_tree.nodes['Principled BSDF'].inputs['Base Color'].default_value = (0.55, 0.53, 0.5, 1)
     dg = bpy.context.evaluated_depsgraph_get()
     sme = sw.evaluated_get(dg).to_mesh()
-    surf = [sw.matrix_world @ v.co for v in sme.vertices]
+    surf = [v.co.copy() for v in sme.vertices]
     sw.evaluated_get(dg).to_mesh_clear()
     for sx in (-1, 1):
         pts = []
