@@ -458,9 +458,40 @@ def retexture():
                     n.image = small_copy(orig, TEX[kind(base)], 'PNG' if alpha else 'JPEG')
 
 
+def strip_cornea(ob):
+    """MPFB's eyes are an eyeball plus a clear cornea shell (UVs in the texture's corner). In Blender the
+    cornea is see-through; in the game it would cover the iris in white. The game doesn't need it."""
+    b = bmesh.new()
+    b.from_mesh(ob.data)
+    uvl = b.loops.layers.uv.active
+    seen, kill = set(), []
+    for f in b.faces:
+        if f.index in seen:
+            continue
+        comp, stack = [], [f]
+        while stack:
+            x = stack.pop()
+            if x.index in seen:
+                continue
+            seen.add(x.index)
+            comp.append(x)
+            stack.extend(g for e in x.edges for g in e.link_faces if g.index not in seen)
+        us = [l[uvl].uv.x for g in comp for l in g.loops]
+        if sum(us) / len(us) > 0.85:
+            kill.extend(comp)
+    bmesh.ops.delete(b, geom=kill, context='FACES')
+    bmesh.ops.delete(b, geom=[v for v in b.verts if not v.link_faces], context='VERTS')
+    b.to_mesh(ob.data)
+    b.free()
+    return len(kill)
+
+
 def optimise():
     for name in NAMES:
         arm = body(name).parent
+        for o in parts(name):
+            if 'high-poly' in o.name:
+                strip_cornea(o)
         join_same_materials(name)
         for o in parts(name):
             merge_slots(o)
