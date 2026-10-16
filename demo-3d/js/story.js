@@ -835,6 +835,7 @@ CH.prologue = async () => {
   PARTNER.stillLook = { x: L.x + 2.5, z: L.z + 5, headY: L.seatY + 0.1 };                          // and away again
   await N('(Snow. Cold air. Lanterns, somewhere behind you. Somebody else who had wandered off.)', { shot: 'keep' });
   const c1 = await choose(['“Are you lost?”', '“Is this seat taken?”', 'Just sit down next to her']);
+  S.flags.fairOpen = c1;   // remembered (or not) in the evening, at the photograph
   const sitShot = () => { const pos = V(L.x - 0.3, L.seatY + 0.42, L.z + 2.3), look = V(L.x - 0.2, L.seatY + 0.32, L.z); return { pos, look, fov: 36, focus: pos.distanceTo(look), aperture: 0.02 }; };
   const sitDown = () => G.cutTo(() => { G.sitAt(PLAYER, L.x - 0.55, L.z + 0.02, 0.1, L.seatY); PARTNER.stillLook = { x: L.x, z: L.z + 8, headY: L.seatY + 0.4 }; G.setShot(sitShot); });
   if (c1 === 0) {
@@ -941,7 +942,7 @@ CH.prologue = async () => {
   if (cw === 0) { await wait(Math.min(1.6, G.Audio.whistle(1.05) + 0.2)); await P('No, that’s mine. …Fine. We can share it.', { shot: sitShot }); }
   else if (cw === 1) { G.Audio.whistle(0.98, 0.5); await wait(1.5); await P('That’s the same as mine but worse.', { shot: sitShot }); await P('…It can be both of ours.', { shot: sitShot }); }
   else { G.Audio.whistle(1.0, 1.4); await wait(1.5); await N('(It comes out as mostly air.)', { shot: sitShot }); await P('You’ll get better.', { shot: sitShot }); }
-  S.flags.fairWhistle = 1;
+  S.flags.fairWhistle = 1; S.flags.fairWhistleKind = cw;
   await P('Will you be here tomorrow?', { shot: sitShot });
   const c4 = await choose(['“I’ll be here.”', '“Every day.”', 'Hold out your little finger']);
   if (c4 === 2) {
@@ -1098,5 +1099,160 @@ bench.label = () => (ch() === 'evening' ? (STATE.porchDone ? 'Bench' : 'Watch th
 bench.act = () => { if (ch() === 'evening') return G.Story.porch(); return run(() => sitFree(SEATS.bench), 'bench'); };
 G.$('pScrap').addEventListener('click', () => { G.UI.scrapbook(S.scrap); });
 // For the other story files (life.js, walk.js): the same helpers this file uses.
-G.SAPI = { S, P, Y, N, Pt, choose, wait, until, pick, dist, near, addBond, addRivalry, addScrap, cyc, checkpoint, inter, run, rewire, findInter, react, REACT, ABOUT, ROOM, DAY, SMALL, SEATS, JOIN, sitFree, canHear, hereRoom, room, sameRoom, fixed, V, CH, go, quiet, houseFor, setBreakfast, setLamps, showFair, morning };
+/* =====================================================================
+ * The evening, after the cake: the photograph in the hall, the porch lanterns and her present,
+ * and the firefly on the bench.
+ * ===================================================================== */
+const EVE = (G.EVE = {});
+// The photograph: painted here, so it can be the night you actually had (who ended up with the scarf).
+function paintPhoto() {
+  const cv = document.createElement('canvas'); cv.width = 320; cv.height = 240; const x = cv.getContext('2d');
+  const sky = x.createLinearGradient(0, 0, 0, 240); sky.addColorStop(0, '#26304a'); sky.addColorStop(0.55, '#52577a'); sky.addColorStop(1, '#c9c6d4');
+  x.fillStyle = sky; x.fillRect(0, 0, 320, 240);
+  // lanterns, out of focus behind them
+  for (let i = 0; i < 14; i++) { const lx = 20 + i * 22 + Math.sin(i * 3.1) * 6, ly = 78 + Math.sin(i * 1.7) * 10, r = 9 + (i % 3) * 3; const g = x.createRadialGradient(lx, ly, 0, lx, ly, r); g.addColorStop(0, 'rgba(255,214,140,0.95)'); g.addColorStop(0.6, 'rgba(255,170,80,0.45)'); g.addColorStop(1, 'rgba(255,150,60,0)'); x.fillStyle = g; x.beginPath(); x.arc(lx, ly, r, 0, 7); x.fill(); }
+  // dark trees at the edges
+  x.fillStyle = 'rgba(28,36,40,0.85)'; for (const [tx, h] of [[18, 120], [44, 90], [292, 110], [268, 80]]) { x.beginPath(); x.moveTo(tx, 170 - h); x.lineTo(tx - 22, 172); x.lineTo(tx + 22, 172); x.fill(); }
+  // snow, and the log
+  x.fillStyle = '#e7e6ee'; x.fillRect(0, 168, 320, 72);
+  x.fillStyle = '#5a4434'; x.fillRect(96, 172, 136, 16); x.fillStyle = '#efeef5'; x.fillRect(98, 168, 132, 5);
+  // two small figures on it
+  const kid = (cx, coat, hat, scarf) => { x.fillStyle = coat; x.fillRect(cx - 11, 140, 22, 32); x.fillStyle = '#e9c3a8'; x.beginPath(); x.arc(cx, 132, 9, 0, 7); x.fill(); x.fillStyle = hat; x.beginPath(); x.arc(cx, 128, 9.5, Math.PI, 0); x.fill(); x.beginPath(); x.arc(cx, 117, 3.5, 0, 7); x.fill(); if (scarf) { x.fillStyle = '#b8322a'; x.fillRect(cx - 10, 140, 20, 6); x.fillRect(cx + 2, 144, 5, 14); } x.fillStyle = '#3b3440'; x.fillRect(cx - 9, 172, 7, 12); x.fillRect(cx + 2, 172, 7, 12); };
+  const given = !!S.flags.scarfGiven;
+  kid(145, '#3a3f4a', '#5b5f68', !given);   // him
+  kid(183, '#d9cfbf', '#ece4d6', given);    // her
+  // falling snow, grain, a soft vignette: an old print
+  x.fillStyle = 'rgba(255,255,255,0.8)'; for (let i = 0; i < 90; i++) { x.beginPath(); x.arc((i * 73) % 320, (i * 151) % 240, 0.6 + (i % 3) * 0.5, 0, 7); x.fill(); }
+  const id = x.getImageData(0, 0, 320, 240), d = id.data; for (let i = 0; i < d.length; i += 4) { const n = (Math.random() - 0.5) * 18; d[i] = Math.min(255, d[i] * 1.04 + n + 8); d[i + 1] += n + 2; d[i + 2] = d[i + 2] * 0.9 + n; } x.putImageData(id, 0, 0);
+  const vg = x.createRadialGradient(160, 120, 60, 160, 120, 200); vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(40,25,10,0.5)'); x.fillStyle = vg; x.fillRect(0, 0, 320, 240);
+  const t = new THREE.CanvasTexture(cv); t.encoding = THREE.sRGBEncoding; return t;
+}
+// The frame on the hall wall, by the coats: empty until the evening.
+(function buildFrame() {
+  const g = new THREE.Group(); g.position.set(7.75, 1.52, 4.43); g.rotation.y = Math.PI;   // facing into the room
+  const wood = G.MAT.darkWood || G.std({ color: '#3a2a20' });
+  const bar = (w, h, x2, y2) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.03), wood); m.position.set(x2, y2, 0); m.castShadow = true; g.add(m); };
+  bar(0.44, 0.04, 0, 0.17); bar(0.44, 0.04, 0, -0.17); bar(0.04, 0.38, -0.2, 0); bar(0.04, 0.38, 0.2, 0);
+  const back = new THREE.Mesh(new THREE.PlaneGeometry(0.36, 0.3), G.std({ color: '#efe6d6', roughness: 0.9 })); back.position.z = -0.004; g.add(back);
+  const photo = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 0.225), G.std({ color: '#ffffff', roughness: 0.6 })); photo.position.z = 0.002; photo.visible = false; g.add(photo);
+  G.world.add(g); EVE.photo = photo;
+})();
+EVE.showPhoto = () => { if (EVE.photo.visible) return; EVE.photo.material.map = paintPhoto(); EVE.photo.material.needsUpdate = true; EVE.photo.visible = true; };
+// Paper lanterns on a string along the porch beam, unlit until the evening.
+(function buildLanterns() {
+  const mat = G.std({ color: '#d99a5c', roughness: 0.85, emissive: '#ff7a24', emissiveIntensity: 0 });   // warm paper, not bulbs
+  const wire = G.std({ color: '#2a2420', roughness: 0.9 });
+  EVE.lanterns = []; EVE.lanternMat = mat;
+  const x0 = 4.2, x1 = 11.0, n = 9, y = 2.18, z = 6.42;
+  for (let i = 0; i < n; i++) {
+    const t = i / (n - 1), lx = x0 + (x1 - x0) * t, sag = Math.sin(t * Math.PI) * 0.16 * 0 + Math.sin(((t * (n - 1)) % 1) * Math.PI) * 0.0;
+    const m = new THREE.Mesh(new THREE.SphereGeometry(0.11, 14, 10), mat); m.scale.set(1, 1.15, 1); m.position.set(lx, y - 0.14 - Math.abs(Math.sin(i * 1.3)) * 0.04 - sag, z); m.castShadow = false; G.world.add(m); EVE.lanterns.push(m);
+  }
+  const line = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.004, x1 - x0 + 0.3, 4), wire); line.rotation.z = Math.PI / 2; line.position.set((x0 + x1) / 2, y, z); G.world.add(line);
+})();
+// The firefly: a small light that should not be here. Made at boot, so nothing compiles mid-scene.
+(function buildFirefly() {
+  const cv = document.createElement('canvas'); cv.width = cv.height = 64; const x = cv.getContext('2d'); const g = x.createRadialGradient(32, 32, 0, 32, 32, 32); g.addColorStop(0, 'rgba(255,255,220,1)'); g.addColorStop(0.25, 'rgba(220,255,120,0.8)'); g.addColorStop(1, 'rgba(160,255,80,0)'); x.fillStyle = g; x.fillRect(0, 0, 64, 64);
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(cv), color: new THREE.Color(4, 4.5, 2), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0, fog: false, toneMapped: false }));
+  s.scale.setScalar(0.16); s.visible = false; G.scene.add(s);
+  // a bright core, so it reads as a point of light whatever the post-processing does to the halo
+  const core = new THREE.Mesh(new THREE.SphereGeometry(0.012, 8, 6), new THREE.MeshBasicMaterial({ color: new THREE.Color(1.9, 3.2, 0.7), transparent: true, opacity: 0, toneMapped: false, fog: false }));
+  s.add(core); core.scale.setScalar(1 / 0.16);
+  EVE.fly = { s, core, on: false, t: 0 };
+  G.TICKERS.add((dt) => {
+    const F = EVE.fly; if (!F.on) { if (s.visible) s.visible = false; return; }
+    F.t += dt; s.visible = true;
+    const B = G.BENCH, t = F.t;
+    // drifting in from the right, down through the snow, wandering in front of the bench
+    const k = Math.min(1, t / 6);
+    // out past the porch posts, in the open air in front of the bench
+    s.position.set(B.x + 2.2 - k * 2.5 + Math.sin(t * 0.9) * 0.3, 2.2 - k * 0.85 + Math.sin(t * 1.7) * 0.1, B.z + 2.5 + Math.sin(t * 0.6) * 0.25);
+    const blink = Math.max(0, Math.min(1, Math.sin(t * 1.5) * 2.2 + 1.3)) * (0.8 + 0.2 * Math.sin(t * 7.3));   // mostly lit, short dark gaps
+    s.material.opacity = blink * Math.min(1, t * 1.5); core.material.opacity = s.material.opacity;
+  });
+})();
+G.TICKERS.add((dt) => { const want = S.flags.lanternsLit ? 0.85 * (0.94 + Math.sin(G.simT * 3.1) * 0.04) : 0; EVE.lanternMat.emissiveIntensity = G.damp(EVE.lanternMat.emissiveIntensity, want, 3, dt); });
+
+// The frame: empty all day; after the cake, a photograph nobody put there.
+inter('frame', [7.75, 1.4, 4.15], 0.8, () => (EVE.photo.visible ? 'Photograph' : 'Empty frame'), async () => {
+  if (!EVE.photo.visible) { await N(cyc('frame', ['(The frame in the hall. It has been empty for as long as you’ve lived here. Partner says it’s “waiting for the right one”.)', '(Still empty. Still waiting, apparently.)'])); return; }
+  if (S.flags.photoSeen) { await N(cyc('photo', ['(Two children in the snow. You look for a long time and it still doesn’t become a memory.)', '(The lanterns in it look brighter than they did. Probably the fire.)'])); return; }
+  // Step to one side of it, so you can both look (and the camera can see it, over your shoulder).
+  await G.slideTo(PLAYER, 7.3, 3.86, Math.atan2(7.75 - 7.3, 4.43 - 3.86), 0.45);
+  const shot = fixed(V(8.45, 1.62, 3.35), V(7.72, 1.5, 4.43), 32, 0.014);
+  await N('(The frame isn’t empty any more.)', { shot });
+  await N('(A photograph. Two children in the snow, side by side on a log, lanterns blurred behind them. ' + (S.flags.scarfGiven ? 'The girl is wearing a red scarf that is far too big for her.' : 'The boy has a red scarf on. The girl hasn’t got one at all.') + ')', { shot });
+  // Fetch her: she ought to see this.
+  if (!canHear() || dist() > 2.2) await Y('Partner? Come and look at this.', { shot });
+  PARTNER.mode = 'script'; await G.walkTo(PARTNER, 8.05, 3.72, 1.3, Math.atan2(7.75 - 8.05, 4.43 - 3.72)); PARTNER.mode = 'still'; PARTNER.stillLook = { x: 7.75, z: 4.43, headY: 1.5 };
+  G.gaze(PARTNER, [7.75, 1.5, 4.43], 6);
+  await P('Did you put that there?', { shot });
+  const c0 = await choose(['“I thought you did.”', '“I found it in the study.”', '“Is that us?”']);
+  if (c0 === 1) { await P('You did not. The study is locked. I have the only key, and it is in my sock.', { shot }); }
+  else if (c0 === 0) await P('I’ve never seen it before in my life.', { shot });
+  await P('That’s us. Isn’t it.', { shot });
+  await N('(Neither of you remembers anyone taking it.)', { shot });
+  // What do you remember? You agree on almost nothing.
+  await P('All right. What do you remember. The scarf: it was blue.', { shot });
+  const c1 = await choose(['“It was red.”', '“It was blue.”', '“There wasn’t a scarf.”']);
+  if (c1 === 0) await P(S.flags.scarfGiven ? 'It was blue. Red is the one you have now. You’re mixing them up.' : 'Blue. I would stake the cake on it. What’s left of the cake.', { shot });
+  else if (c1 === 1) await P('…Now you agree with me I’m not sure. That’s very unsettling, Partner.', { shot });
+  else await P('There is a scarf right there in the photograph. …Although I don’t remember it.', { shot });
+  await P('There were three trees. By the log.', { shot });
+  const c2 = await choose(['“Two.”', '“A whole forest.”', '“I don’t remember any trees.”']);
+  await P(['Three. One of them was leaning.', 'It was a fair, Partner, not a forest. There were three.', 'You were looking at something else, then.'][c2], { shot });
+  if (c2 === 2) await N('(You were. You don’t say what.)', { shot });
+  await P('And the first thing you said to me. What was it?', { shot });
+  const open = S.flags.fairOpen;
+  const c3 = await choose(['“Are you lost?”', '“Is this seat taken?”', '“Nothing. I just sat down.”']);
+  if (open != null && c3 === open) await N('(It’s the right answer. You don’t know how you know.)', { shot });
+  await P('I remember it being “nice hat”.', { shot });
+  await Y('I would never say “nice hat”.', { shot });
+  await P('You were seven. You said all sorts.', { shot });
+  await N('(You agree on nothing at all. Not the scarf, not the trees, not a word of it.)', { shot });
+  await P('Except…', { shot });
+  await wait(Math.min(1.8, G.Audio.whistle(1.12) + 0.3));
+  const c4 = await choose(['Whistle it back', 'Hum it', 'Just smile at her']);
+  if (c4 === 0) { await wait(Math.min(1.8, G.Audio.whistle(S.flags.fairWhistleKind === 1 ? 0.98 : 1.05, S.flags.fairWhistleKind === 2 ? 0.9 : 0) + 0.3)); await N(S.flags.fairWhistleKind === 2 ? '(It still comes out as mostly air. She looks delighted.)' : '(Three notes. You both know them. You always have.)', { shot }); }
+  else if (c4 === 1) await N('(You hum it. Three notes. She nods along as if checking your work.)', { shot });
+  else await N('(You don’t have to whistle it. You both know how it goes.)', { shot });
+  await P('Three notes. That we agree on.', { shot });
+  await N('(When you look at the photograph again, the lanterns in it seem a little brighter. Probably the fire.)', { shot });
+  S.flags.photoSeen = 1; addBond(0.3); PARTNER.mode = 'follow'; PARTNER.stillLook = null;
+  G.hint('The paper lanterns for the porch are in the box by the door.', 6);
+}, () => S.chapter === 'evening' || S.chapter === 'morning');
+
+// The porch lanterns, and her present from the study.
+inter('lanterns', [7.9, 1.0, 5.9], 1.1, () => (S.flags.lanternsLit ? 'Lanterns' : 'Light the porch lanterns'), async () => {
+  if (S.flags.lanternsLit) { await N(cyc('lanternsLit', ['(Nine paper lanterns, nodding a little in the wind.)', '(One of them is crooked. It was crooked last year too.)'])); return; }
+  const shot = fixed(V(7.6, 1.25, 8.6), V(7.6, 1.7, 6.0), 46, 0.008);
+  await N('(The lantern box: string, a lighter, nine paper lanterns that have done this every year.)', { shot });
+  S.flags.lanternsLit = 1; G.Audio.chime && G.Audio.chime();
+  await N('(One by one, along the porch, they come on.)', { shot, auto: 3.2 });
+  if (!canHear() || dist() > 3) { PARTNER.mode = 'script'; await G.walkTo(PARTNER, 7.0, 5.7, 1.2); PARTNER.mode = 'follow'; }
+  G.gaze(PARTNER, [PLAYER.x, PLAYER.y + 1.6, PLAYER.z], 8);
+  const close = fixed(V(PLAYER.x + 1.2, 1.5, PLAYER.z + 1.6), V((PLAYER.x + PARTNER.x) / 2, 1.3, (PLAYER.z + PARTNER.z) / 2), 38, 0.012);
+  await P('Close your eyes. Hold out your hands. Both of them.', { shot: close });
+  await P('…Not like that. You look like you’re expecting a fish.', { shot: close });
+  await N('(Something small and cold and heavy. A snow globe.)', { shot: close });
+  await N('(Inside it: a log, two small figures, a string of lanterns no bigger than seeds. And trees.)', { shot: close });
+  await P('It’s the night we met. The study has been full of glue for a month.', { shot: close });
+  const c = await choose(['“How many trees are there?”', '“It’s perfect.”', 'Shake it']);
+  if (c === 0) {
+    await P('Seven. I didn’t remember how many there were, so I guessed.', { shot: close });
+    if (S.flags.photoSeen) { await Y('You said three, earlier.', { shot: close }); await P('Earlier I was remembering. Now I’m guessing. It’s completely different.', { shot: close }); }
+  } else if (c === 1) {
+    await P('It isn’t. The log is a cinnamon stick. Don’t tell anyone.', { shot: close });
+  } else {
+    await N('(The snow goes up, and comes down slowly over the two of them, the way it did.)', { shot: close });
+    await P('Careful. That’s the only weather we’ve got.', { shot: close });
+  }
+  if (S.flags.fairWish === 'snow') await P('I wanted it to be snowing in there forever. Somebody wished for that once.', { shot: close });
+  await P('Happy first snow, Partner. Again.', { shot: close });
+  S.flags.presentGiven = 1; addBond(0.4);
+  addScrap('globe', 'A snow globe of the night we met. Seven trees, a cinnamon-stick log, and a month of glue.');
+  G.hint('The bench on the porch has the best view of the sky.', 5);
+}, () => S.chapter === 'evening');
+
+G.SAPI = { EVE, S, P, Y, N, Pt, choose, wait, until, pick, dist, near, addBond, addRivalry, addScrap, cyc, checkpoint, inter, run, rewire, findInter, react, REACT, ABOUT, ROOM, DAY, SMALL, SEATS, JOIN, sitFree, canHear, hereRoom, room, sameRoom, fixed, V, CH, go, quiet, houseFor, setBreakfast, setLamps, showFair, morning };
 });

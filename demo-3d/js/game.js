@@ -1086,6 +1086,7 @@ const Story = (G.Story = {
     await G.say('partner', 'Happy first snow, {giant}.');
     await G.say('player', 'Happy first snow.');
     STATE.cakeDone = true;
+    if (G.EVE && G.EVE.showPhoto) { G.EVE.showPhoto(); wait(4).then(() => hint('Something’s different about the frame in the hall.', 6)); }
   },
   async cuddle() {
     if (STATE.cuddled) { G.say(null, '(The sofa still remembers the shape of both of you.)'); return; }
@@ -1138,6 +1139,26 @@ const Story = (G.Story = {
     await G.say('player', 'Which one, {gremlin}?', { shot: 'keep' });
     await G.say('partner', 'The bright one, naturally. I wouldn’t give you a dim one tonight.', { shot: 'keep' });
     await wait(1.5);
+    // Something that should not be here in winter.
+    const E = G.EVE;
+    if (E && E.fly) {
+      E.fly.t = 0; E.fly.on = true;
+      const flyShot = () => { const f = E.fly.s.position, pos = new THREE.Vector3(B.x - 1.1, 1.55, B.z - 0.35), look = f.clone().lerp(new THREE.Vector3(B.x, 1.0, B.z), 0.25); return { pos, look, fov: 48, focus: pos.distanceTo(f), aperture: 0.0004 }; };
+      await wait(2.2);
+      setShot(flyShot);
+      await G.say(null, '(Something comes down through the falling snow, slowly, past the lanterns. A small, steady light. Yellow-green. It goes out. It comes on again.)', { shot: 'keep' });
+      PARTNER.tiltTarget = 0; PARTNER.lookAt = { x: E.fly.s.position.x, z: E.fly.s.position.z, headY: E.fly.s.position.y };
+      await G.say('player', 'Is that a—', { shot: 'keep' });
+      await G.say('partner', 'It’s a firefly.', { shot: 'keep' });
+      await wait(1.2);
+      await G.say('partner', 'It’s the first snow, Partner. There aren’t any fireflies.', { shot: 'keep' });
+      await G.say(null, '(Her hand finds yours on the bench, and holds on.)', { shot: 'keep' });
+      setShot(rear);
+      await G.say('partner', 'Inside. Please.', { shot: 'keep' });
+      E.fly.on = false; PARTNER.lookAt = null;
+      G.S.flags.firefly = 1;
+      await wait(0.8);
+    }
     showEndcard();
     document.body.classList.remove('playing');
     STATE.porchDone = true;

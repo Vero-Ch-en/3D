@@ -63,20 +63,29 @@ fights, a snowman (the sad lemon from the fridge becomes his nose), snow
 angels, cocoa, reading aloud on the sofa, cards at the kitchen table (there is
 a queen up her sleeve), and photographs that end up on the fridge.
 
-## Act II · Something Strange — the evening *(next)*
+## Act II · Something Strange — the evening
 
 - Home at dusk, every window lit. Partner tries hard to be normal.
 - The reveal she kept all day: she hadn't forgotten what day it is. The cake,
   five candles, a wish. *(done, for now as the evening's first beat)*
 - The empty frame in the hall now holds a photograph: two children in the
-  snow, lanterns blurred behind them. Neither remembers it being taken. They
-  compare what they remember: the colour of a scarf, how many trees, the first
-  thing either of them said. They agree on almost nothing, except the whistle:
-  three notes.
-- Lanterns on the porch. Her present from the study: a snow globe of the night
-  they met. *"I didn't remember how many trees there were, so I guessed."*
+  snow, lanterns blurred behind them (whoever ended up with the red scarf at
+  the fair is wearing it). Neither remembers it being taken. They compare what
+  they remember: the colour of the scarf (she says blue), how many trees (she
+  says three), the first thing either of them said (she says "nice hat"). If you
+  pick what you really said in the prologue, you know it's right without
+  knowing how. They agree on almost nothing, except the whistle: three notes,
+  and you whistle it back the way you did as a child. Afterwards the lanterns
+  in the photograph look a little brighter. *(done)*
+- Lanterns on the porch: nine paper lanterns from the box by the door, lit one
+  by one. Her present from the study: a snow globe of the night they met, with
+  a cinnamon-stick log. *"Seven. I didn't remember how many trees there were,
+  so I guessed."* (*"You said three, earlier." "Earlier I was remembering. Now
+  I'm guessing."*) *(done)*
 - Watching the stars on the bench. Then something that should not be there in
-  winter: a firefly, drifting through the falling snow. *"Inside. Please."*
+  winter: a firefly, drifting down through the falling snow past the lanterns.
+  *"It's the first snow, Partner. There aren't any fireflies."* Her hand finds
+  yours. *"Inside. Please."* *(done)*
 
 ## Act III · Recognition — the night
 
