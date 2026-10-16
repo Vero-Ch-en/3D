@@ -249,10 +249,9 @@ const loadEmbedded = () => embedded || (embedded = new Promise((res) => {
   document.head.appendChild(s);
 }));
 G.loadModelBuffer = async (name) => {
-  const custom = G.ASSET_MANIFEST && G.ASSET_MANIFEST.characters[name];
   if (location.protocol !== 'file:') {
     try {
-      const r = await fetch(custom ? custom.url : 'models/' + name + '.glb');
+      const r = await fetch('models/' + name + '.glb');
       if (r.ok) return await r.arrayBuffer();
     } catch (e) { /* fall through to the embedded copy */ }
   }
@@ -260,17 +259,39 @@ G.loadModelBuffer = async (name) => {
   if (!all[name]) return null;
   return Uint8Array.from(atob(all[name]), (c) => c.charCodeAt(0)).buffer;
 };
-G.attachBlenderBody = async (root, name) => {
+/* The realistic characters (assets.js manifest): fetched when served, else from js/models_real.js,
+ * which embeds them as base64 for hosts that can't serve .glb files. Null if neither is there. */
+let embeddedReal = null;
+const loadEmbeddedReal = () => embeddedReal || (embeddedReal = new Promise((res) => {
+  if (window.CBS_REAL) return res(window.CBS_REAL);
+  const s = document.createElement('script');
+  s.src = 'js/models_real.js';
+  s.onload = () => res(window.CBS_REAL || {});
+  s.onerror = () => res({});
+  document.head.appendChild(s);
+}));
+G.loadRealModel = async (name, spec) => {
+  if (location.protocol !== 'file:' && spec.url) {
+    try { const r = await fetch(spec.url); if (r.ok) return await r.arrayBuffer(); } catch (e) { /* try the embedded copy */ }
+  }
+  const all = await loadEmbeddedReal();
+  return all[name] ? Uint8Array.from(atob(all[name]), (c) => c.charCodeAt(0)).buffer : null;
+};
+G.attachBlenderBody = async (root, name, opts = {}) => {
   if (!THREE.GLTFLoader) return false;
-  const bin = await G.loadModelBuffer(name);
+  // A realistic model from the manifest if there is one (not for the children in the prologue), else the built-in body.
+  let spec = !opts.kid && G.ASSET_MANIFEST && G.ASSET_MANIFEST.characters[name];
+  let bin = spec ? await G.loadRealModel(name, spec) : null;
+  if (!bin) { spec = null; bin = await G.loadModelBuffer(name); }
   if (!bin) return false;
+  root.userData.real = !!spec;
   return new Promise((resolve) => {
     new THREE.GLTFLoader().parse(bin, '', (gltf) => {
       const u = root.userData, k = u.k;
       const model = gltf.scene;
       // A model from the asset manifest can bring its own materials and proportions; the built-in ones
       // are authored for a 1.75 m body and take the game's knit and jersey materials.
-      const spec = (G.ASSET_MANIFEST && G.ASSET_MANIFEST.characters[name]) || {};
+      spec = spec || {};
       if (spec.fit) { const b = new THREE.Box3().setFromObject(model); model.scale.setScalar(u.H / Math.max(0.1, b.max.y - b.min.y)); }
       else model.scale.setScalar(spec.scale || k);
       // Rest pose: zero every rig rotation, then capture world matrices.

@@ -1598,7 +1598,7 @@ function boot() {
   KIDS.player.visible = KIDS.partner.visible = false;
   KIDS.adults = { player: PLAYER.m, partner: PARTNER.m };
   buildNav();
-  const bodies = Promise.all([G.attachBlenderBody(PLAYER.m, 'player'), G.attachBlenderBody(PARTNER.m, 'partner'), G.attachBlenderBody(KIDS.player, 'player'), G.attachBlenderBody(KIDS.partner, 'partner')]);
+  const bodies = Promise.all([G.attachBlenderBody(PLAYER.m, 'player'), G.attachBlenderBody(PARTNER.m, 'partner'), G.attachBlenderBody(KIDS.player, 'player', { kid: true }), G.attachBlenderBody(KIDS.partner, 'partner', { kid: true })]);
   buildPost();
   document.querySelectorAll('#quality button').forEach((b) => b.addEventListener('click', () => { G.qName = b.dataset.q; G.applyQuality(); }));
   $('timeBtn').addEventListener('click', () => G.cycleTime());

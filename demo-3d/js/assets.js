@@ -20,7 +20,10 @@ G.ASSET_MANIFEST = Object.assign({ props: {}, textures: {}, characters: {} }, wi
     // floor: { map: 'textures/oak_albedo.jpg', normalMap: 'textures/oak_normal.jpg', roughnessMap: 'textures/oak_rough.jpg', repeat: [2, 2] },
   },
   characters: {
-    // partner: { url: 'models/partner_realistic.glb', fit: true, keepMaterials: true, hideProcedural: 'all' },
+    // The MPFB characters (tools/game_export.py on the character-models branch). If the files aren't
+    // there, the game quietly uses its built-in bodies instead.
+    partner: { url: 'models/real/partner.glb', fit: true, keepMaterials: true, hideProcedural: 'all' },
+    player: { url: 'models/real/player.glb', fit: true, keepMaterials: true, hideProcedural: 'all' },
   },
 });
 G.ASSETS = { props: {}, textures: {} };
