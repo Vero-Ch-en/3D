@@ -272,7 +272,11 @@ const loadEmbeddedReal = () => embeddedReal || (embeddedReal = new Promise((res)
 }));
 G.loadRealModel = async (name, spec) => {
   if (location.protocol !== 'file:' && spec.url) {
-    try { const r = await fetch(spec.url); if (r.ok) return await r.arrayBuffer(); } catch (e) { /* try the embedded copy */ }
+    try {
+      const r = await fetch(spec.url);
+      // Only a real GLB (some hosts answer a missing file with a web page and a 200).
+      if (r.ok) { const buf = await r.arrayBuffer(); if (buf.byteLength > 12 && new TextDecoder().decode(new Uint8Array(buf, 0, 4)) === 'glTF') return buf; }
+    } catch (e) { /* try the embedded copy */ }
   }
   const all = await loadEmbeddedReal();
   return all[name] ? Uint8Array.from(atob(all[name]), (c) => c.charCodeAt(0)).buffer : null;
