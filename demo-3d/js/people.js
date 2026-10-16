@@ -265,7 +265,7 @@ let embeddedReal = null;
 const loadEmbeddedReal = () => embeddedReal || (embeddedReal = new Promise((res) => {
   if (window.CBS_REAL) return res(window.CBS_REAL);
   const s = document.createElement('script');
-  s.src = 'js/models_real.js';
+  s.src = (G.BUILD !== 'dev' ? 'v' + G.BUILD + '/' : '') + 'js/models_real.js';
   s.onload = () => res(window.CBS_REAL || {});
   s.onerror = () => res({});
   document.head.appendChild(s);
@@ -282,6 +282,8 @@ G.loadRealModel = async (name, spec, embeddedOnly) => {
   const all = await loadEmbeddedReal();
   return all[name] ? Uint8Array.from(atob(all[name]), (c) => c.charCodeAt(0)).buffer : null;
 };
+/* Build number of the published page (the artifact build puts every script under v<build>/, so phones don't keep stale copies). */
+G.BUILD = G.BUILD || (document.currentScript && (document.currentScript.src.match(/\/v(\d+)\/js\//) || [])[1]) || 'dev';
 /* A few facts for Stats, to see from a screenshot why a device shows the characters differently. */
 G.ERRS = [];
 window.addEventListener('error', (e) => { G.ERRS.push(String(e.message).slice(0, 60)); });
