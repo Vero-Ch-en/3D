@@ -865,6 +865,7 @@ G.animate = (c, dt, t) => {
   if (mb) { u.head.rotation.x += mb.head[0] * hk; u.head.rotation.y += mb.head[1] * hk; u.head.rotation.z += mb.head[2] * hk; }
   springHead(c, u, dt);
   G.retarget(c.m);
+  if (c.scarfTail && G.simScarf) G.simScarf(c, dt);
   G.curlFingers(c, dt);
   G.swingCoat(c, dt);
 };

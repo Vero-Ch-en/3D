@@ -1379,7 +1379,8 @@ function step(dt, t) {
   } else {
     const run = keys.has('ShiftLeft') || keys.has('ShiftRight') || (stick.on && l > 0.95);
     const target = l > 0.05 ? (run ? 3.1 : 1.5) * Math.min(1, l) * (PLAYER.speedMul || 1) : 0;   // deep snow and armfuls of logs slow you down
-    PLAYER.speed = damp(PLAYER.speed, target, 7, dt);
+    // Speeding up and slowing down like a body with weight: a spring, not an instant jump in pace.
+    G.spring(PLAYER, 'speed', target, target > PLAYER.speed ? 8 : 9, dt); if (PLAYER.speed < 0.005) PLAYER.speed = 0;
     const fp = SETTINGS.view === 'first' && !CAM.shot;
     if (l > 0.05) {
       const cy = Math.cos(CAM.yaw), sy = Math.sin(CAM.yaw);

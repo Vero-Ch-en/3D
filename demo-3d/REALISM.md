@@ -131,6 +131,8 @@ blinks, dozing, hugs. Hats and the snow on them are handed to the model's own he
   so they start gently. Sitting down and getting up take about a second, eased, with the chest going forward
   over the feet half-way.
 - Turning on the spot takes small steps.
+- The scarf's hanging end is a chain of five knitted segments with verlet physics (`G.simScarf`, life.js):
+  gravity, the body's own motion, a little wind, kept in front of the chest. The player's pace is on a spring.
 - Boot shafts ride the shin bone and flare for the calf; the coat's seams share skin weights so they don't open;
   the legs under the leggings are tucked a few millimetres so skin can't poke through.
 

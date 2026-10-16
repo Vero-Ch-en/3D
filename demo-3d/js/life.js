@@ -56,7 +56,8 @@ function buildGear(m, o) {
   const sm = knit(o.scarf);
   const sc = add(new THREE.Mesh(new THREE.TorusGeometry(0.075 * k, 0.034 * k, 10, 24), sm), u.chest, 0, 0.15, 0.008);
   sc.rotation.x = Math.PI / 2 - 0.12; sc.scale.set(1.12, 1.18, 0.95);
-  add(new THREE.Mesh(new THREE.BoxGeometry(0.065 * k, 0.26 * k, 0.026 * k), sm), u.chest, 0.045, 0.04, 0.12).rotation.set(0.14, 0, 0.1);
+  const tail = add(new THREE.Mesh(new THREE.BoxGeometry(0.065 * k, 0.26 * k, 0.026 * k), sm), u.chest, 0.045, 0.04, 0.12);
+  tail.rotation.set(0.14, 0, 0.1); tail.userData.scarfTail = true;   // the hanging end: simulated (G.simScarf)
   // Boots over the socks.
   const bootM = G.std({ color: o.boots, roughness: 0.62, env: 0.4 });
   const fl = 0.152 * 1.75, ank = 0.039 * 1.75;
@@ -209,6 +210,70 @@ function toHeadBone(m, parts) {
   let n = 0; for (const p of parts) if (p.parent === u.head) { e.bone.attach(p); n++; }
   return n;
 }
+/* The scarf's hanging end as a chain of knitted segments with verlet physics: gravity, inertia from the body's
+ * motion, a little wind, kept in front of the chest. The built box stays as the fitted anchor (and the dressed
+ * flag); it draws nothing itself. Run after each character's pose (people.js, G.animate). */
+const _scV = new THREE.Vector3(), _scM = new THREE.Matrix4(), _scDown = new THREE.Vector3(0, -1, 0);
+G.simScarf = (c, dt) => {
+  const box = c.scarfTail; if (!box) return;
+  const u = c.m.userData, ch = u.chest;
+  let S = box.userData.sim;
+  if (!S) {
+    const p = box.geometry.parameters, N = 5;
+    S = box.userData.sim = { N, w: p.width, h: p.height, d: p.depth, P: [], Q: [], segs: [] };
+    for (let i = 0; i < N; i++) { const m = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), box.material); m.castShadow = true; m.userData.gear = true; ch.add(m); S.segs.push(m); }
+    box.geometry = new THREE.BufferGeometry();   // the anchor draws nothing now
+  }
+  const on = box.visible && c.m.visible;
+  S.segs.forEach((m) => (m.visible = on));
+  if (!on) { S.P.length = 0; return; }
+  ch.updateWorldMatrix(true, false);
+  // Root (the top of the fitted box) and its rest direction, in the chest's frame.
+  const L = (S.h * box.scale.y) / S.N;
+  const rootL = new THREE.Vector3(0, (S.h * box.scale.y) / 2, 0).applyEuler(box.rotation).add(box.position);
+  const dirL = new THREE.Vector3(0, -1, 0).applyEuler(box.rotation);
+  const toW = (v) => v.clone().applyMatrix4(ch.matrixWorld);
+  const root = toW(rootL);
+  if (!S.P.length || dt > 0.2 || S.P[0].distanceTo(root) > 0.5) {
+    S.P = []; S.Q = [];
+    for (let i = 0; i <= S.N; i++) { const q = toW(rootL.clone().addScaledVector(dirL, L * i)); S.P.push(q); S.Q.push(q.clone()); }
+  }
+  const inv = _scM.copy(ch.matrixWorld).invert(), k = u.k || 1;
+  const zMin = box.position.z - 0.012 * k;   // the chest's front, under the scarf
+  const W = G.WIND || { gust: 0, drift: 0 }, t = G.simT || 0;
+  const n = Math.max(1, Math.ceil(dt / (1 / 90))), h = dt / n;
+  for (let s = 0; s < n; s++) {
+    S.P[0].copy(root); S.Q[0].copy(root);
+    const wx = (Math.sin(t * 1.3 + c.x) * 0.5 + 0.5) * W.gust * 0.6, wz = Math.sin(t * 0.9) * W.gust * 0.25;
+    for (let i = 1; i <= S.N; i++) {
+      const P = S.P[i], Q = S.Q[i];
+      _scV.copy(P).sub(Q).multiplyScalar(0.955);   // velocity, with air drag (wool is heavy and soft)
+      Q.copy(P);
+      P.add(_scV); P.y -= 9.8 * h * h; P.x += wx * h * h * i * 0.4; P.z += wz * h * h * i * 0.4;
+    }
+    for (let it = 0; it < 4; it++) {
+      for (let i = 1; i <= S.N; i++) {
+        const A = S.P[i - 1], B = S.P[i];
+        _scV.copy(B).sub(A); const d = _scV.length() || 1e-6;
+        if (i === 1) B.copy(A).addScaledVector(_scV, L / d);
+        else { const corr = (d - L) / d * 0.5; A.addScaledVector(_scV, corr); B.addScaledVector(_scV, -corr); }
+      }
+      // Knit is a little stiff: each joint leans toward carrying on the line of the one above.
+      for (let i = 2; i <= S.N; i++) { _scV.copy(S.P[i - 1]).sub(S.P[i - 2]).add(S.P[i - 1]); S.P[i].lerp(_scV, 0.16); }
+      // Not through the chest.
+      for (let i = 1; i <= S.N; i++) { const l = S.P[i].clone().applyMatrix4(inv); if (l.z < zMin) { l.z = zMin; S.P[i].copy(l.applyMatrix4(ch.matrixWorld)); } }
+      S.P[0].copy(root);
+    }
+  }
+  // Draw each segment between its two points, in the chest's frame.
+  for (let i = 0; i < S.N; i++) {
+    const a = S.P[i].clone().applyMatrix4(inv), b = S.P[i + 1].clone().applyMatrix4(inv), m = S.segs[i];
+    const dv = b.clone().sub(a), len = dv.length() || L;
+    m.position.copy(a).add(b).multiplyScalar(0.5);
+    m.quaternion.setFromUnitVectors(_scDown, dv.normalize());
+    m.scale.set(S.w * box.scale.x * (1 - i * 0.03), len * 1.18, S.d * box.scale.z);
+  }
+};
 /* The children's bobble hats and scarf (game.js, kidDress), moved onto a realistic child's head and collar. */
 function fitKid(m) {
   const u = m.userData, f = u.fit;
@@ -622,4 +687,6 @@ G.STEP_HOOKS.push((dt) => {
   if (S.chapter === 'evening' && STATE.cakeDone && !STATE.porchDone && !G.busy()) STATE.autonomy = true;
 });
 setDressed(PLAYER, false); setDressed(PARTNER, false);
+// The scarf ends that get simulated: one per adult (the gear's hanging box).
+[PLAYER, PARTNER].forEach((c) => { c.scarfTail = gearOf(c).parts.find((p) => p.userData.scarfTail) || null; });
 });
