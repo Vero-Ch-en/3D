@@ -123,6 +123,17 @@ gets a skin-coloured lid (`makeRealLids` in people.js) on the head bone, shown w
 blinks, dozing, hugs. Hats and the snow on them are handed to the model's own head bone after fitting
 (`toHeadBone` in life.js), so they stay on when the head turns. Blend-shape blinks from the `.blend` would be better.
 
+### Motion smoothing
+
+- The neck and head ride a critically damped spring toward their pose (`springHead`, people.js), so a new look-at,
+  a glance, a doze or a hug eases in and out instead of snapping; a target behind keeps the same shoulder.
+- Pose weights (arm poses, holding hands, swaying, the hug) use `G.spring` (core.js) instead of plain damping,
+  so they start gently. Sitting down and getting up take about a second, eased, with the chest going forward
+  over the feet half-way.
+- Turning on the spot takes small steps.
+- Boot shafts ride the shin bone and flare for the calf; the coat's seams share skin weights so they don't open;
+  the legs under the leggings are tucked a few millimetres so skin can't poke through.
+
 ## Stand-ins to replace later
 
 These are deliberately cheap approximations, each in one place:

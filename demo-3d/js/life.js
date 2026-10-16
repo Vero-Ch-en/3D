@@ -179,6 +179,7 @@ function fitBoots(m, boots) {
     if (box.isEmpty() || mine.length < 3) return;
     const c = box.getCenter(new THREE.Vector3()), sz = box.getSize(new THREE.Vector3());
     const [shaft, foot, sole] = mine;
+    shaft.userData.shaft = true;
     const lowY = box.min.y, w = Math.max(sz.x, 0.05) * 0.5 + 0.008, fh = Math.min(sz.y, 0.09);
     // Foot: an ellipsoid round the sock, toe to heel (the geometry is a unit sphere).
     foot.position.set(c.x, lowY + fh * 0.42, c.z); foot.scale.set(w * 1.05, fh * 0.5 + 0.006, sz.z * 0.5 + 0.012);
@@ -186,13 +187,16 @@ function fitBoots(m, boots) {
     // Sole: under it.
     const gs = fit(sole); sole.position.set(c.x, lowY + 0.004, c.z); sole.scale.set((w * 2.1) / gs.x, 1, (sz.z + 0.03) / gs.z);
     // Shaft: up the shin from the ankle, wide enough for the sock's top.
-    const sh = fit(shaft), top = box.max.y + 0.17, bot = lowY + 0.03, rr = w * 1.06;   // to mid-calf, over the leggings' hem
+    // A real calf widens above the ankle: the shaft flares to fit it (unit cylinder, top half as wide again).
+    if (!shaft.userData.flared) { shaft.geometry = new THREE.CylinderGeometry(0.5 * 1.5, 0.5, 1, 18, 1, true); shaft.material.side = THREE.DoubleSide; shaft.userData.flared = true; }
+    const sh = new THREE.Vector3(1, 1, 1), top = box.max.y + 0.2, bot = lowY + 0.03, rr = w * 1.08;   // to mid-calf, well over the leggings' hem (the shaft tips with the foot)
     shaft.position.set(c.x, (top + bot) / 2, c.z - sz.z * 0.22); shaft.scale.set((rr * 2) / sh.x, (top - bot) / sh.y, (rr * 2) / sh.z);
     out.push([+sz.x.toFixed(3), +sz.y.toFixed(3), +sz.z.toFixed(3)]);
   });
   if (R) {
     G.retarget(m); m.updateMatrixWorld(true);
-    u.legs.forEach((lg) => { const e = R.map.find((q) => q.group === lg.ft); if (!e) return; for (const p of boots.slice()) if (p.parent === lg.ft) e.bone.attach(p); });
+    // The shaft goes with the shin (so the calf can't push through it when the ankle bends), the rest with the foot.
+    u.legs.forEach((lg) => { const e = R.map.find((q) => q.group === lg.ft), s = R.map.find((q) => q.group === lg.kn); if (!e) return; for (const p of boots.slice()) if (p.parent === lg.ft) (p.userData.shaft && s ? s : e).bone.attach(p); });
   }
   return out;
 }

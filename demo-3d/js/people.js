@@ -399,6 +399,11 @@ async function attachBody(root, name, spec, bin) {
       u.fingers = findFingers(model);
       // Eyelids: the real heads have no blink shapes, so each eye gets a skin-coloured lid that rides the head bone.
       if (spec.keepMaterials) u.realLids = makeRealLids(model);
+      // The coat's seams (the skirt is split front and back, each half on its own leg): vertices that share a
+      // position share their skin weights too, so the seams stay closed when the legs part.
+      if (spec.keepMaterials) model.traverse((o) => { if (o.isSkinnedMesh && /^coat/.test(o.name)) u.coatWelds = (u.coatWelds || 0) + weldSkin(o.geometry); });
+      // Skin that pokes through the leggings when a knee bends: the legs under them pulled in a few millimetres.
+      if (spec.keepMaterials) u.tucked = tuckLegs(model);
       // Coat tails: spring bones the coat's skirt hangs from (tools/coats.py, coat_L / coat_R).
       u.springs = [];
       model.traverse((o) => { if (o.isBone && /^coat_?[LR]$/.test(o.name.replace(/[^A-Za-z_]/g, ''))) u.springs.push({ bone: o, q0: o.quaternion.clone(), side: /L$/.test(o.name) ? 1 : -1, a: 0, va: 0, b: 0, vb: 0 }); });
@@ -415,11 +420,45 @@ async function attachBody(root, name, spec, bin) {
     }, (err) => { console.error('model', name, err); resolve(false); });
   });
 }
+function weldSkin(g) {
+  const P = g.attributes.position, I = g.attributes.skinIndex, W = g.attributes.skinWeight; if (!I || !W) return 0;
+  const AX = ['X', 'Y', 'Z', 'W'], get = (A, i, j) => A['get' + AX[j]](i), set = (A, i, j, v) => A['set' + AX[j]](i, v);
+  const by = new Map(), key = (i) => Math.round(P.getX(i) * 2000) + ',' + Math.round(P.getY(i) * 2000) + ',' + Math.round(P.getZ(i) * 2000);
+  for (let i = 0; i < P.count; i++) { const k = key(i); let a = by.get(k); if (!a) by.set(k, (a = [])); a.push(i); }
+  let n = 0;
+  for (const grp of by.values()) {
+    if (grp.length < 2) continue;
+    const sum = new Map();
+    for (const i of grp) for (let j = 0; j < 4; j++) { const b = get(I, i, j), w = get(W, i, j); if (w > 0) sum.set(b, (sum.get(b) || 0) + w); }
+    const top = [...sum.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4), tot = top.reduce((s, e) => s + e[1], 0) || 1;
+    for (const i of grp) for (let j = 0; j < 4; j++) { set(I, i, j, top[j] ? top[j][0] : 0); set(W, i, j, top[j] ? top[j][1] / tot : 0); }
+    n++;
+  }
+  I.needsUpdate = W.needsUpdate = true;
+  return n;
+}
+function tuckLegs(model) {
+  let body = null, legs = null;
+  model.traverse((o) => { if (!o.isMesh) return; const mn = o.material.name || ''; if (/body/.test(mn)) body = o; if (/^legs|leggings/.test(mn) || /leggings/.test(o.name)) legs = o; });
+  if (!body || !legs) return 0;
+  legs.geometry.computeBoundingBox();
+  const lb = legs.geometry.boundingBox, top = lb.max.y - 0.02, xMax = Math.max(Math.abs(lb.min.x), Math.abs(lb.max.x)) + 0.01;
+  const g = body.geometry, P = g.attributes.position, N = g.attributes.normal; if (!N) return 0;
+  let n = 0;
+  for (let i = 0; i < P.count; i++) {
+    const y = P.getY(i), x = P.getX(i);
+    if (y > top || Math.abs(x) > xMax) continue;
+    const d = 0.007 * Math.min(1, (top - y) / 0.04);   // eased in just below the waistband
+    P.setXYZ(i, x - N.getX(i) * d, y - N.getY(i) * d, P.getZ(i) - N.getZ(i) * d); n++;
+  }
+  P.needsUpdate = true;
+  return n;
+}
 /* Eyelids for a model whose head has no blink shapes: a cap over each eyeball (the eyes mesh split left and right),
  * attached to the head bone, in the face's average skin colour; shown while the eyes are shut. */
 function makeRealLids(model) {
   let eyes = null, skin = null, head = null;
-  model.traverse((o) => { if (o.isMesh && /high-?poly/i.test(o.name)) eyes = o; if (o.isMesh && /^base/i.test(o.name)) skin = o; if (o.isBone && /Head$/.test(o.name)) head = o; });
+  model.traverse((o) => { if (o.isMesh && /high-?poly/i.test(o.name)) eyes = o; if (o.isMesh && /body/.test(o.material.name || '')) skin = o; if (o.isBone && /Head$/.test(o.name)) head = o; });
   if (!eyes || !head) return null;
   const col = new THREE.Color(0xdcae98).convertSRGBToLinear();
   try {   // average the skin texture (mostly skin), slightly darkened like a lid in the eye's shadow
@@ -490,6 +529,22 @@ function findFingers(model) {
     }
   }
   return out;
+}
+/* Neck and head on a critically damped spring toward where the pose wants them: a head moves with ease-in
+ * and ease-out, never jumps, whatever sets its target (a glance, a new look-at, a doze, a hug, a clip change).
+ * A cut (a long frame, or c.snapHead) puts it straight there. */
+function springHead(c, u, dt) {
+  const J = [u.neck.rotation, u.head.rotation], S = c._hsp;
+  if (!S || dt > 0.25 || c.snapHead) { c._hsp = J.map((r) => ({ p: [r.x, r.y, r.z], v: [0, 0, 0] })); c.snapHead = false; return; }
+  const w = 11, n = Math.max(1, Math.ceil(dt / 0.017)), h = dt / n, ax = ['x', 'y', 'z'];
+  J.forEach((r, j) => {
+    const s = S[j];
+    for (let i = 0; i < 3; i++) {
+      const tg = r[ax[i]];
+      for (let k = 0; k < n; k++) { s.v[i] += (w * w * (tg - s.p[i]) - 2 * w * s.v[i]) * h; s.p[i] += s.v[i] * h; }
+      r[ax[i]] = s.p[i];
+    }
+  });
 }
 const _fq = new THREE.Quaternion();
 /* Coat tails on springs: they trail behind when walking, swing out on turns, and settle when you stop.
@@ -646,6 +701,11 @@ G.animate = (c, dt, t) => {
   const prevPh = c.phase;
   c.phase += dt * (4.0 + sp * 3.0) * Math.min(1, sp * 2);
   const ph = c.phase, w = Math.min(1, sp);
+  // Turning on the spot: small steps round, one foot then the other, so the feet don't swivel on the ground.
+  const yawRate = Math.abs(dy) / Math.max(dt, 1e-3);
+  G.spring(c, '_turnW', c.lie || (c.sit || 0) > 0.05 ? 0 : clamp((yawRate - 0.5) / 1.5, 0, 1) * (1 - w), 9, dt);
+  const turnW = clamp(c._turnW, 0, 1);
+  if (turnW > 0.02) c._turnPh = (c._turnPh || 0) + dt * 10; else c._turnPh = 0;
   const sit = c.sit || 0, idle = (1 - w) * (1 - sit);
   // Foot plants (heel strike when a leg is fully forward) drive footstep sounds and footprints.
   const plant = (p) => Math.floor((p - 1.5 * Math.PI) / Math.PI);
@@ -690,6 +750,7 @@ G.animate = (c, dt, t) => {
       Lg.kn.rotation.x = L(Lg.kn.rotation.x, S.w['kn' + i], k2);
       Lg.ft.rotation.x = L(Lg.ft.rotation.x, S.w['ft' + i], k2);
     }
+    if (turnW > 0.02) { const lift = Math.max(0, Math.sin(c._turnPh + i * Math.PI)) * turnW; Lg.th.rotation.x -= lift * 0.32; Lg.kn.rotation.x += lift * 0.62; Lg.ft.rotation.x -= lift * 0.22; }
     if (c.angel) { Lg.th.rotation.set(0, 0, s * (0.05 + 0.32 * (0.5 - 0.5 * Math.cos(t * 2.4)))); Lg.kn.rotation.x = 0.04; }
   });
   u.hips.position.y = L(u.hipY, (c.seatY || 0.6) - c.y + 0.03, sit) - Math.abs(Math.sin(ph)) * 0.03 * w - Math.abs(shift) * 0.012;
@@ -711,8 +772,12 @@ G.animate = (c, dt, t) => {
     // With the recorded pelvis (walking) the spine is relative to it; without, against the upright body.
     u.spine.rotation.set(L(mb.spineW[0], mb.spine[0], k2) + (c.lean || 0) + sit * 0.1, L(mb.spineW[1], mb.spine[1], k2), L(mb.spineW[2], mb.spine[2], k2));
   }
+  // Sitting down and getting up: the chest goes forward over the feet half-way through (the weight has to be over
+  // them to lift off or lower onto the seat), and the head stays up, looking ahead.
+  c._sitTr = 4 * sit * (1 - sit) * (c.lie ? 0 : 1);
+  u.spine.rotation.x += c._sitTr * 0.48;
   // Swaying to music (the radio, or a slow dance): weight rocks side to side on the beat.
-  c.swayW = damp(c.swayW || 0, c.swayTarget || 0, 2, dt);
+  G.spring(c, 'swayW', c.swayTarget || 0, 3, dt);
   c.headSway = 0;
   if (c.swayW > 0.002) {
     const sw = c.swayW, bt = t * 4.83;
@@ -730,8 +795,8 @@ G.animate = (c, dt, t) => {
   // Arm poses fade in and out instead of popping.
   const pw = c.poseW || (c.poseW = {});
   const want = c.forcePose || c.pose;
-  c.holdW = damp(c.holdW || 0, c.holdOn ? 1 : 0, 8, dt);
-  for (const name in ARM_POSES) pw[name] = damp(pw[name] || 0, want === name ? 1 : 0, 4, dt);
+  G.spring(c, 'holdW', c.holdOn ? 1 : 0, 11, dt);
+  for (const name in ARM_POSES) { G.spring(pw, name, want === name ? 1 : 0, 7, dt); pw[name] = clamp(pw[name], 0, 1); }
   u.arms.forEach((A, i) => {
     const s = i ? 1 : -1, p = ph + (i ? 0 : Math.PI);
     const swing = Math.sin(p);
@@ -786,16 +851,19 @@ G.animate = (c, dt, t) => {
   if (tgt) {
     const dx = tgt.x - c.x, dz = tgt.z - c.z;
     let a = Math.atan2(dx, dz) - c.yaw; while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI;
+    // Something behind: keep looking over the same shoulder instead of whipping across to the other one.
+    if (Math.abs(a) > 2.1 && c._lookSide) a = c._lookSide * Math.abs(a); else c._lookSide = Math.sign(a) || c._lookSide || 1;
     c.look = damp(c.look || 0, clamp(a, -1.1, 1.1), 4, dt);
     const dy = (tgt.headY || 1.5) - (c.y + u.H * 0.93);
     c.lookUp = damp(c.lookUp || 0, clamp(-Math.atan2(dy, Math.hypot(dx, dz)), -0.4, 0.4), 4, dt);
   } else if (!c.lie) { c.look = damp(c.look || 0, 0, 3, dt); c.lookUp = damp(c.lookUp || 0, 0, 3, dt); }
-  u.neck.rotation.set(c.lookUp * 0.4, c.look * 0.45 + Math.sin(ph) * 0.06 * w, (c.tilt || 0) - shift * 0.05);   // walking, the head stays steady over a turning chest
+  u.neck.rotation.set(c.lookUp * 0.4 - (c._sitTr || 0) * 0.3, c.look * 0.45 + Math.sin(ph) * 0.06 * w, (c.tilt || 0) - shift * 0.05);   // walking, the head stays steady over a turning chest
   // Recorded head and neck motion under the look-at: kept small when looking at something, so the gaze holds.
-  const hk = tgt ? 0.35 : 1;
+  c._hk = damp(c._hk == null ? 1 : c._hk, tgt ? 0.35 : 1, 2.5, dt); const hk = c._hk;
   if (mb) { u.neck.rotation.x += mb.neck[0] * hk; u.neck.rotation.y += mb.neck[1] * hk; u.neck.rotation.z += mb.neck[2] * hk; }
   u.head.rotation.set(c.lookUp * 0.6 + Math.sin(t * 0.7 + c.z) * 0.02 * (mb ? 0 : 1) + (c.headDown || 0), c.look * 0.55, (c.tilt || 0) * 0.6 + c.headSway);
   if (mb) { u.head.rotation.x += mb.head[0] * hk; u.head.rotation.y += mb.head[1] * hk; u.head.rotation.z += mb.head[2] * hk; }
+  springHead(c, u, dt);
   G.retarget(c.m);
   G.curlFingers(c, dt);
   G.swingCoat(c, dt);

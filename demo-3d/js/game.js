@@ -1443,10 +1443,15 @@ function step(dt, t) {
     }
     if (c.snowyT > 0) c.snowyT -= dt * (G.onDeck(c.x, c.z) ? 1 : 0);
     c.y = c.lie ? c.lieY : damp(c.y, c.yFloor != null ? c.yFloor : G.floorAt(c.x, c.z), 14, dt);
-    c.sit = damp(c.sit || 0, c.sitTarget || 0, 5, dt);
+    // Sitting and standing take about a second, eased in and out (lowering is a touch slower than rising).
+    { const tg = c.sitTarget || 0, s0 = c.sit || 0;
+      if (Math.abs(tg - s0) < 0.002) c.sit = tg;
+      else { let u0 = c._sitU != null && Math.abs(G.smooth01(c._sitU) - s0) < 0.02 ? c._sitU : G.unsmooth01(s0);
+        u0 += Math.sign(tg - s0) * dt / (tg > s0 ? 0.95 : 0.85); u0 = Math.max(0, Math.min(1, u0));
+        c._sitU = u0; c.sit = G.smooth01(u0); if ((tg > s0 && c.sit > tg) || (tg < s0 && c.sit < tg)) c.sit = tg; } }
     c.tilt = damp(c.tilt || 0, c.tiltTarget || 0, 3, dt);
     c.lean = damp(c.lean || 0, c.leanTarget || 0, 3, dt);
-    c.hug = damp(c.hug || 0, STATE.hugging ? (STATE.dancing ? 0.62 : STATE.hugIn && STATE.kiss ? 0.55 : 1) : 0, 7, dt);
+    G.spring(c, 'hug', STATE.hugging ? (STATE.dancing ? 0.62 : STATE.hugIn && STATE.kiss ? 0.55 : 1) : 0, 8, dt); c.hug = Math.max(0, Math.min(1, c.hug));
     G.animate(c, dt, t);
     // Footsteps: sound and (on snow) a footprint at each heel strike.
     if (c.stepEvent) {

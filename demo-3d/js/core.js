@@ -8,6 +8,16 @@ G.$ = (id) => document.getElementById(id);
 G.clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 G.lerp = (a, b, t) => a + (b - a) * t;
 G.smooth = (a, b, x) => { const t = G.clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+G.smooth01 = (x) => x * x * (3 - 2 * x);
+G.unsmooth01 = (y) => 0.5 - Math.sin(Math.asin(1 - 2 * Math.max(0, Math.min(1, y))) / 3);   // inverse of smooth01
+/* A critically damped spring on o[key] toward target (velocity kept in o[key + 'V']): starts gently, no overshoot.
+ * w is the stiffness in 1/s; about 2.5/w seconds to get most of the way there. */
+G.spring = (o, key, target, w, dt) => {
+  const vk = key + 'V'; let p = o[key] == null ? target : o[key], v = o[vk] || 0;
+  const n = Math.max(1, Math.ceil(dt / 0.017)), h = dt / n;
+  for (let i = 0; i < n; i++) { v += (w * w * (target - p) - 2 * w * v) * h; p += v * h; }
+  o[key] = p; o[vk] = v; return p;
+};
 G.damp = (a, b, k, dt) => G.lerp(a, b, 1 - Math.exp(-k * dt));
 G.rand = (a, b) => a + Math.random() * (b - a);
 G.seeded = (s) => () => { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; };
