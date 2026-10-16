@@ -155,8 +155,37 @@ function fitGear(c) {
     return Object.assign(out, { sH: +sH.toFixed(3), dyHat: +dyHat.toFixed(3), dyScarf: +dyScarf.toFixed(3), sB: +sB.toFixed(3) });
   });
 }
+/* The children's bobble hats and scarf (game.js, kidDress), moved onto a realistic child's head and collar. */
+function fitKid(m) {
+  const u = m.userData, f = u.fit;
+  if (!f || !u.real || !u.kidHat || u.gearFitted) return null;
+  u.gearFitted = true;
+  const k = u.k;
+  return G.atRest(m, () => {
+    const inv = new THREE.Matrix4(), v = new THREE.Vector3();
+    const pct = (a, q) => { if (!a.length) return 0; a.sort((x, y) => x - y); return a[Math.min(a.length - 1, Math.floor(a.length * q))]; };
+    const hp = u.kidHat, hat = hp[0], r0 = hat.geometry.parameters.radius;
+    const dyHat = (f.skinTop - f.headY + 0.02) - (hat.position.y + r0 * hat.scale.y * 0.85);
+    hp.forEach((p) => { p.position.y += dyHat; });
+    // Centre it front to back and side to side on the top of this skull and hair.
+    hat.updateMatrixWorld(true); inv.copy(hat.matrixWorld).invert();
+    let cx = 0, cz = 0, cn = 0;
+    const S = f.skull || f.hair;   // the skull alone: a bun or ponytail would pull it backwards
+    for (let i = 0; i < S.length; i += 3) { v.set(S[i], S[i + 1], S[i + 2]).applyMatrix4(inv); if (v.y > 0.2 * r0 && v.length() < 1.6 * r0) { cx += v.x; cz += v.z; cn++; } }
+    if (cn) { const d = new THREE.Vector3(cx / cn, 0, cz / cn).multiply(hat.scale); hp.forEach((p) => { p.position.x += d.x; p.position.z += d.z; }); }
+    hat.updateMatrixWorld(true); inv.copy(hat.matrixWorld).invert();
+    const hr = [];
+    for (let i = 0; i < f.hair.length; i += 3) { v.set(f.hair[i], f.hair[i + 1], f.hair[i + 2]).applyMatrix4(inv); if (v.y > 0.1 * r0 && v.length() < 1.6 * r0) hr.push(v.length() / r0); }
+    const sH = clamp(pct(hr, 0.95) * 1.02, 0.85, 1.25), c0 = hat.position.clone();
+    hp.forEach((p) => { p.position.sub(c0).multiplyScalar(sH).add(c0); p.scale.multiplyScalar(sH); });
+    const dyScarf = clamp(f.neck - (f.chestY + 0.15 * k), -0.05, 0.05);
+    u.kidScarf.forEach((p) => { p.position.y += dyScarf; });
+    return { sH: +sH.toFixed(3), dyHat: +dyHat.toFixed(3), dyScarf: +dyScarf.toFixed(3), centre: cn ? [+(cx / cn).toFixed(3), +(cz / cn).toFixed(3)] : null };
+  });
+}
 (G.onBodies = G.onBodies || []).push(() => {
   G.GEAR_FIT = { player: fitGear(PLAYER), partner: fitGear(PARTNER) };
+  if (G.KIDS) { G.GEAR_FIT.kidPlayer = fitKid(G.KIDS.player); G.GEAR_FIT.kidPartner = fitKid(G.KIDS.partner); }
   // Already dressed when the bodies arrived (a save outdoors): put the jumper under the coat now.
   [PLAYER, PARTNER].forEach((c) => { if (c.dressed) setDressed(c, true); });
 });

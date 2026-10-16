@@ -1560,11 +1560,15 @@ function kidDress(root, hatCol, scarfCol) {
   hat.position.set(0, 0.035 * k, -0.008 * k); hat.scale.set(1.04, 1.12, 1.07); hat.castShadow = true; u.head.add(hat);
   const brim = new THREE.Mesh(new THREE.TorusGeometry(0.088 * k, 0.014 * k, 8, 28), knit); brim.rotation.x = Math.PI / 2 + 0.12; brim.position.set(0, 0.045 * k, -0.004 * k); brim.scale.set(1.04, 1.1, 1); u.head.add(brim);
   const pom = new THREE.Mesh(new THREE.SphereGeometry(0.03 * k, 12, 8), knit); pom.position.set(0, 0.145 * k, -0.02 * k); u.head.add(pom);
+  // Kept when a realistic body replaces the procedural one (people.js), and fitted to it (life.js, fitKid).
+  u.kidHat = [hat, brim, pom]; u.kidScarf = [];
   if (scarfCol) {
     const sm = G.std({ map: G.rep(G.TX.knitCream, 3, 1), color: scarfCol, bumpMap: G.TX.knitB, bumpScale: 0.004, roughness: 1 });
     const sc = new THREE.Mesh(new THREE.TorusGeometry(0.068 * k, 0.03 * k, 10, 24), sm); sc.rotation.x = Math.PI / 2 - 0.1; sc.position.set(0, 0.14 * k, 0.005 * k); sc.scale.set(1, 1.15, 0.9); u.chest.add(sc);
     const tail = new THREE.Mesh(new THREE.BoxGeometry(0.06 * k, 0.2 * k, 0.025 * k), sm); tail.position.set(0.04 * k, 0.04 * k, 0.1 * k); tail.rotation.set(0.12, 0, 0.1); u.chest.add(tail);
+    u.kidScarf = [sc, tail];
   }
+  u.kidHat.concat(u.kidScarf).forEach((o) => { o.userData.gear = true; o.castShadow = true; });
 }
 G.useKids = (on) => {
   const K = G.KIDS;

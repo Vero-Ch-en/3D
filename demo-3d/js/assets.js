@@ -10,7 +10,7 @@
  *
  *   props:      { id: { url, scale? } }                 a glTF/GLB placed at the prop's slot
  *   textures:   { material: { map, normalMap, roughnessMap, aoMap, repeat?: [u, v], params? } }
- *   characters: { player | partner: { url, fit?: true, keepMaterials?: true, hideProcedural?: 'all' } }
+ *   characters: { player | partner | kid_player | kid_partner: { url, fit?: true, keepMaterials?: true, hideProcedural?: 'all' } }
  * ========================================================================= */
 G.ASSET_MANIFEST = Object.assign({ props: {}, textures: {}, characters: {} }, window.CBS_ASSETS || {
   props: {
@@ -24,6 +24,9 @@ G.ASSET_MANIFEST = Object.assign({ props: {}, textures: {}, characters: {} }, wi
     // there, the game quietly uses its built-in bodies instead.
     partner: { url: 'models/real/partner.glb', fit: true, keepMaterials: true, hideProcedural: 'all' },
     player: { url: 'models/real/player.glb', fit: true, keepMaterials: true, hideProcedural: 'all' },
+    // The two of them as children (the prologue): child copies of the same characters.
+    kid_partner: { url: 'models/real/kid_partner.glb', fit: true, keepMaterials: true, hideProcedural: 'all' },
+    kid_player: { url: 'models/real/kid_player.glb', fit: true, keepMaterials: true, hideProcedural: 'all' },
   },
 });
 G.ASSETS = { props: {}, textures: {} };

@@ -105,6 +105,11 @@ uses those measurements to:
 - set the hat on that skull and over the hair;
 - move the scarf to the collar and size the boots to the feet.
 
+The children in the prologue are child copies of the same characters
+(`models/real/kid_*.glb`, embedded in `js/models_kids.js`), made by `make_kid()`,
+`kid_figure()` and `export_kids()` in `tools/game_export.py`; their bobble hats
+and scarf are fitted the same way (`fitKid`).
+
 The model's own jumper is hidden while the coat is on. The real faces don't
 blink yet.
 

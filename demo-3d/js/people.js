@@ -262,18 +262,22 @@ G.loadModelBuffer = async (name) => {
 /* The realistic characters (assets.js manifest): fetched when served, else from js/models_real.js,
  * which embeds them as base64 for hosts that can't serve .glb files. Null if neither is there. */
 let embeddedReal = null;
-const loadEmbeddedReal = () => embeddedReal || (embeddedReal = new Promise((res) => {
-  if (window.CBS_REAL) return res(window.CBS_REAL);
+const embeddedFiles = {};
+// Adults in js/models_real.js (window.CBS_REAL), the children in js/models_kids.js (window.CBS_REAL_KIDS).
+const loadEmbeddedReal = (kid) => embeddedFiles[kid ? 1 : 0] || (embeddedFiles[kid ? 1 : 0] = new Promise((res) => {
+  const v = kid ? 'CBS_REAL_KIDS' : 'CBS_REAL';
+  if (window[v]) return res(window[v]);
   const s = document.createElement('script');
-  s.src = (G.BUILD !== 'dev' ? 'v' + G.BUILD + '/' : '') + 'js/models_real.js';
-  s.onload = () => res(window.CBS_REAL || {});
+  s.src = (G.BUILD !== 'dev' ? 'v' + G.BUILD + '/' : '') + (kid ? 'js/models_kids.js' : 'js/models_real.js');
+  s.onload = () => res(window[v] || {});
   s.onerror = () => res({});
   document.head.appendChild(s);
 }));
 G.loadRealModel = async (name, spec, embeddedOnly) => {
   G.CHAR_SRC = G.CHAR_SRC || {};
   // Already on the page (the published build includes js/models_real.js): use it, don't fetch.
-  if (window.CBS_REAL && window.CBS_REAL[name]) { G.CHAR_SRC[name] = 'page'; return decodeReal(window.CBS_REAL[name]); }
+  const kidV = /^kid_/.test(name) ? window.CBS_REAL_KIDS : window.CBS_REAL;
+  if (kidV && kidV[name]) { G.CHAR_SRC[name] = 'page'; return decodeReal(kidV[name]); }
   if (!embeddedOnly && location.protocol !== 'file:' && spec.url) {
     try {
       const r = await fetch(spec.url);
@@ -282,7 +286,7 @@ G.loadRealModel = async (name, spec, embeddedOnly) => {
       if (r.ok) { const buf = await r.arrayBuffer(); if (isRealGlb(buf)) { G.CHAR_SRC[name] = 'fetched ' + (buf.byteLength / 1e6).toFixed(1) + 'MB'; return buf; } console.warn('[characters]', spec.url, 'served something else; using the embedded copy'); }
     } catch (e) { /* try the embedded copy */ }
   }
-  const all = await loadEmbeddedReal();
+  const all = await loadEmbeddedReal(/^kid_/.test(name));
   if (all[name]) G.CHAR_SRC[name] = 'embedded';
   return all[name] ? decodeReal(all[name]) : null;
 };
@@ -302,7 +306,7 @@ G.diag = () => {
   const per = (m) => { let n = 0, vis = 0, tex = 0, bones = 0; m.traverse((o) => { if (o.isSkinnedMesh) { n++; if (o.visible) vis++; if (o.material.map && o.material.map.image) tex++; bones = Math.max(bones, o.skeleton.bones.length); } }); const u = m.userData; return `${vis}/${n} vis ${tex} tex ${bones} bones top ${(u.realTop || []).map((o) => (o.visible ? 1 : 0)).join('')} fit ${u.gearFitted ? 1 : 0}`; };
   const ext = gl.getExtension('WEBGL_debug_renderer_info');
   const kid = G.KIDS && G.PLAYER.m === G.KIDS.player;
-  diagS = `${kid ? '\n(childhood scene: the children, built-in bodies)' : ''}\nHim ${per(G.PLAYER.m)}\nHer ${per(G.PARTNER.m)}\nGPU ${ext ? String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)).slice(0, 34) : '?'}\nWebGL${cap.isWebGL2 ? 2 : 1} vtex ${cap.floatVertexTextures ? 1 : 0} vuni ${cap.maxVertexUniforms} tex ${cap.maxTextureSize} dressed ${G.PLAYER.dressed ? 1 : 0}${G.PARTNER.dressed ? 1 : 0}` + G.ERRS.slice(-3).map((e) => '\n! ' + e).join('');
+  diagS = `${kid ? '\n(childhood scene: the children)' : ''}\nHim ${per(G.PLAYER.m)}\nHer ${per(G.PARTNER.m)}\nGPU ${ext ? String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)).slice(0, 34) : '?'}\nWebGL${cap.isWebGL2 ? 2 : 1} vtex ${cap.floatVertexTextures ? 1 : 0} vuni ${cap.maxVertexUniforms} tex ${cap.maxTextureSize} dressed ${G.PLAYER.dressed ? 1 : 0}${G.PARTNER.dressed ? 1 : 0}` + G.ERRS.slice(-3).map((e) => '\n! ' + e).join('');
   return diagS;
 };
 /* Which body each character got, and why (shown in Stats). */
@@ -310,17 +314,18 @@ G.CHAR_STATUS = {};
 G.attachBlenderBody = async (root, name, opts = {}) => {
   if (!THREE.GLTFLoader) return false;
   // A realistic model from the manifest if there is one (not for the children in the prologue), else the built-in body.
-  const spec = !opts.kid && G.ASSET_MANIFEST && G.ASSET_MANIFEST.characters[name];
+  const mname = opts.kid ? 'kid_' + name : name;
+  const spec = G.ASSET_MANIFEST && G.ASSET_MANIFEST.characters[mname];
   const key = opts.kid ? 'kid ' + name : name;
   if (spec) {
     let why = 'not found';
     try {
       // The served file first; if it can't be decoded here (no WebAssembly for meshopt), the embedded copy.
       for (const only of [false, true]) {
-        const bin = await G.loadRealModel(name, spec, only);
+        const bin = await G.loadRealModel(mname, spec, only);
         if (!bin) continue;
         root.userData.real = true;
-        if (await attachBody(root, name, spec, bin)) { G.CHAR_STATUS[key] = 'realistic ' + ((G.CHAR_SRC || {})[name] || '?') + ' ' + (bin.byteLength / 1e6).toFixed(1) + 'MB'; return true; }
+        if (await attachBody(root, name, spec, bin)) { G.CHAR_STATUS[key] = 'realistic ' + ((G.CHAR_SRC || {})[mname] || '?') + ' ' + (bin.byteLength / 1e6).toFixed(1) + 'MB'; return true; }
         why = 'could not be read';
         if (!isMeshopt(bin)) break;
       }
@@ -397,7 +402,7 @@ async function attachBody(root, name, spec, bin) {
       root.position.copy(pos0); root.rotation.copy(rot0);
       // Hide procedural body parts.
       const hide = new Set(u.bodyMats);
-      root.traverse((o) => { if (o.isMesh && !o.isSkinnedMesh && (spec.hideProcedural === 'all' ? !model.getObjectById(o.id) : hide.has(o.material) && !u.lids.includes(o))) o.visible = false; });
+      root.traverse((o) => { if (o.isMesh && !o.isSkinnedMesh && !o.userData.gear && (spec.hideProcedural === 'all' ? !model.getObjectById(o.id) : hide.has(o.material) && !u.lids.includes(o))) o.visible = false; });
       u.retarget = { map, model };
       resolve(true);
     }, (err) => { console.error('model', name, err); resolve(false); });
@@ -421,7 +426,7 @@ function measureFit(model, u) {
   model.traverse((o) => {
     if (!o.isMesh) return;
     const n = o.name.toLowerCase();
-    const key = /sweater|hood|cord|pocket/.test(n) ? 'top' : /sock/.test(n) ? 'socks' : /^human_(partner|player)$/.test(n) ? 'skin'
+    const key = /sweater|hood|cord|pocket/.test(n) ? 'top' : /sock/.test(n) ? 'socks' : /^human_(kid_)?(partner|player)$/.test(n) ? 'skin'
       : /legging|trouser|jean/.test(n) ? 'legs' : /hair|ponytail|fringe|short|bun|braid/.test(n) ? 'hair' : null;
     if (!key) return;
     cat[key] = cat[key] || [];
@@ -444,7 +449,7 @@ function measureFit(model, u) {
   // The raw rest-pose points too (every 2nd vertex, plenty), for fitting the coat and hat around them.
   const thin = (a) => { const r = []; for (let i = 0; a && i < a.length; i += 6) r.push(a[i], a[i + 1], a[i + 2]); return new Float32Array(r); };
   return { headY: head.y, chestY: chest.y, skinTop, headHalfW, halfD, neck, footLen: (side(1) + side(-1)) / 2,
-    body: thin(cat.skin.concat(cat.legs || [])), hair: thin((cat.hair || []).concat(skull.flat())) };
+    body: thin(cat.skin.concat(cat.legs || [])), hair: thin((cat.hair || []).concat(skull.flat())), skull: thin(skull.flat()) };
 }
 
 /* Run fn with a character in its rest pose at the origin (as measured above), then put everything back. */
