@@ -142,6 +142,7 @@ def make_coat(name, color=(0.36, 0.37, 0.39), **kw):
             if best and any(k in gi.get(best.group, '') for k in ('Arm', 'Hand')) and best.weight > 0.5:
                 spts.append(s.matrix_world @ v.co)
     bm = bmesh.new(); bm.from_mesh(me); uvl = bm.loops.layers.uv.verify()
+    ob['body_verts'] = len(bm.verts)
     for S in ('Left', 'Right'):
         a0, a1, a2 = P(S + 'Arm'), P(S + 'ForeArm'), P(S + 'Hand')
         out = (a0 - Vector((cx, cy, a0.z))).normalized()
@@ -171,6 +172,7 @@ def make_coat(name, color=(0.36, 0.37, 0.39), **kw):
                 f = bm.faces.new((rings[k][j], rings[k][(j + 1) % nseg], rings[k + 1][(j + 1) % nseg], rings[k + 1][j]))
                 for l, (uu, vv) in zip(f.loops, ((j, k), (j + 1, k), (j + 1, k + 1), (j, k + 1))):
                     l[uvl].uv = (uu / nseg * 1.5, -vv / len(rings) * 2.5)
+    bm.verts.ensure_lookup_table(); ob['sleeve_verts'] = len(bm.verts) - ob['body_verts']
     # Collar: a band standing round the neck from the coat's top edge, opening at the front.
     top = [v for v in bm.verts if abs(v.co.z - zNeck) < 1e-4]
     top.sort(key=lambda v: math.atan2(v.co.x - cx, -(v.co.y - cy)))
@@ -248,6 +250,24 @@ def skin_coat(name, spring=0.35, thigh=0.45):
         for gname, w in acc.items():
             if w / tot > 0.002:
                 vg.setdefault(gname, ob.vertex_groups.get(gname) or ob.vertex_groups.new(name=gname)).add([v.index], w / tot, 'REPLACE')
+    # The coat's body and collar hang from the torso and legs, never the arms: nearest skin at hip height
+    # is the hanging hands, and their weights would drag the coat about whenever the arms moved.
+    nb = ob.get('body_verts', 0); nsl = ob.get('sleeve_verts', 0)
+    for v in ob.data.vertices:
+        if nb <= v.index < nb + nsl:
+            continue
+        gs = [(ob.vertex_groups[g.group].name, g.weight, g.group) for g in v.groups]
+        bad = [g for g in gs if any(k in g[0] for k in ('Arm', 'Hand', 'Shoulder'))]
+        if not bad:
+            continue
+        keep = [g for g in gs if g not in bad]
+        if not keep:
+            keep = [('mixamorig:Spine2', 1.0, None)]
+        for name_, w, gi in bad:
+            ob.vertex_groups[gi].remove([v.index])
+        tot = sum(w for _, w, _ in keep) or 1
+        for name_, w, gi in keep:
+            (ob.vertex_groups.get(name_) or ob.vertex_groups.new(name=name_)).add([v.index], w / tot, 'REPLACE')
     # Parent to the rig like the other clothes (under the body, so parts(name) includes it).
     mwc = ob.matrix_world.copy()
     ob.parent = bpy.data.objects['human_' + name]; ob.matrix_world = mwc
