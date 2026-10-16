@@ -136,7 +136,11 @@ function fitGear(c) {
     const hp = g.hatParts, hat = hp[0], dyHat = (f.skinTop + 0.016) - (f.headY + 0.12 * k);
     hp.forEach((p) => { p.position.y += dyHat; });
     const r0 = hat.geometry.parameters.radius;
-    const hr = local(hat, f.hair, (q) => q.y > 0.1 * r0 && q.length() < 1.6 * r0).map((q) => q.length() / r0);
+    // Centred on the skull itself: the middle of its extent above the brim, side to side and front to back
+    // (the middle of the extent, not the average, which the forehead or a bun would pull).
+    { const sk = local(hat, f.skull || f.hair, (q) => q.y > 0.35 * r0 && q.length() < 1.6 * r0);
+      if (sk.length > 8) { const b = new THREE.Box3().setFromPoints(sk), d = b.getCenter(new THREE.Vector3()); d.y = 0; d.multiply(hat.scale); d.x = clamp(d.x, -0.02, 0.02); d.z = clamp(d.z, -0.01, 0.06); hp.forEach((p) => { p.position.x += d.x; p.position.z += d.z; }); out.hatCentre = [+d.x.toFixed(3), +d.z.toFixed(3)]; } }
+    const hr = local(hat, f.hair, (q) => q.y > 0.1 * r0 && q.z > -0.35 * r0 && q.length() < 1.6 * r0).map((q) => q.length() / r0);   // not the bun at the back
     const sH = clamp(pct(hr, 0.95) * 1.02, 0.85, 1.15), c0 = hat.position.clone();
     hp.forEach((p) => { p.position.sub(c0).multiplyScalar(sH).add(c0); p.scale.multiplyScalar(sH); });
     // Then down to the forehead: the brim just above the brows (the real heads' eye line), and big enough over
@@ -145,11 +149,12 @@ function fitGear(c) {
     if (lid) {
       m.updateMatrixWorld(true);
       const W = (o) => o.getWorldPosition(new THREE.Vector3());
-      const brim = hp[1], dy2 = W(lid).y + 0.052 * k - W(brim).y;
+      // the brim's lowest edge (its front: it's tilted) just above the brows
+      const brim = hp[1], bb = new THREE.Box3().setFromObject(brim), dy2 = W(lid).y + 0.036 * k - bb.min.y;
       hp.forEach((p) => { p.position.y += dy2; }); g.snow.forEach((s2) => { if (s2.parent === u.head) s2.position.y += dy2; });
       m.updateMatrixWorld(true);
       const dc = W(hat), hTop = f.hair.reduce((mx, _, i) => (i % 3 === 1 && Math.hypot(f.hair[i - 1] - dc.x, f.hair[i + 1] - dc.z) < 0.06 ? Math.max(mx, f.hair[i]) : mx), f.skinTop);
-      const need = clamp((hTop + 0.014 - dc.y) / (r0 * hat.scale.y), 1, 1.28), c1 = brim.position.clone();
+      const need = clamp((hTop + 0.014 - dc.y) / (r0 * hat.scale.y), 1, 1.12), c1 = brim.position.clone();
       if (need > 1) hp.forEach((p) => { p.position.sub(c1).multiplyScalar(need).add(c1); p.scale.multiplyScalar(need); });
       out.hatDrop = +dy2.toFixed(3); out.hatGrow = +need.toFixed(3);
     }

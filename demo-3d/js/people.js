@@ -399,6 +399,8 @@ async function attachBody(root, name, spec, bin) {
       u.fingers = findFingers(model);
       // Eyelids: the real heads have no blink shapes, so each eye gets a skin-coloured lid that rides the head bone.
       if (spec.keepMaterials) u.realLids = makeRealLids(model);
+      // Eyes that turn: the eyes mesh split into two eyeballs on pivots at their centres, riding the head bone.
+      if (spec.keepMaterials) u.realEyes = makeRealEyes(model);
       // The coat's seams (the skirt is split front and back, each half on its own leg): vertices that share a
       // position share their skin weights too, so the seams stay closed when the legs part.
       if (spec.keepMaterials) model.traverse((o) => { if (o.isSkinnedMesh && /^coat/.test(o.name)) u.coatWelds = (u.coatWelds || 0) + weldSkin(o.geometry); });
@@ -509,6 +511,58 @@ function tuckLegs(model) {
   }
   P.needsUpdate = true;
   return n;
+}
+function makeRealEyes(model) {
+  let eyes = null, head = null;
+  model.traverse((o) => { if (o.isMesh && /high-?poly/i.test(o.name)) eyes = o; if (o.isBone && /Head$/.test(o.name)) head = o; });
+  if (!eyes || !head || !eyes.geometry.index) return null;
+  eyes.updateMatrixWorld(true);
+  const g = eyes.geometry, P = g.attributes.position, Nn = g.attributes.normal, UV = g.attributes.uv, ix = g.index.array, M = eyes.matrixWorld;
+  const nm = new THREE.Matrix3().getNormalMatrix(M), v = new THREE.Vector3(), out = [];
+  for (const side of [1, -1]) {
+    // world-space (rest) positions of this eye's triangles
+    const tris = []; for (let t = 0; t < ix.length; t += 3) { let ok = true; for (let j = 0; j < 3; j++) { v.fromBufferAttribute(P, ix[t + j]).applyMatrix4(M); if (Math.sign(v.x) !== side) ok = false; } if (ok) tris.push(t); }
+    if (!tris.length) continue;
+    const box = new THREE.Box3(); tris.forEach((t) => { for (let j = 0; j < 3; j++) box.expandByPoint(v.fromBufferAttribute(P, ix[t + j]).applyMatrix4(M)); });
+    const c = box.getCenter(new THREE.Vector3());
+    const pos = [], nor = [], uv = [];
+    tris.forEach((t) => { for (let j = 0; j < 3; j++) { const i = ix[t + j]; v.fromBufferAttribute(P, i).applyMatrix4(M).sub(c); pos.push(v.x, v.y, v.z); if (Nn) { v.fromBufferAttribute(Nn, i).applyMatrix3(nm).normalize(); nor.push(v.x, v.y, v.z); } if (UV) uv.push(UV.getX(i), UV.getY(i)); } });
+    const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    if (nor.length) geo.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3)); else geo.computeVertexNormals();
+    if (uv.length) geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    const mat = eyes.material.clone(); mat.skinning = false;
+    const piv = new THREE.Object3D(); piv.position.copy(c); model.parent.add(piv); piv.updateMatrixWorld(true); head.attach(piv);
+    const mesh = new THREE.Mesh(geo, mat); mesh.frustumCulled = false; piv.add(mesh);
+    out.push({ piv, q0: piv.quaternion.clone(), yaw: 0, pitch: 0 });
+  }
+  if (out.length === 2) eyes.visible = false;
+  return out.length === 2 ? out : null;
+}
+/* Eyes toward what the character is looking at (or straight ahead), leading the head; quick small saccades
+ * between fixations, never further than eyes can turn. After the bones are posed. */
+const _eq = new THREE.Quaternion(), _ev = new THREE.Vector3(), _ew = new THREE.Vector3();
+function aimEyes(c, u, tgt, dt) {
+  const E = u.realEyes; if (!E) return;
+  c._sacT = (c._sacT || 0) - dt;
+  if (c._sacT <= 0) { c._sacT = 0.35 + Math.random() * (tgt ? 1.4 : 2.2); c._sac = [(Math.random() - 0.5) * (tgt ? 0.06 : 0.16), (Math.random() - 0.5) * (tgt ? 0.04 : 0.1)]; }
+  const sac = c._sac || [0, 0];
+  for (const e of E) {
+    const par = e.piv.parent; par.updateWorldMatrix(true, false);
+    let yaw = 0, pitch = 0;
+    if (tgt) {
+      e.piv.getWorldPosition(_ev);
+      _ew.copy(tgt).sub(_ev).normalize();
+      // into the eye's rest frame
+      _eq.copy(par.getWorldQuaternion(new THREE.Quaternion())).multiply(e.q0).invert();
+      _ew.applyQuaternion(_eq);
+      yaw = Math.atan2(_ew.x, _ew.z); pitch = -Math.atan2(_ew.y, Math.hypot(_ew.x, _ew.z));
+      if (_ew.z < 0.2) { yaw = 0; pitch = 0; }   // behind: no wall-eyes
+    }
+    yaw = Math.max(-0.55, Math.min(0.55, yaw + sac[0])); pitch = Math.max(-0.35, Math.min(0.3, pitch + sac[1]));
+    const k = 1 - Math.exp(-dt * 28);   // eyes are fast
+    e.yaw += (yaw - e.yaw) * k; e.pitch += (pitch - e.pitch) * k;
+    e.piv.quaternion.copy(e.q0).multiply(_eq.setFromEuler(new THREE.Euler(e.pitch, e.yaw, 0, 'YXZ')));
+  }
 }
 /* Eyelids for a model whose head has no blink shapes: a cap over each eyeball (the eyes mesh split left and right),
  * attached to the head bone, in the face's average skin colour; shown while the eyes are shut. */
@@ -973,6 +1027,7 @@ G.animate = (c, dt, t) => {
   if (mb) { u.head.rotation.x += mb.head[0] * hk; u.head.rotation.y += mb.head[1] * hk; u.head.rotation.z += mb.head[2] * hk; }
   springHead(c, u, dt);
   G.retarget(c.m);
+  if (u.realEyes) aimEyes(c, u, tgt ? new THREE.Vector3(tgt.x, tgt.headY != null ? tgt.headY : c.y + u.H * 0.93, tgt.z) : null, dt);
   if (c.scarfTail && G.simScarf) G.simScarf(c, dt);
   G.curlFingers(c, dt);
   G.swingCoat(c, dt);
