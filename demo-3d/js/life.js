@@ -85,7 +85,7 @@ const gearOf = (c) => (c === PLAYER ? GEAR.player : GEAR.partner);
  * boots to those feet. */
 function fitGear(c) {
   const m = c === PLAYER ? ADULT.player : ADULT.partner, u = m.userData, f = u.fit;
-  if (!f || u.gearFitted) return null;
+  if (!f || u.gearFitted || !u.real) return null;
   u.gearFitted = true;
   const g = gearOf(c), k = u.k, out = {};
   return G.atRest(m, () => {

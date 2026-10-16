@@ -270,8 +270,8 @@ const loadEmbeddedReal = () => embeddedReal || (embeddedReal = new Promise((res)
   s.onerror = () => res({});
   document.head.appendChild(s);
 }));
-G.loadRealModel = async (name, spec) => {
-  if (location.protocol !== 'file:' && spec.url) {
+G.loadRealModel = async (name, spec, embeddedOnly) => {
+  if (!embeddedOnly && location.protocol !== 'file:' && spec.url) {
     try {
       const r = await fetch(spec.url);
       // Only a real GLB (some hosts answer a missing file with a web page and a 200).
@@ -281,17 +281,40 @@ G.loadRealModel = async (name, spec) => {
   const all = await loadEmbeddedReal();
   return all[name] ? Uint8Array.from(atob(all[name]), (c) => c.charCodeAt(0)).buffer : null;
 };
+/* Which body each character got, and why (shown in Stats). */
+G.CHAR_STATUS = {};
 G.attachBlenderBody = async (root, name, opts = {}) => {
   if (!THREE.GLTFLoader) return false;
   // A realistic model from the manifest if there is one (not for the children in the prologue), else the built-in body.
-  let spec = !opts.kid && G.ASSET_MANIFEST && G.ASSET_MANIFEST.characters[name];
-  let bin = spec ? await G.loadRealModel(name, spec) : null;
-  if (!bin) { spec = null; bin = await G.loadModelBuffer(name); }
-  if (!bin) return false;
-  root.userData.real = !!spec;
-  // The realistic models are meshopt-compressed (EXT_meshopt_compression) with WebP textures.
+  const spec = !opts.kid && G.ASSET_MANIFEST && G.ASSET_MANIFEST.characters[name];
+  const key = opts.kid ? 'kid ' + name : name;
+  if (spec) {
+    let why = 'not found';
+    try {
+      // The served file first; if it can't be decoded here (no WebAssembly for meshopt), the embedded copy.
+      for (const only of [false, true]) {
+        const bin = await G.loadRealModel(name, spec, only);
+        if (!bin) continue;
+        root.userData.real = true;
+        if (await attachBody(root, name, spec, bin)) { G.CHAR_STATUS[key] = 'realistic' + (only ? ' (embedded)' : ''); return true; }
+        why = 'could not be read';
+        if (!isMeshopt(bin)) break;
+      }
+    } catch (e) { why = String(e && e.message || e); }
+    console.warn('[characters] realistic', name, why, '- using the built-in body');
+    G.CHAR_STATUS[key] = 'built-in (realistic ' + why + ')';
+    root.userData.real = false;
+  }
+  const bin = await G.loadModelBuffer(name);
+  const ok = bin ? await attachBody(root, name, null, bin) : false;
+  if (!G.CHAR_STATUS[key]) G.CHAR_STATUS[key] = ok ? 'built-in' : 'procedural';
+  return ok;
+};
+async function attachBody(root, name, spec, bin) {
+  // The realistic models may be meshopt-compressed (EXT_meshopt_compression); the decoder is WebAssembly,
+  // so the embedded copies (js/models_real.js) are stored decompressed and load without it.
   const loader = new THREE.GLTFLoader();
-  if (window.MeshoptDecoder) { await MeshoptDecoder.ready; loader.setMeshoptDecoder(MeshoptDecoder); }
+  if (window.MeshoptDecoder && isMeshopt(bin)) { await MeshoptDecoder.ready; loader.setMeshoptDecoder(MeshoptDecoder); }
   return new Promise((resolve) => {
     loader.parse(bin, '', (gltf) => {
       const u = root.userData, k = u.k;
@@ -355,7 +378,10 @@ G.attachBlenderBody = async (root, name, opts = {}) => {
       resolve(true);
     }, (err) => { console.error('model', name, err); resolve(false); });
   });
-};
+}
+function isMeshopt(bin) {
+  try { const v = new DataView(bin), n = v.getUint32(12, true); return new TextDecoder().decode(new Uint8Array(bin, 20, n)).includes('EXT_meshopt_compression'); } catch (e) { return false; }
+}
 /* Rest-pose measurements of a realistic model, in the character's own space (root at the origin, facing +z):
  * the top and width of the skull, the depth of the knitwear through the chest, the collar, the feet. */
 function measureFit(model, u) {
