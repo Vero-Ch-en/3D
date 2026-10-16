@@ -275,7 +275,8 @@ G.loadRealModel = async (name, spec, embeddedOnly) => {
     try {
       const r = await fetch(spec.url);
       // Only a real GLB (some hosts answer a missing file with a web page and a 200).
-      if (r.ok) { const buf = await r.arrayBuffer(); if (buf.byteLength > 12 && new TextDecoder().decode(new Uint8Array(buf, 0, 4)) === 'glTF') return buf; }
+      // And it must be the realistic rig (Mixamo bones), not some other file served in its place.
+      if (r.ok) { const buf = await r.arrayBuffer(); if (isRealGlb(buf)) return buf; console.warn('[characters]', spec.url, 'served something else; using the embedded copy'); }
     } catch (e) { /* try the embedded copy */ }
   }
   const all = await loadEmbeddedReal();
@@ -393,6 +394,13 @@ async function attachBody(root, name, spec, bin) {
       resolve(true);
     }, (err) => { console.error('model', name, err); resolve(false); });
   });
+}
+function isRealGlb(buf) {
+  try {
+    if (buf.byteLength < 20 || new TextDecoder().decode(new Uint8Array(buf, 0, 4)) !== 'glTF') return false;
+    const n = new DataView(buf).getUint32(12, true);
+    return new TextDecoder().decode(new Uint8Array(buf, 20, n)).includes('mixamorig');
+  } catch (e) { return false; }
 }
 function isMeshopt(bin) {
   try { const v = new DataView(bin), n = v.getUint32(12, true); return new TextDecoder().decode(new Uint8Array(bin, 20, n)).includes('EXT_meshopt_compression'); } catch (e) { return false; }
