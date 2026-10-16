@@ -126,6 +126,10 @@ Fitted on top of that, from each model's own measurements (life.js, `fitGear`):
 - jumpers follow the hips, not the thighs, and their hems are let down a little (`fixTops`, people.js), so
   sitting doesn't pull them into a point or open a gap at the waist.
 
+The exported hands lost most of their finger width when the meshes were simplified; `plumpFingers` (people.js)
+pushes finger-weighted vertices out along their normals at load, and the relaxed hand closes the thumb toward
+the index finger. Re-exporting the hands at full detail from the `.blend` would be the proper fix.
+
 Hugs reach with two-bone IK on the model's own arm bones (`hugIK`, people.js): the taller one over the
 shoulders, the other round the back, hands curled on the back.
 

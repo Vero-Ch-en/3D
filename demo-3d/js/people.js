@@ -405,6 +405,8 @@ async function attachBody(root, name, spec, bin) {
       // Jumpers: the hem follows the hips, not the thighs (sitting, the thighs would pull it into a point), and is a
       // little longer, so it always overlaps the waistband.
       if (spec.keepMaterials) u.topFixed = fixTops(model);
+      // The exported hands lost most of their finger width when the meshes were simplified: plump them back up.
+      if (spec.keepMaterials) u.fingersPlumped = plumpFingers(model, u.H || 1.7);
       // Skin that pokes through the leggings when a knee bends: the legs under them pulled in a few millimetres.
       if (spec.keepMaterials) u.tucked = tuckLegs(model);
       // Coat tails: spring bones the coat's skirt hangs from (tools/coats.py, coat_L / coat_R).
@@ -446,6 +448,24 @@ function weldSkin(g) {
     n++;
   }
   I.needsUpdate = W.needsUpdate = true;
+  return n;
+}
+function plumpFingers(model, H) {
+  let body = null; model.traverse((o) => { if (o.isSkinnedMesh && /body/.test(o.material.name || '')) body = o; });
+  if (!body) return 0;
+  const g = body.geometry, P = g.attributes.position, N = g.attributes.normal, I = g.attributes.skinIndex, W = g.attributes.skinWeight;
+  if (!N || !I) return 0;
+  const bones = body.skeleton.bones, fing = new Set(), AX = ['X', 'Y', 'Z', 'W'];
+  bones.forEach((b, i) => { if (/Hand(Thumb|Index|Middle|Ring|Pinky)/.test(b.name)) fing.add(i); });
+  const d = 0.0042 * (H / 1.7);
+  let n = 0;
+  for (let i = 0; i < P.count; i++) {
+    let w = 0; for (let j = 0; j < 4; j++) if (fing.has(I['get' + AX[j]](i))) w += W['get' + AX[j]](i);
+    if (w < 0.25) continue;
+    const k = d * Math.min(1, w);
+    P.setXYZ(i, P.getX(i) + N.getX(i) * k, P.getY(i) + N.getY(i) * k, P.getZ(i) + N.getZ(i) * k); n++;
+  }
+  P.needsUpdate = true;
   return n;
 }
 function fixTops(model) {
@@ -548,8 +568,9 @@ function findFingers(model) {
       // And the axis that closes the finger toward the middle one (the base mesh is modelled splayed).
       let close = null;
       const mid = by['mixamorig' + side + 'HandMiddle1'];
-      if (f !== 'Middle' && f !== 'Thumb' && mid) {
-        const toMid = W(mid).sub(W(b0));
+      const toward = f === 'Thumb' ? idx : mid;   // fingers close toward the middle one, the thumb toward the index
+      if (f !== 'Middle' && toward) {
+        const toMid = W(toward).sub(W(b0));
         for (const ax of [new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, 1, 0)]) {
           if (Math.abs(ax.dot(best.ax)) > 0.9) continue;
           const before = W(tip);
@@ -559,7 +580,7 @@ function findFingers(model) {
           if (!close || Math.abs(d) > Math.abs(close.d)) close = { ax, d };
         }
       }
-      const spread = { Index: 0.1, Ring: 0.08, Pinky: 0.2 }[f] || 0;
+      const spread = { Thumb: 0.38, Index: 0.14, Ring: 0.12, Pinky: 0.26 }[f] || 0;
       chain.forEach((b, j) => out.push({ bone: b, q0: b.quaternion.clone(), ax: best.ax.clone().multiplyScalar(sgn), finger: f, j, side,
         adx: j === 0 && close ? close.ax.clone().multiplyScalar(close.d >= 0 ? 1 : -1) : null, ad: spread }));
     }
@@ -651,7 +672,7 @@ G.swingCoat = (c, dt) => {
 // How far each finger curls, per joint, for a relaxed hand; holding something closes them further.
 const CURL = { Thumb: [0.1, 0.15, 0.15], Index: [0.18, 0.28, 0.2], Middle: [0.24, 0.34, 0.24], Ring: [0.3, 0.4, 0.27], Pinky: [0.36, 0.45, 0.3] };
 G.curlFingers = (c, dt) => {
-  const u = c.m.userData; if (!u.fingers || !u.fingers.length) return;
+  const u = c.m.userData; if (!u.fingers || !u.fingers.length || window.NOCURL) return;
   const pz = c.forcePose || c.pose;
   const grip = c.carry || pz === 'carry' ? 1 : (c.holdPose || pz === 'cup' || pz === 'read') ? 0.75 : pz === 'cold' ? 0.85 : pz === 'pockets' || pz === 'coatPockets' ? 0.6 : c.holdOn ? 0.45 : (c.hug || 0) > 0.3 ? 0.4 : 0;
   c.grip = G.damp(c.grip || 0, grip, 6, dt);
