@@ -105,6 +105,14 @@ uses those measurements to:
 - set the hat on that skull and over the hair;
 - move the scarf to the collar and size the boots to the feet.
 
+The adults' long wool coats are real meshes in the models (`tools/coats.py` on the
+`claude/character-models` branch: `make_coat()` builds each round its character's body and jumper,
+`skin_coat()` weights it — upper coat like the body, never the arms; the skirt split front and back,
+each half blending from the hips onto its own thigh and a spring bone, `coat_L` / `coat_R`). In the game
+`setDressed` swaps the built-on coat for them, they take the game's wool, and `G.swingCoat` (people.js)
+swings the tails so they trail, swing out on turns and settle when you stop. Hat, scarf and boots stay
+built-on; the boots are sized from each model's own feet and ride its foot bones.
+
 The children in the prologue are child copies of the same characters
 (`models/real/kid_*.glb`, embedded in `js/models_kids.js`), made by `make_kid()`,
 `kid_figure()` and `export_kids()` in `tools/game_export.py`; their bobble hats

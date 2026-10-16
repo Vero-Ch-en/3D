@@ -397,6 +397,9 @@ async function attachBody(root, name, spec, bin) {
       if (spec.fit) u.fit = measureFit(model, u);
       // Fingers (the rig doesn't drive them): found and measured now, in the rest pose, curled every frame.
       u.fingers = findFingers(model);
+      // Coat tails: spring bones the coat's skirt hangs from (tools/coats.py, coat_L / coat_R).
+      u.springs = [];
+      model.traverse((o) => { if (o.isBone && /^coat_?[LR]$/.test(o.name.replace(/[^A-Za-z_]/g, ''))) u.springs.push({ bone: o, q0: o.quaternion.clone(), side: /L$/.test(o.name) ? 1 : -1, a: 0, va: 0, b: 0, vb: 0 }); });
       // Bones parents before children.
       const depth = (b) => { let d = 0; for (let p = b.parent; p; p = p.parent) d++; return d; };
       map.sort((a, b) => depth(a.bone) - depth(b.bone));
@@ -457,6 +460,23 @@ function findFingers(model) {
   return out;
 }
 const _fq = new THREE.Quaternion();
+/* Coat tails on springs: they trail behind when walking, swing out on turns, and settle when you stop.
+ * Each tail follows its leg a little (the coat is weighted to the thigh as well), the spring adds the rest. */
+const _sx = new THREE.Vector3(1, 0, 0), _sz = new THREE.Vector3(0, 0, 1);
+G.swingCoat = (c, dt) => {
+  const u = c.m.userData; if (!u.springs || !u.springs.length || !c.dressed) return;
+  dt = Math.min(dt, 1 / 20);
+  const sp = c.lie ? 0 : (c.speed || 0), acc = (sp - (c._csp || 0)) / Math.max(dt, 1e-3); c._csp = sp;
+  const turn = c.turnLean || 0, sit = c.sit || 0;
+  for (const S of u.springs) {
+    // back (trailing) with speed, forward when slowing; out on the outside of a turn; tucked when sitting
+    const ta = (-0.07 * Math.min(sp, 2.2) + 0.025 * Math.max(-3, Math.min(3, acc))) * (1 - sit) + sit * -0.25;
+    const tb = -turn * 2.2 * S.side * 0 + turn * 1.6;
+    S.va += ((ta - S.a) * 60 - S.va * 7) * dt; S.a += S.va * dt;
+    S.vb += ((tb - S.b) * 50 - S.vb * 7) * dt; S.b += S.vb * dt;
+    S.bone.quaternion.copy(S.q0).multiply(_fq.setFromAxisAngle(_sx, S.a * (u.springSign || 1))).multiply(_fq.setFromAxisAngle(_sz, S.b));
+  }
+};
 // How far each finger curls, per joint, for a relaxed hand; holding something closes them further.
 const CURL = { Thumb: [0.1, 0.15, 0.15], Index: [0.18, 0.28, 0.2], Middle: [0.24, 0.34, 0.24], Ring: [0.3, 0.4, 0.27], Pinky: [0.36, 0.45, 0.3] };
 G.curlFingers = (c, dt) => {
@@ -491,6 +511,13 @@ function measureFit(model, u) {
   model.traverse((o) => {
     if (!o.isMesh) return;
     const n = o.name.toLowerCase();
+    if (/^coat/.test(n)) {
+      // The model's own long coat (tools/coats.py): shown when dressed (life.js, setDressed), in the game's wool.
+      u.realCoat = (u.realCoat || []).concat(o);
+      if (G.TX && G.TX.jersey) { o.material.map = G.rep(G.TX.jersey, 3, 3); o.material.bumpMap = G.TX.jerseyB || null; o.material.bumpScale = 0.004; o.material.roughness = 1; o.material.side = THREE.DoubleSide; o.material.needsUpdate = true; }
+      o.visible = false; o.userData.warm = true; o.userData.gear = true;
+      return;
+    }
     const key = /sweater|hood|cord|pocket/.test(n) ? 'top' : /sock/.test(n) ? 'socks' : /^human_(kid_)?(partner|player)$/.test(n) ? 'skin'
       : /legging|trouser|jean/.test(n) ? 'legs' : /hair|ponytail|fringe|short|bun|braid/.test(n) ? 'hair' : null;
     if (!key) return;
@@ -738,5 +765,6 @@ G.animate = (c, dt, t) => {
   if (mb) { u.head.rotation.x += mb.head[0] * hk; u.head.rotation.y += mb.head[1] * hk; u.head.rotation.z += mb.head[2] * hk; }
   G.retarget(c.m);
   G.curlFingers(c, dt);
+  G.swingCoat(c, dt);
 };
 })();

@@ -23,7 +23,7 @@ function buildGear(m, o) {
   const u = m.userData, k = u.k, fem = !!o.fem;
   const W = fem ? { hip: 0.172, waist: 0.13, chest: 0.155, sh: 0.16 } : { hip: 0.162, waist: 0.15, chest: 0.18, sh: 0.19 };
   const parts = [];
-  const add = (mesh, parent, x = 0, y = 0, z = 0) => { mesh.position.set(x * k, y * k, z * k); mesh.castShadow = true; mesh.receiveShadow = true; mesh.visible = false; mesh.userData.warm = true; parent.add(mesh); parts.push(mesh); return mesh; };
+  const add = (mesh, parent, x = 0, y = 0, z = 0) => { if (mesh.material === coatM || (parent === u.spine && mesh.geometry.parameters && mesh.geometry.parameters.radius < 0.01 * k)) mesh.userData.coatPiece = true; /* coat and its buttons */ mesh.position.set(x * k, y * k, z * k); mesh.castShadow = true; mesh.receiveShadow = true; mesh.visible = false; mesh.userData.warm = true; parent.add(mesh); parts.push(mesh); return mesh; };
   // Profiles must run bottom to top, or the lathe's faces point inward and get culled.
   const lathe = (pts, seg = 32) => { const P = pts[0][1] > pts[pts.length - 1][1] ? pts.slice().reverse() : pts; return new THREE.LatheGeometry(P.map(([r, y]) => new THREE.Vector2(Math.max(0.0005, r) * k, y * k)), seg); };
   const coatM = G.std({ map: G.rep(G.TX.jersey, 2, 2), color: o.coat, bumpMap: G.TX.jerseyB, bumpScale: 0.004, roughness: 1, env: 0.2 });
@@ -152,6 +152,10 @@ function fitGear(c) {
     }
     g.snow.forEach((s) => { if (s.parent === u.head) s.position.y += dyHat; else { s.position.x *= sT; s.position.z *= sT; } });
     out.boots = fitBoots(m, g.parts.filter((p) => foot(p.parent)));
+    // The model's own long coat wears the same wool and colour as the built-on one did.
+    // Over the long coat's own collar the scarf sits a little lower and wider, wrapped round it, not the chin.
+    if ((u.realCoat || []).length) g.parts.forEach((p) => { if (p.parent === u.chest && p.material !== g.coatM && !p.userData.coatPiece) { p.position.y -= 0.035 * k; p.scale.x *= 1.08; p.scale.z *= 1.1; } });
+    (u.realCoat || []).forEach((o) => { const mt = g.coatM.clone(); mt.skinning = true; mt.side = THREE.DoubleSide; mt.map = G.rep(G.TX.jersey, 4, 4); G.MATS && G.MATS.push(mt); o.material = mt; });
     out.flare = +(torso.userData.flare || 1).toFixed(3);
     need.forEach((s, p) => { out[p.parent === u.spine ? 'coat' : (out.sl = (out.sl || 0) + 1, 'sleeve' + out.sl)] = +s.toFixed(3); });
     return Object.assign(out, { sH: +sH.toFixed(3), dyHat: +dyHat.toFixed(3), dyScarf: +dyScarf.toFixed(3), sB: +sB.toFixed(3) });
@@ -234,7 +238,13 @@ function setDressed(c, on) {
   if (G.HOOK_COATS) G.HOOK_COATS[c === PLAYER ? 0 : 1].visible = !on;
   BOOTS[c === PLAYER ? 0 : 1].visible = !on;
   // A realistic body's own jumper would poke through the coat: it goes under it, out of sight.
-  ((c === PLAYER ? ADULT.player : ADULT.partner).userData.realTop || []).forEach((o) => { o.visible = !on; });
+  const mu = (c === PLAYER ? ADULT.player : ADULT.partner).userData;
+  (mu.realTop || []).forEach((o) => { o.visible = !on; });
+  // A realistic body with its own long coat wears that instead of the built-on one (hat, scarf, boots stay).
+  if (mu.realCoat && mu.realCoat.length) {
+    mu.realCoat.forEach((o) => { o.visible = on; });
+    g.parts.forEach((p) => { if (p.userData.coatPiece) p.visible = false; });
+  }
 }
 G.setDressed = setDressed;
 
