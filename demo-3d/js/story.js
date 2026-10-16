@@ -24,7 +24,7 @@ const fresh = () => ({
   chapter: null,
   vars: { bond: 0, trust: 0, rivalry: 0, fear: 0 },
   mem: { hugs: 0, holds: 0, teases: 0, kisses: 0, fridge: 0, foodStolen: 0, foodShared: 0, snacks: 0, sitBeside: 0, sitAcross: 0, affection: 0, partnerInit: 0 },
-  flags: {}, scrap: [], talked: {}, n: {}, reacted: {},
+  flags: {}, scrap: [], talked: {}, n: {}, reacted: {}, photos: [], life: {},
 });
 const S = (G.S = fresh());
 const addBond = (v) => { S.vars.bond = Math.min(12, S.vars.bond + v); };
@@ -36,7 +36,11 @@ const cyc = (id, lines) => { S.n[id] = (S.n[id] || 0) + 1; return lines[Math.min
 const SAVE_KEY = 'cbs.base.save';
 function checkpoint(chapter) {
   S.chapter = chapter;
-  try { localStorage.setItem(SAVE_KEY, JSON.stringify({ v: 1, chapter, vars: S.vars, mem: S.mem, scrap: S.scrap, talked: S.talked, flags: { pancakeQuality: S.flags.pancakeQuality, teaMade: S.flags.teaMade } })); } catch (e) { /* private mode */ }
+  const data = { v: 1, chapter, vars: S.vars, mem: S.mem, scrap: S.scrap, talked: S.talked, flags: { pancakeQuality: S.flags.pancakeQuality, teaMade: S.flags.teaMade }, life: S.life, photos: S.photos };
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify(data)); } catch (e) {
+    // Photographs are the big part; if storage is full, keep the story and drop the oldest pictures.
+    try { data.photos = S.photos.slice(-3); localStorage.setItem(SAVE_KEY, JSON.stringify(data)); } catch (e2) { /* private mode */ }
+  }
 }
 function loadSave() { try { const d = JSON.parse(localStorage.getItem(SAVE_KEY)); return d && d.v === 1 && CH[d.chapter] ? d : null; } catch (e) { return null; } }
 if (loadSave()) G.$('continue').hidden = false;
@@ -134,8 +138,8 @@ async function run(fn, id) {
   STATE.busy = false;
   if (id) { S.lastUse = { id, t: G.simT, room: hereRoom() }; react(id); const it = findInter(id); if (it && canHear() && !PARTNER.task) G.gaze(PARTNER, it.pos, 2.4); }
 }
-const inter = (id, pos, r, label, act, when) => G.INTER.push({ id, pos, r, label, act: () => run(act, id), when });
-const rewire = (id, act) => { const it = findInter(id); it.act = () => run(act, id); return it; };
+const inter = (id, pos, r, label, act, when) => G.INTER.push({ id, pos, r, label, act: () => run(act, id), raw: act, when });
+const rewire = (id, act) => { const it = findInter(id); it.raw = act; it.act = () => run(act, id); return it; };
 const Pt = (t, o) => { S.pSpoke = true; return P(t, o); };   // Partner speaking inside an interaction
 
 /* ---------- Partner reacts to what you're doing, if she's within earshot ----------
@@ -355,7 +359,7 @@ async function sitSofa() {
   PLAYER.freeSit = from;
   if (G.SETTINGS.view === 'first') G.CAM.yaw = 0;
   S.pSpoke = true;   // the sofa has its own replies
-  const partnerThere = PARTNER.task && PARTNER.task.o.id === 'sofa' && PARTNER.task.phase === 'do';
+  const partnerThere = PARTNER.task && (PARTNER.task.o.id === 'sofa' || PARTNER.task.o.id === 'nap') && PARTNER.task.phase === 'do';
   if (partnerThere) { S.mem.affection++; addBond(0.4); G.bark(['*leans against you*', 'Mm. My pillow has arrived.', 'Oh, good. The heater.'], 2.4); return; }
   await N(S.flags.sofaN ? '(The sofa. It knows the exact shape of both of you.)' : '(You sink into the sofa. It makes a noise as if it had been waiting for you.)');
   S.flags.sofaN = 1;
@@ -525,6 +529,9 @@ async function together() {
   if (!seated && snowy) acts.push({ id: 'snow', t: 'Throw a snowball' });
   if (!seated && music) acts.push({ id: 'dance', t: 'Dance' });
   if (!p.lie) acts.push({ id: 'tease', t: 'Tease' });
+  // Other things to do together (snowmen, snow angels, a photograph...) add themselves here.
+  const ctx = { seated, snowy, music, out: !G.inside(PLAYER.x, PLAYER.z) };
+  for (const x of EXTRA) { try { if (x.when(ctx)) acts.push({ id: x.id, t: typeof x.t === 'function' ? x.t(ctx) : x.t }); } catch (e) { console.error(e); } }
   acts.push({ id: 'kiss', t: 'Kiss' }, { id: 'talk', t: 'Talk' });
   STATE.busy = true;   // she waits while you decide
   const keep = p.task && p.task.phase === 'go' ? null : p.task;
@@ -560,8 +567,10 @@ async function together() {
     case 'snow': await snowball(); return;
     case 'dance': S.mem.dances = (S.mem.dances || 0) + 1; S.mem.affection++; addBond(S.mem.dances < 3 ? 0.5 : 0.1); if (S.mem.dances === 1) addScrap('dance', 'A slow dance in the kitchen. Somebody stepped on somebody’s foot.'); await G.dance(); return;
     case 'talk': STATE.busy = true; await talk(); STATE.busy = false; return;
+    default: { const x = EXTRA.find((e) => e.id === id); if (x) { try { await x.run(); } catch (e) { console.error(e); STATE.busy = false; } } }
   }
 }
+const EXTRA = (G.TOGETHER_EXTRA = []);
 /* =====================================================================
  * Shots
  * ===================================================================== */
@@ -580,7 +589,7 @@ Object.assign(Story, {
   together,
   async begin(fromSave) {
     const sv = fromSave && loadSave();
-    if (sv) { Object.assign(S, fresh(), { vars: sv.vars, mem: sv.mem, scrap: sv.scrap || [], talked: sv.talked || {} }); Object.assign(S.flags, sv.flags || {}); return go(sv.chapter); }
+    if (sv) { Object.assign(S, fresh(), { vars: sv.vars, mem: sv.mem, scrap: sv.scrap || [], talked: sv.talked || {}, life: sv.life || {}, photos: sv.photos || [] }); Object.assign(S.flags, sv.flags || {}); if (G.onLoadSave) G.onLoadSave(S); return go(sv.chapter); }
     Object.assign(S, fresh());
     return go('prologue');
   },
@@ -694,7 +703,8 @@ function flipAnim(m, color) {
 }
 function quiet() {
   // Clear anything a previous scene left running.
-  for (const c of [PLAYER, PARTNER]) { c.script = null; c.slide = null; c.lie = false; c.sit = c.sitTarget = 0; c.freeSit = null; c.rise = null; c.task = null; c.lead = null; c.speed = 0; c.nav = null; c.lidsClosed = false; c.tilt = c.tiltTarget = 0; }
+  for (const c of [PLAYER, PARTNER]) { c.script = null; c.slide = null; c.lie = false; c.sit = c.sitTarget = 0; c.freeSit = null; c.rise = null; c.task = null; c.lead = null; c.speed = 0; c.nav = null; c.lidsClosed = false; c.tilt = c.tiltTarget = 0; c.angel = false; c.holdPose = null; c.forcePose = null; c.lieTilt = null; c.dozing = false; }
+  if (G.onQuiet) G.onQuiet();
   G.setHold(false); PARTNER.hidden = false; PARTNER.m.visible = true; PARTNER.mode = 'follow';
   STATE.busy = false; STATE.sceneShot = false; STATE.noControl = false; STATE.autonomy = false; STATE.bounds = null;
   Object.assign(S.flags, { noTogether: false, noBarks: false, noInteract: false });
@@ -716,7 +726,7 @@ CH.prologue = async () => {
   G.fade(false);
   await G.UI.card(['We don’t remember exactly how it started.'], { hold: 3.8 });
   STATE.busy = false;
-  G.hint(G.MOBILE ? 'Drag on the left side of the screen to walk.' : 'Walk with WASD or the arrow keys.', 7);
+  G.hint(G.MOBILE ? 'Drag on the left side of the screen to walk.' : `Walk with ${[G.keyFor('forward'), G.keyFor('left'), G.keyFor('back'), G.keyFor('right')].join('')} or the arrow keys.`, 7);
   await until(() => dist() < 2.4);
   STATE.noControl = true;
   await wait(0.7);
@@ -795,7 +805,7 @@ CH.morning = async () => {
     STATE.sceneShot = false; G.releaseCamera(); G.CAM.yaw = -Math.PI / 2 + Math.PI; G.CAM.cut = true;
   });
   STATE.busy = false;
-  G.hint(G.MOBILE ? 'Tap Use near things to interact. Tap ♥ near {P} to be together.' : 'E or Space: interact.   Q: be together (hug, hold hands, talk).   V: first person.', 9);
+  G.hint(G.MOBILE ? 'Tap Use near things to interact. Tap ♥ near {P} to be together. ◉ takes a photo.' : `${G.keyFor('interact')} or Space: interact.   ${G.keyFor('together')}: be together (hug, hold hands, talk).   ${G.keyFor('photo')}: take a photo.   ${G.keyFor('view')}: first person.`, 9);
   // She gets up on her own after a while; never in front of you mid-move.
   const run = S.run, live = () => S.run === run;
   (async () => {
@@ -853,4 +863,6 @@ const bench = findInter('bench');
 bench.label = () => (ch() === 'evening' ? (STATE.porchDone ? 'Bench' : 'Watch the stars') : 'Sit on the bench');
 bench.act = () => { if (ch() === 'evening') return G.Story.porch(); return run(() => sitFree(SEATS.bench), 'bench'); };
 G.$('pScrap').addEventListener('click', () => { G.UI.scrapbook(S.scrap); });
+// For the other story files (life.js, walk.js): the same helpers this file uses.
+G.SAPI = { S, P, Y, N, Pt, choose, wait, until, pick, dist, near, addBond, addRivalry, addScrap, cyc, checkpoint, inter, run, rewire, findInter, react, REACT, ABOUT, ROOM, DAY, SMALL, SEATS, JOIN, sitFree, canHear, hereRoom, room, sameRoom, fixed, V, CH, go, quiet, houseFor, setBreakfast, setLamps, showFair, morning };
 });

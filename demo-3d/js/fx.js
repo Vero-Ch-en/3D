@@ -46,13 +46,13 @@ function buildFootprints() {
   FP.mesh = m; FP.born = new Float32Array(FP.N).fill(-1e9);
 }
 let fxTime = 0;
-G.addFootprint = (x, z, yaw, leg, size = 1) => {
+G.addFootprint = (x, z, yaw, leg, size = 1, keep = false) => {
   if (!FP.mesh) return;
   const i = FP.i; FP.i = (FP.i + 1) % FP.N;
   const y = G.floorAt(x, z) + 0.022;
   FP.mesh.setMatrixAt(i, G.mtx(x, y, z, (leg ? 1 : -1) * size, 1, size, yaw + (Math.random() - 0.5) * 0.12));
   FP.mesh.setColorAt(i, new THREE.Color(1, 1, 1));
-  FP.born[i] = fxTime;
+  FP.born[i] = keep ? 1e12 : fxTime;   // kept prints never fill in (until the ring buffer comes round)
   FP.mesh.instanceMatrix.needsUpdate = true; FP.mesh.instanceColor.needsUpdate = true;
 };
 const _c = new THREE.Color(), HIDE = G.mtx(0, -50, 0, 0.0001, 0.0001, 0.0001);
@@ -228,6 +228,7 @@ function buildSteam() {
   for (let i = 0; i < 48; i++) { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, color: '#ffffff', transparent: true, depthWrite: false, opacity: 0 })); s.visible = false; G.scene.add(s); STEAM.pool.push({ s, age: 9, life: 1 }); }
 }
 // rate: wisps per second; dur: seconds of game time (Infinity until cleared); size: wisp scale.
+G.steamMove = (id, x, y, z) => { const e = STEAM.em.get(id); if (e) { e.x = x; e.y = y; e.z = z; } };   // follow a mug that's being carried
 G.steam = (id, x, y, z, o = {}) => { if (o.off) { STEAM.em.delete(id); return; } STEAM.em.set(id, { x, y, z, rate: o.rate || 2, until: fxTime + (o.dur == null ? Infinity : o.dur), size: o.size || 1, acc: 0 }); };
 function updateSteam(dt) {
   for (const [id, e] of STEAM.em) {

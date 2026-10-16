@@ -348,7 +348,13 @@ const ARM_POSES = (G.ARM_POSES = {
   warm: [-1.0, 0.18, -0.45, -0.25],  // hands held out to the fire
   pockets: [-0.18, 0.22, -1.05, -0.55], // hands tucked into the hoodie pocket
   throw: [-2.5, -0.15, -0.5, 0.2],      // arm back over the shoulder (snowballs)
+  carry: [-0.85, 0.3, -1.25, -0.45],    // an armful of logs against the chest
+  read: [-0.95, 0.36, -1.7, -0.7],      // a book held up in both hands
+  water: [-1.05, 0.05, -0.55, 0.1],     // one arm out, tipping a watering can (arm 0 only)
+  wave: [-2.7, -0.3, -0.7, 0.1],        // one hand up (arm 1 only): hello, and a pose for photographs
+  cup: [-0.7, 0.32, -1.85, -0.75],      // a mug cradled in both hands
 });
+const ONE_ARM = { throw: 0, water: 0, wave: 1 };
 G.animate = (c, dt, t) => {
   const u = c.m.userData, k = u.k, { lerp: L, clamp, damp } = G;
   c.m.position.set(c.x, c.y, c.z);
@@ -380,6 +386,7 @@ G.animate = (c, dt, t) => {
     Lg.th.rotation.set(L(Math.sin(p) * 0.55 * w - bend * 0.5, -1.5, sit), 0, L(-s * 0.02 * idle, 0, sit));
     Lg.kn.rotation.x = L(Math.max(0, -Math.sin(p + 0.6)) * 1.0 * w + 0.03 + bend, 1.55, sit);
     Lg.ft.rotation.x = L(Math.sin(p) * 0.2 * w - bend * 0.5, -0.05, sit);
+    if (c.angel) { Lg.th.rotation.set(0, 0, s * (0.05 + 0.32 * (0.5 - 0.5 * Math.cos(t * 2.4)))); Lg.kn.rotation.x = 0.04; }
   });
   u.hips.position.y = L(u.hipY, (c.seatY || 0.6) - c.y + 0.03, sit) - Math.abs(Math.sin(ph)) * 0.03 * w - Math.abs(shift) * 0.006;
   u.hips.position.x = shift * 0.018 * k;
@@ -416,13 +423,15 @@ G.animate = (c, dt, t) => {
     let ex = -0.22 * idle - (0.25 + Math.max(0, -swing) * 0.35) * w, sy = 0;
     if (sit > 0.5) { sx = -0.3; ex = -0.75; sz = s * 0.1; }
     for (const name in ARM_POSES) {
-      const wgt = pw[name] * (1 - sit) * (name === 'warm' ? idle : 1);
-      if (wgt < 0.001 || (name === 'throw' && i !== 0)) continue;   // one arm throws
+      const wgt = pw[name] * (name === 'read' || name === 'cup' ? 1 : 1 - sit) * (name === 'warm' ? idle : 1);   // a book or a mug works sitting down too
+      if (wgt < 0.001 || (ONE_ARM[name] != null && i !== ONE_ARM[name])) continue;   // one arm throws, or waves
       const P = ARM_POSES[name];
       // On this rig +s rolls the arm in toward the body (−s spreads it, as the hug does).
       sx = L(sx, P[0] + (name === 'cold' ? Math.sin(t * 31 + i) * 0.012 : 0), wgt); sz = L(sz, s * P[1], wgt); ex = L(ex, P[2], wgt); sy = L(sy, s * P[3], wgt);
     }
     if (c.pose === 'chin') { if (i === (c.chinSide || 0)) { sx = -1.6; sz = s * -0.35; ex = -2.3; } }
+    // Snow angels: lying on your back, arms sweeping up and down through the snow.
+    if (c.angel) { const sw = 0.5 - 0.5 * Math.cos(t * 2.4); sx = -0.05; sz = -s * (0.25 + 1.55 * sw); ex = -0.12; sy = 0; }
     if (c.hug > 0) {
       // [forward, spread, elbow, twist]; the taller one wraps lower so their arms go around, not over.
       const hp = c.hugPose || [-1.3, 0.6, -1.4, 0];

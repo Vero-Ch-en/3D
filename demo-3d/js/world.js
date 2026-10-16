@@ -15,6 +15,7 @@ const PORCH = (G.PORCH = { x0: 3.4, x1: 11.4, z0: 4.6, z1: 6.6, stepX0: 5.85, st
 const GROUND = -0.35;
 const CLEAR = (G.CLEAR = { x: 6.5, z: 15, r: 23 });
 const LAKE = (G.LAKE = { x: 6, z: 60, r: 16, y: -1.15 });
+const HILL = (G.HILL = { x: 13, z: 36.5, h: 3.0, s: 4.0 });   // the hill past the meadow, with a bench on top (the walk)
 G.SUN_SET = new THREE.Vector3(0.62, 0.17, -1).normalize();
 G.SUN_DAY = new THREE.Vector3(0.55, 0.42, 0.72).normalize();   // morning sun low in the south-east, in through the south windows
 const ANNEX = (G.ANNEX = { x0: 15.1, x1: 16.9, z0: 2.9, z1: 4.75 });
@@ -31,17 +32,23 @@ function terrainH(x, z) {
   const southness = Math.max(0, (z - CLEAR.z) / Math.max(1, dC));
   const rise = smooth(16, 34, dC) * (fbm(x * 0.025 + 5, z * 0.025, 3) * 3.5 + Math.max(0, dC - 32) * 0.11) * (1 - 0.85 * southness);
   h += rise;
+  h += HILL.h * Math.exp(-((x - HILL.x) ** 2 + (z - HILL.z) ** 2) / (2 * HILL.s * HILL.s));
   const dl = Math.hypot(x - LAKE.x, z - LAKE.z);
   h = lerp(h, LAKE.y - 0.25, 1 - smooth(LAKE.r - 1, LAKE.r + 7, dl));
-  return h;
+  return Math.max(h, shoreH(x, z));
 }
 G.terrainH = terrainH;
 G.floorAt = (x, z) => {
   if (x > CAB.x0 - 0.05 && x < CAB.x1 + 0.05 && z > CAB.z0 - 0.05 && z < CAB.z1 + 0.05) return 0;
   if (x > PORCH.x0 && x < PORCH.x1 && z >= PORCH.z0 && z < PORCH.z1) return 0;
   if (x > PORCH.stepX0 && x < PORCH.stepX1 && z >= PORCH.z1 && z < PORCH.stepZ1) return lerp(0, GROUND, (z - PORCH.z1) / (PORCH.stepZ1 - PORCH.z1));
+  if (G.onIce(x, z)) return LAKE.y;
   return terrainH(x, z);
 };
+// The ice, and a shelf of packed snow that brings the shore up to meet it so you can step on and off.
+G.onIce = (x, z) => Math.hypot(x - LAKE.x, z - LAKE.z) < LAKE.r - 0.05;
+function shoreH(x, z) { if (!LAKE) return -9; const d = Math.hypot(x - LAKE.x, z - LAKE.z) - LAKE.r; return d < 0 || d > 3 ? -9 : LAKE.y - d * 0.16; }
+G.shoreH = shoreH;
 G.inside = (x, z) => x > CAB.x0 && x < CAB.x1 && z > CAB.z0 && z < CAB.z1;
 // On wooden floor or decking (inside, porch or its steps) rather than snow.
 G.onDeck = (x, z) => G.inside(x, z) || (x > PORCH.x0 && x < PORCH.x1 && z >= PORCH.z0 - 0.1 && z < PORCH.z1) || (x > PORCH.stepX0 && x < PORCH.stepX1 && z >= PORCH.z1 && z < PORCH.stepZ1);
@@ -51,7 +58,19 @@ const RUGS = [[1.1, 2.4, 3.7, 4.0], [6.55, 1.2, 9.45, 3.2], [11.3, 0.85, 13.6, 1
 G.onRug = (x, z) => RUGS.some((r) => x > r[0] && x < r[2] && z > r[1] && z < r[3]);
 G.walkable = (x, z) => {
   if (Math.hypot(x - CLEAR.x, (z - CLEAR.z) * 0.9) < CLEAR.r) return true;
+  // The walk: past the end of the path, across the meadow, over the hill and down onto the frozen lake.
+  // (The forest leaves this corridor open; see buildForest.)
+  if (z > 26 && z < 66 && Math.abs(x - 6.5) < 4.5 + (z - 8) * 0.25) return true;
   return false;
+};
+// What's underfoot, for footsteps: the packed path, deep snow, ice, the porch, a rug, the creaky board...
+const CREAK = [5.25, 2.0, 5.75, 2.7];   // the board by the bedroom door that everyone knows about
+G.surfaceAt = (x, z) => {
+  if (G.inside(x, z)) return G.onRug(x, z) ? 'rug' : (x > CREAK[0] && x < CREAK[2] && z > CREAK[1] && z < CREAK[3]) ? 'creak' : 'wood';
+  if (G.onDeck(x, z)) return 'porch';
+  if (G.onIce(x, z)) return 'ice';
+  if ((z > 6.5 && z < PATH_END + 0.5 && Math.abs(x - pathX(z)) < 1.3) || rectDist(x, z, -0.6, -0.8, 15.8, 7.8) < 1.2) return 'packed';
+  return 'snow';
 };
 
 /* ---------------- terrain ---------------- */
@@ -368,6 +387,8 @@ G.buildPath = () => {
       G.box(0.18, 0.08, 0.18, capMat, x, y + 1.08, z, { r: 0.04 });
       if (prev) {
         const dx = x - prev.x, dz = z - prev.z, len = Math.hypot(dx, dz);
+        // You can't walk through the fence: a row of small blockers along each rail.
+        for (let t = 0; t <= 1.001; t += 0.25 / len) { const cx = prev.x + dx * t, cz = prev.z + dz * t; G.COLL.push({ x0: cx - 0.09, z0: cz - 0.09, x1: cx + 0.09, z1: cz + 0.09, fence: true }); }
         for (const h of [0.45, 0.85]) {
           const m = G.add(new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.05, len, 7), rail), world);
           m.position.set((x + prev.x) / 2, (y + prev.y) / 2 + h, (z + prev.z) / 2);

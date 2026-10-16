@@ -6,9 +6,39 @@
 (() => {
 const { $, clamp, lerp, damp, rand, MAT } = G;
 /* Player settings, remembered per browser. */
-const SETTINGS = (G.SETTINGS = { volume: 0.8, muted: false, view: 'third', motion: (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) ? 'reduced' : 'full' });
+const SETTINGS = (G.SETTINGS = { volume: 0.8, muted: false, view: 'third', subs: 'm', keys: {}, motion: (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) ? 'reduced' : 'full' });
 try { Object.assign(SETTINGS, JSON.parse(localStorage.getItem('cbs.base.settings') || '{}')); } catch (e) { /* storage unavailable */ }
 const saveSettings = () => { try { localStorage.setItem('cbs.base.settings', JSON.stringify(SETTINGS)); } catch (e) { /* ignore */ } };
+G.saveSettings = saveSettings;
+/* ---------- key bindings ----------
+ * The game reads fixed default codes (KeyW, KeyE...). A rebound key is translated to its action's
+ * default code before anything else sees it, and the old default key stops doing anything, so
+ * every handler (movement, the menus, dialogue) follows the new binding with no other changes.
+ * Arrow keys, Enter and Space always keep working. */
+const KEY_DEFAULTS = (G.KEY_DEFAULTS = { forward: 'KeyW', back: 'KeyS', left: 'KeyA', right: 'KeyD', run: 'ShiftLeft', interact: 'KeyE', together: 'KeyQ', photo: 'KeyT', view: 'KeyV' });
+SETTINGS.keys = Object.assign({}, KEY_DEFAULTS, SETTINGS.keys || {});
+G.keyName = (code) => (code || '').replace(/^Key/, '').replace(/^Digit/, '').replace(/^Shift(Left|Right)$/, 'Shift').replace(/^Control(Left|Right)$/, 'Ctrl').replace(/^Alt(Left|Right)$/, 'Alt').replace('Backquote', '`').replace('Space', 'Space').replace('Tab', 'Tab').replace(/^Numpad/, 'Num ');
+G.keyFor = (action) => G.keyName(SETTINGS.keys[action] || KEY_DEFAULTS[action]);
+function translateKey(code) {
+  const K = SETTINGS.keys;
+  for (const a in KEY_DEFAULTS) if (K[a] === code) return KEY_DEFAULTS[a];
+  for (const a in KEY_DEFAULTS) if (KEY_DEFAULTS[a] === code) return 'Unbound';
+  return code;
+}
+G.REBIND = null;   // { action, done(code) } while the pause menu waits for a key
+const keyTranslate = (e) => {
+  if (G.REBIND && e.type === 'keydown') {
+    e.preventDefault(); e.stopImmediatePropagation();
+    if (!e.repeat) { const R = G.REBIND; G.REBIND = null; R.done(e.code === 'Escape' ? null : e.code); }
+    return;
+  }
+  const t = translateKey(e.code);
+  if (t !== e.code) { try { Object.defineProperty(e, 'code', { value: t }); } catch (err) { /* read-only in this browser */ } }
+};
+addEventListener('keydown', keyTranslate, true);
+addEventListener('keyup', keyTranslate, true);
+G.applySubs = () => { document.documentElement.dataset.subs = SETTINGS.subs || 'm'; };
+G.applySubs();
 G.MOTION = SETTINGS.motion === 'reduced' ? 0 : 1;   // scales handheld sway, step bob and the run zoom
 const STATE = (G.STATE = { started: false, tod: 0, todTarget: 0, day: 0, dayTarget: 0, snow: 1, snowTarget: 1, cuddled: false, cakeDone: false, porchDone: false, busy: false });
 // Wind: a slow gust value (0..1) shared by snowfall, tree sway and the wind sound.
@@ -16,7 +46,8 @@ const WIND = (G.WIND = { gust: 0.3, drift: 0, t: 0 });
 function updateWind(dt) {
   WIND.t += dt;
   const n = G.simplex.noise(WIND.t * 0.06, 3.1) * 0.7 + G.simplex.noise(WIND.t * 0.23, 7.7) * 0.3;
-  WIND.gust = clamp(0.35 + n * 0.65, 0, 1);
+  WIND.bias = damp(WIND.bias || 0, WIND.biasTarget || 0, 0.15, dt);   // the weather leans the gusts calmer or wilder
+  WIND.gust = clamp(0.35 + n * 0.65 + WIND.bias, 0, 1);
   WIND.drift += dt * (0.08 + WIND.gust * 0.55);
   if (G.SWAY) { G.SWAY.uTime.value = WIND.t; G.SWAY.uGust.value = WIND.gust; }
 }
@@ -145,7 +176,7 @@ G.Audio = (() => {
     humAt(p) { humPos = p; },
     // Partner humming the snow globe's tune to herself, a few bars, off-key and content.
     hum() {
-      if (!ctx || radioOn) return 0; const N = [659.3, 784, 880, 784, 659.3, 587.3, 659.3, 523.3], b = 0.55;
+      if (!ctx) return 0; const N = [659.3, 784, 880, 784, 659.3, 587.3, 659.3, 523.3], b = 0.55;
       N.forEach((f0, i) => { const t = ctx.currentTime + i * b * (i === 3 ? 1.6 : 1), f = f0 / 2 * (1 + (Math.random() - 0.5) * 0.01), o = ctx.createOscillator(), v = ctx.createOscillator(), vg = ctx.createGain(), lp = ctx.createBiquadFilter(), g = ctx.createGain();
         o.type = 'triangle'; o.frequency.value = f; v.frequency.value = 5.2; vg.gain.value = f * 0.012; v.connect(vg); vg.connect(o.frequency); lp.type = 'lowpass'; lp.frequency.value = 900;
         g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.022, t + 0.08); g.gain.setTargetAtTime(0.0001, t + b * 0.8, 0.12); o.connect(lp); lp.connect(g); g.connect(SPOTS.hum.in); o.start(t); v.start(t); o.stop(t + b * 1.6); v.stop(t + b * 1.6); });
@@ -171,10 +202,21 @@ G.Audio = (() => {
       if (!ctx) return;
       if (surface === 'rug') { burst(0.06, 260, 0.035 * vol, 'lowpass', 0.8); return; }
       if (surface === 'porch') { burst(0.09, 180, 0.1 * vol, 'lowpass', 1.6); burst(0.05, 900, 0.025 * vol, 'bandpass', 3, 0.01); return; }
-      if (surface === 'snow') {
-        // Crunch: a dull compress then a short bright squeak, both slightly randomised.
-        burst(0.09, 500 + Math.random() * 200, 0.06 * vol, 'lowpass', 0.7);
-        burst(0.12 + Math.random() * 0.05, 2600 + Math.random() * 1400, 0.045 * vol, 'bandpass', 0.9, 0.025);
+      if (surface === 'ice') {
+        // Hard and hollow: a knock, and now and then the faint singing ring of lake ice.
+        burst(0.05, 900 + Math.random() * 300, 0.05 * vol, 'bandpass', 2.5); burst(0.03, 3400, 0.012 * vol, 'highpass', 1, 0.01);
+        if (Math.random() < 0.12) { const t = ctx.currentTime + 0.03, o = ctx.createOscillator(), g = ctx.createGain(); o.frequency.setValueAtTime(1900 + Math.random() * 900, t); o.frequency.exponentialRampToValueAtTime(260, t + 0.5); g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.008 * vol, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.55); o.connect(g); g.connect(master); o.start(t); o.stop(t + 0.6); }
+        return;
+      }
+      if (surface === 'snow' || surface === 'packed') {
+        // Crunch: a dull compress then a short bright squeak, both slightly randomised. Deep snow is
+        // a longer, softer push; the trodden path is a quick, squeakier crunch.
+        const deep = surface === 'snow';
+        burst(deep ? 0.15 : 0.08, (deep ? 380 : 520) + Math.random() * 200, (deep ? 0.075 : 0.05) * vol, 'lowpass', 0.7);
+        burst((deep ? 0.16 : 0.1) + Math.random() * 0.05, (deep ? 2100 : 2900) + Math.random() * 1400, (deep ? 0.035 : 0.05) * vol, 'bandpass', 0.9, deep ? 0.05 : 0.02);
+      } else if (surface === 'creak') {
+        burst(0.07, 240, 0.09 * vol, 'lowpass', 1.2);
+        const t = ctx.currentTime + 0.05, o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.setValueAtTime(150, t); o.frequency.linearRampToValueAtTime(95, t + 0.32); const bf = ctx.createBiquadFilter(); bf.type = 'bandpass'; bf.frequency.value = 760; bf.Q.value = 7; const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.02 * vol, t + 0.06); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.36); o.connect(bf); bf.connect(g); g.connect(master); o.start(t); o.stop(t + 0.4);
       } else {
         burst(0.07, 240 + Math.random() * 60, 0.09 * vol, 'lowpass', 1.2);
         if (Math.random() < 0.18) { const t = ctx.currentTime + 0.04; const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.setValueAtTime(170, t); o.frequency.linearRampToValueAtTime(120 + Math.random() * 40, t + 0.22); const bf = ctx.createBiquadFilter(); bf.type = 'bandpass'; bf.frequency.value = 900; bf.Q.value = 6; const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.012 * vol, t + 0.05); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.26); o.connect(bf); bf.connect(g); g.connect(master); o.start(t); o.stop(t + 0.3); }
@@ -249,6 +291,8 @@ function updateLighting(t, dt, focus) {
   hemi.intensity = lerp(lerp(PAL.hemiI[0], PAL.hemiI[1], n), DAY.hemiI, d) * (inside ? lerp(0.55, DAY.hemiIn, d) : 1);
   G.scene.fog.color.copy(PAL.fog[0]).lerp(PAL.fog[1], n).lerp(DAY.fog, d);
   G.scene.fog.near = lerp(lerp(30, 20, n), 40, d); G.scene.fog.far = lerp(lerp(230, 170, n), 270, d);
+  STATE.fogKs = damp(STATE.fogKs || 1, STATE.fogK || 1, 0.3, dt);   // heavy snow closes the distance in
+  G.scene.fog.near *= STATE.fogKs; G.scene.fog.far *= STATE.fogKs;
   if (STATE.fog) { G.scene.fog.near = STATE.fog.near; G.scene.fog.far = STATE.fog.far; }   // a scene's own fog (the prologue's)
   G.renderer.toneMappingExposure = lerp(lerp(PAL.exposure[0], PAL.exposure[1], n), DAY.exposure, d) * (1 + ik * 0.3) * (STATE.exposureMul || 1);
   const camIn0 = G.inside(G.camera.position.x, G.camera.position.z);
@@ -455,19 +499,31 @@ function moveChar(c, dx, dz) { const ox = c.x, oz = c.z; c.x += dx; c.z += dz; c
  */
 const NAV = { cs: 0.15, x0: -17, z0: -11, nx: 0, nz: 0, open: null, h: null };
 const AGENT_R = 0.21;
+// Out to the frozen lake and the far shore (the walk); closed per collider, not per cell, so it builds fast.
 function buildNav() {
-  const N = NAV; N.nx = Math.ceil((30 - N.x0) / N.cs); N.nz = Math.ceil((42 - N.z0) / N.cs);
+  const N = NAV; N.nx = Math.ceil((32 - N.x0) / N.cs); N.nz = Math.ceil((68 - N.z0) / N.cs);
   const n = N.nx * N.nz; N.open = new Uint8Array(n); N.h = new Float32Array(n);
-  const boxes = G.COLL.filter((b) => !b.solidExterior);
   for (let j = 0; j < N.nz; j++) for (let i = 0; i < N.nx; i++) {
     const x = N.x0 + (i + 0.5) * N.cs, z = N.z0 + (j + 0.5) * N.cs, k = j * N.nx + i;
     N.h[k] = G.floorAt(x, z);
-    if (!G.walkable(x, z)) continue;
-    let ok = true;
-    for (const b of boxes) { if (x > b.x0 - AGENT_R && x < b.x1 + AGENT_R && z > b.z0 - AGENT_R && z < b.z1 + AGENT_R) { const dx = Math.max(b.x0 - x, 0, x - b.x1), dz = Math.max(b.z0 - z, 0, z - b.z1); if (Math.hypot(dx, dz) < AGENT_R) { ok = false; break; } } }
-    N.open[k] = ok ? 1 : 0;
+    N.open[k] = G.walkable(x, z) ? 1 : 0;
+  }
+  for (const b of G.COLL) if (!b.solidExterior) navClose(b);
+}
+function navClose(b) {
+  const N = NAV, R = AGENT_R;
+  const i0 = Math.max(0, Math.floor((b.x0 - R - N.x0) / N.cs)), i1 = Math.min(N.nx - 1, Math.floor((b.x1 + R - N.x0) / N.cs));
+  const j0 = Math.max(0, Math.floor((b.z0 - R - N.z0) / N.cs)), j1 = Math.min(N.nz - 1, Math.floor((b.z1 + R - N.z0) / N.cs));
+  for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+    const x = N.x0 + (i + 0.5) * N.cs, z = N.z0 + (j + 0.5) * N.cs;
+    const dx = Math.max(b.x0 - x, 0, x - b.x1), dz = Math.max(b.z0 - z, 0, z - b.z1);
+    if (Math.hypot(dx, dz) < R) N.open[j * N.nx + i] = 0;
   }
 }
+G.buildNav = buildNav;
+G.navOpen = (x, z) => { if (!NAV.open) buildNav(); const [i, j] = cellOf(x, z); return isOpen(i, j); };
+// Add a solid thing to the world after boot (a snowman): a collider, closed off on the nav grid too.
+G.addCollider = (b) => { G.COLL.push(b); if (NAV.open) navClose(b); };
 const cellOf = (x, z) => [Math.floor((x - NAV.x0) / NAV.cs), Math.floor((z - NAV.z0) / NAV.cs)];
 const cellPos = (i, j) => ({ x: NAV.x0 + (i + 0.5) * NAV.cs, z: NAV.z0 + (j + 0.5) * NAV.cs });
 const inGrid = (i, j) => i >= 0 && j >= 0 && i < NAV.nx && j < NAV.nz;
@@ -493,11 +549,11 @@ function lineClear(a, b) {
   }
   return true;
 }
-let heapK, heapF, gScore, came, closed;
+let heapK, heapF, gScore, came, closed, gridN = 0;
 function findPath(sx, sz, tx, tz) {
   if (!NAV.open) buildNav();
   const n = NAV.nx * NAV.nz;
-  if (!gScore) { gScore = new Float32Array(n); came = new Int32Array(n); closed = new Uint8Array(n); heapK = new Int32Array(n); heapF = new Float32Array(n); }
+  if (!gScore || gridN !== n) { gridN = n; gScore = new Float32Array(n); came = new Int32Array(n); closed = new Uint8Array(n); heapK = new Int32Array(n); heapF = new Float32Array(n); }
   const s = nearestOpen(...cellOf(sx, sz), 6), t = nearestOpen(...cellOf(tx, tz));
   if (!s || !t) return null;
   const goal = t[1] * NAV.nx + t[0], start = s[1] * NAV.nx + s[0];
@@ -508,7 +564,7 @@ function findPath(sx, sz, tx, tz) {
   const hEst = (i, j) => { const dx = Math.abs(i - t[0]), dz = Math.abs(j - t[1]); return Math.max(dx, dz) + 0.414 * Math.min(dx, dz); };
   gScore[start] = 0; push(start, hEst(s[0], s[1]));
   let found = false, iter = 0;
-  while (hn && iter++ < 60000) {
+  while (hn && iter++ < 120000) {
     const k = pop();
     if (closed[k]) continue;
     if (k === goal) { found = true; break; }
@@ -734,6 +790,7 @@ addEventListener('keydown', (e) => {
   if (e.code === 'KeyM') { setMuted(!SETTINGS.muted); return; }
   if (e.code === 'KeyV' && !STATE.paused) { setView(SETTINGS.view === 'first' ? 'third' : 'first'); return; }
   if (STATE.paused) return;
+  if (e.code === 'KeyT' && !e.repeat && STATE.started && G.takePhoto) { G.takePhoto(); return; }
   if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
   if (!keys.has(e.code)) pressed.add(e.code);
   keys.add(e.code); G.Audio.start();
@@ -742,6 +799,7 @@ addEventListener('keydown', (e) => {
 addEventListener('keyup', (e) => keys.delete(e.code));
 addEventListener('blur', () => keys.clear());
 const hit = (...c) => c.some((k) => pressed.has(k));
+G.hit = hit; G.pressed = pressed;
 let drag = null;
 G.canvas.addEventListener('pointerdown', (e) => { drag = { id: e.pointerId, x: e.clientX, y: e.clientY }; try { G.canvas.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ } G.Audio.start(); });
 G.canvas.addEventListener('pointermove', (e) => { if (!drag || drag.id !== e.pointerId || CAM.shot || STATE.paused) return; CAM.yaw -= (e.clientX - drag.x) * 0.006; if (SETTINGS.view === 'first') CAM.fpPitch = clamp((CAM.fpPitch || 0) + (e.clientY - drag.y) * 0.004, -0.9, 1.0); else CAM.pitch = clamp(CAM.pitch + (e.clientY - drag.y) * 0.004, -0.2, 0.85); drag.x = e.clientX; drag.y = e.clientY; CAM.lastDrag = G.simT; });
@@ -757,6 +815,7 @@ const stick = { x: 0, y: 0, on: false };
   zone.addEventListener('pointerup', end); zone.addEventListener('pointercancel', end);
   $('btn-use').addEventListener('pointerdown', (e) => { e.preventDefault(); pressed.add('KeyE'); });
   $('btn-hug').addEventListener('pointerdown', (e) => { e.preventDefault(); pressed.add('KeyQ'); });
+  if ($('btn-photo')) $('btn-photo').addEventListener('pointerdown', (e) => { e.preventDefault(); if (G.takePhoto) G.takePhoto(); });
 })();
 
 /* =====================================================================
@@ -875,7 +934,7 @@ function partnerTask(p, dt, t) {
   const T = p.task, o = T.o, dP = Math.hypot(PLAYER.x - p.x, PLAYER.z - p.z);
   T.t += dt;
   if (T.phase === 'go') {
-    if (dP > 11 || T.t > 14) { p.task = null; return false; }
+    if ((dP > 11 && !o.stay) || T.t > (o.stay ? 30 : 14)) { p.task = null; return false; }
     if (steer(p, o.spot.x, o.spot.z, 1.2, dt, 0.1)) {
       T.phase = 'do'; T.t = 0; T.dur = o.dur[0] + Math.random() * (o.dur[1] - o.dur[0]);
       p.speed = 0; p.nav = null;
@@ -891,12 +950,14 @@ function partnerTask(p, dt, t) {
   // doing it
   if (o.yaw != null && !o.seatAt) p.yaw = angDamp(p.yaw, o.yaw, 4, dt);
   p.lookAt = o.look ? { x: o.look.x, z: o.look.z, headY: o.look.y } : (Math.sin(t * 0.5) > 0.7 ? head(PLAYER) : null);
-  const done = T.t > T.dur || (dP > 9 && !p.hidden) || T.abort;
+  if (o.onTick) o.onTick(p, dt, T);
+  const done = T.t > T.dur || (dP > 9 && !p.hidden && !o.stay) || T.abort;
   if (done) endTask(p);
   return true;
 }
 function endTask(p) {
   const T = p.task; if (!T) return;
+  if (T.o.onEnd) { try { T.o.onEnd(p, T); } catch (e) { console.error(e); } }
   if (p.hidden) { p.hidden = false; p.m.visible = true; if (T.o.exit) placeChar(p, T.o.exit.x, T.o.exit.z, T.o.exit.yaw || 0); bark(['*reappears, entirely casual*', 'Hm? I wasn’t doing anything.', 'There’s nothing in there. Please don’t look.'], 2.4); }
   if (p.sitTarget) { p.sitTarget = 0; G.slideTo(p, T.o.spot.x, T.o.spot.z, null, 0.55); }
   p.task = null; p.nav = null;
@@ -971,7 +1032,7 @@ const Story = (G.Story = {
     STATE.sceneShot = false; STATE.busy = false;
     PARTNER.mode = 'follow';
     releaseCamera();
-    hint(G.MOBILE ? 'Drag on the left to walk; drag on the right to look. Use to interact, ♥ to be together.' : 'WASD to walk, Shift to run. Drag to look, scroll to zoom. E to interact, Q to be together.', 8);
+    hint(G.MOBILE ? 'Drag on the left to walk; drag on the right to look. Use to interact, ♥ to be together.' : `${[G.keyFor('forward'), G.keyFor('left'), G.keyFor('back'), G.keyFor('right')].join('')} to walk, ${G.keyFor('run')} to run. Drag to look, scroll to zoom. ${G.keyFor('interact')} to interact, ${G.keyFor('together')} to be together.`, 8);
     STATE.watchDoor = true;
   },
   async cake() {
@@ -1141,6 +1202,7 @@ G.dance = dance;
  * ===================================================================== */
 function setPaused(on) {
   if (on === !!STATE.paused) return;
+  G.REBIND = null;
   if (on && (!STATE.started || $('endcard').classList.contains('show'))) return;
   STATE.paused = on;
   $('pause').hidden = !on;
@@ -1158,7 +1220,36 @@ function syncPauseUI() {
   $('pMute').textContent = SETTINGS.muted ? 'Muted' : 'Mute';
   document.querySelectorAll('[data-motion]').forEach((b) => b.classList.toggle('on', b.dataset.motion === SETTINGS.motion));
   document.querySelectorAll('[data-view]').forEach((b) => b.classList.toggle('on', b.dataset.view === SETTINGS.view));
+  document.querySelectorAll('[data-subs]').forEach((b) => b.classList.toggle('on', b.dataset.subs === (SETTINGS.subs || 'm')));
+  renderControls();
 }
+/* Controls: every rebindable action with its key. Click one, then press the new key (Esc cancels). */
+const ACTION_NAMES = { forward: 'Walk forward', back: 'Walk back', left: 'Walk left', right: 'Walk right', run: 'Run', interact: 'Interact', together: 'Together', photo: 'Take a photo', view: 'First / third person' };
+const RESERVED = ['Escape', 'KeyP', 'KeyM', 'Backquote', 'Enter', 'Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab', 'MetaLeft', 'MetaRight'];
+function renderControls() {
+  const box = $('pControls'); if (!box) return;
+  box.innerHTML = Object.keys(KEY_DEFAULTS).map((a) => `<span>${ACTION_NAMES[a]}</span><button class="btn small" type="button" data-bind="${a}">${G.keyFor(a)}</button>`).join('');
+  box.querySelectorAll('[data-bind]').forEach((b) => b.addEventListener('click', () => {
+    const a = b.dataset.bind;
+    box.querySelectorAll('.wait').forEach((x) => { x.classList.remove('wait'); });
+    b.classList.add('wait'); b.textContent = 'Press a key…';
+    G.REBIND = { action: a, done(code) {
+      if (code && !RESERVED.includes(code) && !/^Digit/.test(code)) {
+        // A key can only do one thing: whatever had it before takes this action's old key.
+        const K = SETTINGS.keys, old = K[a];
+        for (const o in K) if (o !== a && K[o] === code) K[o] = old;
+        K[a] = code; saveSettings(); keys.clear();
+      } else if (code) hint('That key is kept for something else.', 2.5);
+      renderControls(); updateKeyHints();
+    } };
+  }));
+}
+function updateKeyHints() {
+  const k = (a) => G.keyFor(a), mv = [k('forward'), k('left'), k('back'), k('right')].join('');
+  const t = $('titleKeys'); if (t) t.textContent = `${mv} walk · ${k('run')} run · drag to look · scroll to zoom · ${k('interact')} interact · ${k('together')} together · ${k('photo')} take a photo · ${k('view')} first person · N time of day · \` stats`;
+  const pk = $('pKeys'); if (pk) pk.textContent = `Esc pause · M mute · ${k('view')} first/third person · ${mv} walk · ${k('run')} run · ${k('interact')} interact · ${k('together')} together · ${k('photo')} photo`;
+}
+G.updateKeyHints = updateKeyHints;
 G.setPaused = setPaused;
 function initPauseUI() {
   $('pauseBtn').addEventListener('click', () => setPaused(true));
@@ -1167,6 +1258,9 @@ function initPauseUI() {
   $('pVolume').addEventListener('input', (e) => { SETTINGS.volume = e.target.value / 100; if (SETTINGS.volume > 0 && SETTINGS.muted) SETTINGS.muted = false; saveSettings(); G.Audio.applyVolume(); syncPauseUI(); });
   $('pMute').addEventListener('click', () => setMuted(!SETTINGS.muted));
   document.querySelectorAll('[data-view]').forEach((b) => b.addEventListener('click', () => setView(b.dataset.view)));
+  document.querySelectorAll('[data-subs]').forEach((b) => b.addEventListener('click', () => { SETTINGS.subs = b.dataset.subs; saveSettings(); G.applySubs(); syncPauseUI(); }));
+  if ($('pKeysReset')) $('pKeysReset').addEventListener('click', () => { SETTINGS.keys = Object.assign({}, KEY_DEFAULTS); saveSettings(); G.REBIND = null; renderControls(); updateKeyHints(); });
+  updateKeyHints();
   document.querySelectorAll('[data-motion]').forEach((b) => b.addEventListener('click', () => { SETTINGS.motion = b.dataset.motion; G.MOTION = SETTINGS.motion === 'reduced' ? 0 : 1; saveSettings(); syncPauseUI(); }));
   // Leaving the tab pauses the game and its sound.
   document.addEventListener('visibilitychange', () => { if (document.hidden) setPaused(true); });
@@ -1199,10 +1293,13 @@ function ambientPoses(dt) {
     let facing = toFire - c.yaw; while (facing > Math.PI) facing -= 2 * Math.PI; while (facing < -Math.PI) facing += 2 * Math.PI;
     const nearFire = G.FIRE.on && G.inside(c.x, c.z) && Math.hypot(c.x - FIRE_AT.x, c.z - FIRE_AT.z) < 2.2;
     let pose = null;
-    if (STATE.hugging || (c.sit || 0) > 0.2 || c.script || c.lie || c.holdOn) pose = null;
+    if (c.carry && !c.lie && !STATE.hugging) pose = 'carry';
+    else if (c.holdPose && !c.lie && !STATE.hugging) pose = c.holdPose;   // a book, a watering can: whatever she's busy with
+    else if (STATE.hugging || (c.sit || 0) > 0.2 || c.script || c.lie || c.holdOn) pose = null;
     else if (nearFire && c === PARTNER && c.idleT > 1.2 && !busy()) pose = 'warm';   // not mid-conversation
     else if (nearFire && c === PLAYER && c.idleT > 2.5 && Math.abs(facing) < 1.0) pose = 'warm';
     else if (out && c === PARTNER && (STATE.tod > 0.35 || c.idleT > 5)) pose = 'cold';
+    else if (c === PLAYER && (c.cold || 0) > 0.6 && c.idleT > 1.2 && !c.holdOn) pose = 'cold';   // shivering
     else if (out && c === PLAYER && c.idleT > 3.5) pose = 'pockets';
     c.pose = pose;
   }
@@ -1249,7 +1346,7 @@ function step(dt, t) {
     if (steer(PLAYER, s.x, s.z, s.speed || 1.2, dt, 0.08) || s.t > 20) { PLAYER.script = null; s.res && s.res(); }
   } else {
     const run = keys.has('ShiftLeft') || keys.has('ShiftRight') || (stick.on && l > 0.95);
-    const target = l > 0.05 ? (run ? 3.1 : 1.5) * Math.min(1, l) : 0;
+    const target = l > 0.05 ? (run ? 3.1 : 1.5) * Math.min(1, l) * (PLAYER.speedMul || 1) : 0;   // deep snow and armfuls of logs slow you down
     PLAYER.speed = damp(PLAYER.speed, target, 7, dt);
     const fp = SETTINGS.view === 'first' && !CAM.shot;
     if (l > 0.05) {
@@ -1275,7 +1372,7 @@ function step(dt, t) {
   // Music: she sways a little when the radio's on and she's standing about nearby.
   if (G.Audio.radioOn && !STATE.dancing) {
     const hearRadio = G.Audio.radioOn() && G.inside(PARTNER.x, PARTNER.z) && PARTNER.x > 5;
-    PARTNER.swayTarget = hearRadio && PARTNER.speed < 0.15 && !(PARTNER.sit > 0.2) && !PARTNER.task && !PARTNER.lie ? 0.55 : 0;
+    PARTNER.swayTarget = hearRadio && PARTNER.speed < 0.15 && !(PARTNER.sit > 0.2) && (!PARTNER.task || PARTNER.task.o.sway) && !PARTNER.lie ? 0.55 : 0;
     PLAYER.swayTarget = 0;
   }
   G.Audio.humAt(G.headPos(PARTNER));
@@ -1322,17 +1419,17 @@ function step(dt, t) {
     // Footsteps: sound and (on snow) a footprint at each heel strike.
     if (c.stepEvent) {
       const e = c.stepEvent; c.stepEvent = null;
-      const deck = G.onDeck(e.x, e.z), indoors = G.inside(e.x, e.z);
-      const surf = !deck ? 'snow' : !indoors ? 'porch' : G.onRug(e.x, e.z) ? 'rug' : 'wood';
+      const deck = G.onDeck(e.x, e.z);
+      const surf = G.surfaceAt(e.x, e.z);
       const vol = c === PLAYER ? 1 : clamp(1.3 - Math.hypot(PARTNER.x - PLAYER.x, PARTNER.z - PLAYER.z) * 0.25, 0, 0.7);
       if (vol > 0.02) G.Audio.step(surf, vol * clamp(c.speed / 1.5, 0.5, 1.4));
-      if (!deck && G.addFootprint) G.addFootprint(e.x, e.z, e.yaw, e.leg, c === PLAYER ? 1.05 : 0.9);
+      if (!deck && surf !== 'ice' && G.addFootprint) G.addFootprint(e.x, e.z, e.yaw, e.leg, c === PLAYER ? 1.05 : 0.9);
       // Boots that were in the snow leave wet prints on the boards for a while after you come in.
-      if (!deck) c.snowyT = 30; else if (c.snowyT > 0 && surf !== 'rug' && G.addWetPrint) G.addWetPrint(e.x, e.z, e.yaw, e.leg, c === PLAYER ? 1.05 : 0.9, c.snowyT / 30);
+      if (!deck) c.snowyT = surf === 'ice' ? Math.max(c.snowyT || 0, 10) : 30; else if (c.snowyT > 0 && surf !== 'rug' && G.addWetPrint) G.addWetPrint(e.x, e.z, e.yaw, e.leg, c === PLAYER ? 1.05 : 0.9, c.snowyT / 30);
     }
     // Breath shows on each exhale whenever you're out in the cold.
     const cyc = Math.floor((c.breath || 0) / (2 * Math.PI));
-    if (cyc !== c._cyc) { c._cyc = cyc; if (!G.inside(c.x, c.z)) G.breathe(c, c.speed > 2 ? 1.3 : 1); }
+    if (cyc !== c._cyc) { c._cyc = cyc; if (!G.inside(c.x, c.z)) G.breathe(c, (c.speed > 2 ? 1.3 : 1) * (1 + (c.cold || 0) * 0.7)); }   // colder, heavier
   }
   PLAYER.lookAt = Math.hypot(PARTNER.x - PLAYER.x, PARTNER.z - PLAYER.z) < 3 && !PARTNER.hidden ? head(PARTNER) : null;
   // Interaction prompt
@@ -1348,8 +1445,8 @@ function step(dt, t) {
   const nearP = (free || (sittingFree && together)) && !PARTNER.hidden && (!PARTNER.lie || together) && !PARTNER.script && Math.hypot(ph.x - PLAYER.x, ph.z - PLAYER.z) < (PARTNER.hold ? 1.8 : PARTNER.lie ? 1.5 : 1.4) && (together ? (!G.S || !G.S.flags.noTogether) : PARTNER.sit < 0.2);
   let html = '';
   const lab = it ? G.fmt(typeof it.label === 'function' ? it.label() : it.label) : '';
-  if (it && lab) html += `<span class="key">${G.MOBILE ? 'Use' : 'E'}</span>${lab}`;
-  if (nearP) html += `${html ? '<span class="sep"></span>' : ''}<span class="key">${G.MOBILE ? '♥' : 'Q'}</span>${together ? 'Together' : 'Hug'}`;
+  if (it && lab) html += `<span class="key">${G.MOBILE ? 'Use' : G.keyFor('interact')}</span>${lab}`;
+  if (nearP) html += `${html ? '<span class="sep"></span>' : ''}<span class="key">${G.MOBILE ? '♥' : G.keyFor('together')}</span>${together ? 'Together' : 'Hug'}`;
   const pr = $('prompt'); if (pr._h !== html) { pr._h = html; pr.innerHTML = html; pr.classList.toggle('hidden', !html); }
   if (it && lab && hit('KeyE', 'Space', 'Enter')) { pressed.clear(); it.act(); }
   else if (nearP && hit('KeyQ', 'KeyF')) { pressed.clear(); if (together) G.Story.together(); else hug(); }
@@ -1357,7 +1454,9 @@ function step(dt, t) {
   if (STATE.watchDoor && G.inside(PLAYER.x, PLAYER.z)) { STATE.watchDoor = false; bark('Close your eyes. …No, open them. Look at the table.', 4); }
   if (STATE.watchDoor && PLAYER.z < 8.5 && !STATE.porchBark) { STATE.porchBark = true; bark('Inside, please. I can no longer feel my nose.', 3); }
   ambientBarks(dt);
+  for (const f of G.STEP_HOOKS) f(dt, t, free);
 }
+G.STEP_HOOKS = [];
 function bubble(dt) {
   const el = $('bubble'), c = PARTNER;
   if (!c.bark || !STATE.started) { el.classList.remove('show'); return; }
@@ -1419,6 +1518,7 @@ function frame(now) {
   // Input pressed this frame must survive until simulate() reads it.
   simulate(dt);
   composer.render(dt);
+  if (G.onFrameEnd) { const f = G.onFrameEnd; G.onFrameEnd = null; try { f(); } catch (e) { console.error(e); } }   // read the canvas in the same task it was drawn
   bubble(dt);
 }
 
@@ -1430,7 +1530,10 @@ function warmUp() {
   const t0 = performance.now(), R = G.renderer, before = R.info.programs.length;
   const inChar = (o) => { for (let p = o; p; p = p.parent) if (p === PLAYER.m || p === PARTNER.m) return true; return false; };
   const later = [];
-  G.scene.traverse((o) => { if (o.visible === false && (o.isMesh || o.isSprite || o.isPoints) && !inChar(o)) later.push(o); });
+  // Hidden things inside the characters are normally skipped (some never show), except gear flagged to warm.
+  const warmIn = (o) => { for (let p = o; p; p = p.parent) if (p.userData && p.userData.warm) return true; return false; };
+  const hiddenUp = (o) => { const r = []; for (let p = o; p && p !== G.scene; p = p.parent) if (p.visible === false) r.push(p); return r; };
+  G.scene.traverse((o) => { if ((o.isMesh || o.isSprite || o.isPoints) && (inChar(o) ? warmIn(o) : true)) { const h = hiddenUp(o); if (h.length && (!inChar(o) || warmIn(o))) later.push(...h); } });
   later.forEach((o) => { o.visible = true; });
   // One frame drawn with culling off compiles exactly what can appear (renderer.compile() in this
   // three.js version would also compile materials on hidden objects that never show).

@@ -217,7 +217,9 @@ G.buildInterior = () => {
   // Coats by the door.
   box(0.6, 0.05, 0.08, MAT.darkWood, 5.5, 1.75, 4.45);
   const coat = G.std({ map: TX.jersey, color: '#5c5f63', roughness: 1 });
-  box(0.3, 0.75, 0.12, coat, 5.38, 1.35, 4.38, { r: 0.05 }); box(0.28, 0.7, 0.12, G.std({ map: TX.knitCream, roughness: 1 }), 5.65, 1.38, 4.38, { r: 0.05 });
+  // Kept separate (not batched): each one comes off its hook when it's being worn (life.js).
+  G.HOOK_COATS = [box(0.3, 0.75, 0.12, coat, 5.38, 1.35, 4.38, { r: 0.05 }), box(0.28, 0.7, 0.12, G.std({ map: TX.jersey, color: '#a8875e', roughness: 1 }), 5.65, 1.38, 4.38, { r: 0.05 })];
+  G.HOOK_COATS.forEach((m) => { m.userData.dynamic = true; });
   buildKitchen();
 };
 

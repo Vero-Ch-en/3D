@@ -57,12 +57,14 @@
   #subs.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; cursor: pointer; }
   #who { font: 600 11px var(--mono); letter-spacing: 0.22em; text-transform: uppercase; color: var(--amber); margin-bottom: 6px; text-shadow: 0 1px 8px rgba(0,0,0,0.8); }
   #subs.who-player #who { color: #a9c4e8; }
-  #line { font: 500 clamp(18px, 2.4vw, 24px)/1.45 var(--ui); text-shadow: 0 2px 4px rgba(0,0,0,0.9), 0 0 24px rgba(0,0,0,0.6); }
-  #subs.narr #line { font-family: var(--display); font-style: italic; font-size: clamp(20px, 2.7vw, 27px); color: #efe2cf; }
+  :root { --subK: 1; }
+  :root[data-subs="s"] { --subK: 0.85; } :root[data-subs="l"] { --subK: 1.22; } :root[data-subs="xl"] { --subK: 1.45; }
+  #line { font: 500 calc(clamp(18px, 2.4vw, 24px) * var(--subK))/1.45 var(--ui); text-shadow: 0 2px 4px rgba(0,0,0,0.9), 0 0 24px rgba(0,0,0,0.6); }
+  #subs.narr #line { font-family: var(--display); font-style: italic; font-size: calc(clamp(20px, 2.7vw, 27px) * var(--subK)); color: #efe2cf; }
   #subs::after { content: "E \2192"; display: block; margin-top: 8px; font: 500 10px var(--mono); letter-spacing: 0.2em; color: var(--ink-dim); }
   @media (pointer: coarse) { #subs::after { content: "tap \2192"; } }
 
-  #bubble { position: fixed; left: 0; top: 0; transform: translate(-50%, -100%); will-change: transform; background: rgba(16,12,12,0.62); color: var(--ink); font-size: 13px; font-weight: 500; padding: 6px 11px; border-radius: 10px; max-width: 240px; text-align: center; opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 11; backdrop-filter: blur(4px); }
+  #bubble { position: fixed; left: 0; top: 0; transform: translate(-50%, -100%); will-change: transform; background: rgba(16,12,12,0.62); color: var(--ink); font-size: calc(13px * var(--subK)); font-weight: 500; padding: 6px 11px; border-radius: 10px; max-width: calc(240px * var(--subK)); text-align: center; opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 11; backdrop-filter: blur(4px); }
   #bubble.show { opacity: 1; }
 
   #endcard { position: fixed; inset: 0; display: flex; flex-direction: column; text-align: center; padding: 16px 16px calc(9vh + env(safe-area-inset-bottom, 0px)); background: linear-gradient(180deg, rgba(4,6,14,0) 22%, rgba(4,6,14,0.55) 48%, rgba(4,6,14,0.82)); opacity: 0; pointer-events: none; transition: opacity 2.5s; z-index: 18; overflow-y: auto; }
@@ -104,7 +106,7 @@
   #btn-hug { right: calc(102px + env(safe-area-inset-right, 0px)); bottom: calc(40px + env(safe-area-inset-bottom, 0px)); width: 54px; height: 54px; background: rgba(176,90,70,0.9); color: #fff; font-size: 20px; }
   /* Story UI: choices, title cards, the timing minigame, the Together menu, the scrapbook. */
   #choices { position: fixed; left: 50%; bottom: calc(9vh + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); width: min(520px, calc(100vw - 32px)); display: grid; gap: 8px; z-index: 19; }
-  #choices button { display: flex; align-items: center; gap: 12px; text-align: left; border: 1px solid var(--line); background: rgba(16,12,12,0.78); backdrop-filter: blur(6px); padding: 12px 16px; border-radius: 14px; cursor: pointer; font-size: 16px; font-weight: 500; opacity: 0; transform: translateY(6px); animation: endLine 0.35s ease forwards; transition: background 0.15s, border-color 0.15s; }
+  #choices button { display: flex; align-items: center; gap: 12px; text-align: left; border: 1px solid var(--line); background: rgba(16,12,12,0.78); backdrop-filter: blur(6px); padding: 12px 16px; border-radius: 14px; cursor: pointer; font-size: calc(16px * var(--subK)); font-weight: 500; opacity: 0; transform: translateY(6px); animation: endLine 0.35s ease forwards; transition: background 0.15s, border-color 0.15s; }
   #choices button .n { font: 600 11px var(--mono); color: var(--ink-dim); min-width: 1.4em; }
   #choices button.sel, #choices button:hover { background: rgba(240,176,100,0.18); border-color: rgba(240,176,100,0.6); }
   #choices button.sel .n { color: var(--amber); }
@@ -143,6 +145,23 @@
   .scrap-nav .btn:disabled { opacity: 0.35; cursor: default; }
   @media (max-width: 560px) { .scrap-book { grid-template-columns: 1fr; } .scrap-book::before { display: none; } .scrap-page + .scrap-page { display: none; } }
   #title .row { display: flex; gap: 10px; flex-wrap: wrap; }
+  /* The cold: frost creeping in from the edges of the screen. */
+  #frost { position: fixed; inset: 0; pointer-events: none; z-index: 9; opacity: 0; background-size: cover; background-position: center; mix-blend-mode: screen; }
+  /* Photographs: a flash, then the print slides in at the corner. */
+  #flash { position: fixed; inset: 0; background: #fff; opacity: 0; pointer-events: none; z-index: 26; transition: opacity 0.5s ease-out; }
+  #flash.on { opacity: 0.85; transition: none; }
+  #polaroid { position: fixed; right: 18px; bottom: calc(96px + env(safe-area-inset-bottom, 0px)); width: 170px; padding: 9px 9px 30px; background: #f6f1e6; border-radius: 3px; box-shadow: 0 10px 30px rgba(0,0,0,0.45); transform: translateX(240px) rotate(6deg); transition: transform 0.6s cubic-bezier(.2,.9,.3,1.2); z-index: 24; pointer-events: none; }
+  #polaroid.show { transform: translateX(0) rotate(-3deg); }
+  #polaroid img { width: 100%; display: block; aspect-ratio: 4 / 3; object-fit: cover; background: #222; }
+  #polaroid p { position: absolute; left: 0; right: 0; bottom: 6px; margin: 0; text-align: center; font: italic 500 14px var(--display); color: #3a2c22; }
+  #btn-photo { right: calc(22px + env(safe-area-inset-right, 0px)); bottom: calc(118px + env(safe-area-inset-bottom, 0px)); width: 46px; height: 46px; background: rgba(16,12,12,0.6); color: var(--ink); font-size: 18px; }
+  .scrap-page img.photo { width: 220px; height: 165px; object-fit: cover; border: 7px solid #fbf8f1; border-bottom-width: 22px; box-shadow: 0 3px 10px rgba(58,44,34,0.25); transform: rotate(-1.5deg); }
+  /* Controls in the pause menu */
+  .pcontrols { display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; align-items: center; font-size: 13px; color: var(--ink-dim); }
+  .pcontrols .btn.small { min-width: 74px; font: 600 12px var(--mono); }
+  .pcontrols .btn.wait { background: var(--amber); color: #24160c; }
+  details.psec summary { cursor: pointer; font-size: 14px; color: var(--ink-dim); padding: 4px 0; }
+  details.psec[open] summary { color: var(--ink); margin-bottom: 8px; }
   @media (prefers-reduced-motion: reduce) { #title, #endcard, #hint, #subs, #card { transition: none; } #endcard.show .end-msg p, #endcard.show .end-sig { animation-duration: 0.01s; animation-delay: 0s !important; } }
 </style>
 </head>
@@ -156,7 +175,7 @@
     <h1>Snowed In</h1>
     <p class="lede">The first real snow of the winter, a cabin in the pines, and a whole day with nowhere to be. Wake up tangled in the blanket, burn the pancakes, take the long way round, and find your way home by the light in the windows.</p>
     <div class="row"><button class="btn primary" id="begin">Begin</button><button class="btn" id="continue" hidden>Continue</button></div>
-    <div class="keys">WASD walk · Shift run · drag to look · scroll to zoom · E interact · Q together · V first person · N time of day · ` stats</div>
+    <div class="keys" id="titleKeys">WASD walk · Shift run · drag to look · scroll to zoom · E interact · Q together · T take a photo · V first person · N time of day · ` stats</div>
   </div>
 </div>
 
@@ -170,7 +189,10 @@
 <div id="hint"></div>
 <div id="prompt" class="hidden"></div>
 <div id="bubble"></div>
+<div id="frost"></div>
 <div id="fade"></div>
+<div id="flash"></div>
+<div id="polaroid"><img alt=""><p></p></div>
 <div id="subs" role="dialog" aria-live="polite"><div id="who"></div><div id="line"></div></div>
 
 <div id="endcard" role="dialog" aria-labelledby="endHeading">
@@ -204,8 +226,19 @@
         <button class="btn small" data-view="third">Third person</button><button class="btn small" data-view="first">First person</button>
       </div>
     </div>
+    <div class="prow">
+      <span>Subtitles</span>
+      <div class="seg" role="group" aria-label="Subtitle size">
+        <button class="btn small" data-subs="s">Small</button><button class="btn small" data-subs="m">Medium</button><button class="btn small" data-subs="l">Large</button><button class="btn small" data-subs="xl">Largest</button>
+      </div>
+    </div>
+    <details class="psec" id="pControlsSec">
+      <summary>Controls</summary>
+      <div class="pcontrols" id="pControls"></div>
+      <div class="row" style="display:flex;gap:8px;margin-top:10px"><button class="btn small" id="pKeysReset">Reset to defaults</button></div>
+    </details>
     <button class="btn" id="pScrap">Scrapbook</button>
-    <p class="pkeys">Esc pause · M mute · V first/third person · WASD walk · Shift run · E interact · Q together</p>
+    <p class="pkeys" id="pKeys">Esc pause · M mute · V first/third person · WASD walk · Shift run · E interact · Q together · T photo</p>
   </div>
 </div>
 
@@ -220,6 +253,7 @@
   <div id="stick"><div id="knob"></div></div>
   <button class="tbtn" id="btn-hug" aria-label="Together">&#9829;</button>
   <button class="tbtn" id="btn-use" aria-label="Interact">Use</button>
+  <button class="tbtn" id="btn-photo" aria-label="Take a photo">&#9673;</button>
 </div>
 
 <script src="../cozy-birthday-simulator/js/config.js"></script>
@@ -248,5 +282,8 @@
 <script src="js/game.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/story.js"></script>
+<script src="js/life.js"></script>
+<script src="js/play.js"></script>
+<script src="js/walk.js"></script>
 </body>
 </html>

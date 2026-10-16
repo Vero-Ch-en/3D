@@ -126,7 +126,7 @@ UI.together = (acts) => new Promise((res) => {
 // Little painted snapshots for each page, drawn on a canvas like the polaroids in the cabin.
 function paintSnap(cv, art) {
   const c = cv.getContext('2d'), W = cv.width, H = cv.height;
-  const sky = { pancakes: ['#f3d9b0', '#e7b780'], blanket: ['#efe3d0', '#c9b59a'], snowkids: ['#1a2440', '#4a5a86'], tea: ['#e8d8c0', '#b89470'], basil: ['#dfe8d6', '#9db08c'], study: ['#e9dcc8', '#b39a7c'], hug: ['#f0d6c0', '#d39a7a'], default: ['#d8dde6', '#9aa6b8'] }[art] || ['#d8dde6', '#9aa6b8'];
+  const sky = { snowman: ['#c8d6e8', '#e8eef6'], angels: ['#eef2f8', '#eef2f8'], cocoa: ['#e8d0b0', '#b0805a'], reading: ['#e0c8a8', '#a87c58'], cards: ['#dfe6da', '#a8b49a'], pinecones: ['#cfdcec', '#e8eef6'], hill: ['#bcd0e8', '#e6eef8'], lake: ['#c8d4e4', '#dfe8f2'], circle: ['#f0d8b8', '#e8c8a0'], pancakes: ['#f3d9b0', '#e7b780'], blanket: ['#efe3d0', '#c9b59a'], snowkids: ['#1a2440', '#4a5a86'], tea: ['#e8d8c0', '#b89470'], basil: ['#dfe8d6', '#9db08c'], study: ['#e9dcc8', '#b39a7c'], hug: ['#f0d6c0', '#d39a7a'], default: ['#d8dde6', '#9aa6b8'] }[art] || ['#d8dde6', '#9aa6b8'];
   const g = c.createLinearGradient(0, 0, 0, H); g.addColorStop(0, sky[0]); g.addColorStop(1, sky[1]); c.fillStyle = g; c.fillRect(0, 0, W, H);
   const fig = (x, y, s, col, hair) => { c.fillStyle = '#e8c0a0'; c.beginPath(); c.arc(x, y - 34 * s, 10 * s, 0, 7); c.fill(); c.fillStyle = hair; c.beginPath(); c.arc(x, y - 37 * s, 10.5 * s, Math.PI, 0); c.fill(); c.fillStyle = col; c.beginPath(); c.roundRect ? c.roundRect(x - 11 * s, y - 24 * s, 22 * s, 30 * s, 6 * s) : c.rect(x - 11 * s, y - 24 * s, 22 * s, 30 * s); c.fill(); };
   if (art === 'pancakes') {
@@ -141,6 +141,25 @@ function paintSnap(cv, art) {
   } else if (art === 'blanket') {
     c.fillStyle = '#8a2a2a'; c.beginPath(); c.ellipse(W * 0.55, H * 0.62, W * 0.42, H * 0.2, -0.1, 0, 7); c.fill();
     c.fillStyle = '#e8c0a0'; c.beginPath(); c.arc(W * 0.3, H * 0.42, 13, 0, 7); c.fill(); c.beginPath(); c.arc(W * 0.7, H * 0.4, 12, 0, 7); c.fill();
+  } else if (art === 'snowman') {
+    c.fillStyle = '#e8eef6'; c.fillRect(0, H * 0.72, W, H * 0.28);
+    c.fillStyle = '#f7f9fc'; for (const [y, r] of [[H * 0.74, 34], [H * 0.5, 25], [H * 0.31, 17]]) { c.beginPath(); c.arc(W / 2, y, r, 0, 7); c.fill(); }
+    c.fillStyle = '#e8c840'; c.beginPath(); c.ellipse(W / 2 + 6, H * 0.32, 8, 5, 0, 0, 7); c.fill();
+    c.strokeStyle = '#5a3a26'; c.lineWidth = 3; for (const s of [-1, 1]) { c.beginPath(); c.moveTo(W / 2 + s * 22, H * 0.5); c.lineTo(W / 2 + s * 52, H * 0.36); c.stroke(); c.beginPath(); c.moveTo(W / 2 + s * 4, H * 0.27); c.lineTo(W / 2 + s * 13, H * 0.25 - s * 2); c.stroke(); }
+  } else if (art === 'angels') {
+    c.fillStyle = '#eef2f8'; c.fillRect(0, 0, W, H);
+    c.fillStyle = 'rgba(150,165,200,0.55)'; for (const x of [W * 0.33, W * 0.67]) { c.beginPath(); c.arc(x, H * 0.22, 12, 0, 7); c.fill(); c.beginPath(); c.moveTo(x, H * 0.3); c.arc(x, H * 0.3, 52, Math.PI * 0.85, Math.PI * 2.15); c.fill(); c.fillRect(x - 13, H * 0.3, 26, H * 0.4); c.beginPath(); c.moveTo(x, H * 0.62); c.arc(x, H * 0.62, 40, Math.PI * 0.25, Math.PI * 0.75); c.fill(); }
+  } else if (art === 'cocoa' || art === 'reading' || art === 'cards') {
+    c.fillStyle = 'rgba(80,50,30,0.25)'; c.fillRect(0, H * 0.62, W, H * 0.38);
+    if (art === 'cocoa') for (const [x, col] of [[W * 0.38, '#8a3a2e'], [W * 0.62, '#efe7da']]) { c.fillStyle = col; c.fillRect(x - 18, H * 0.45, 36, 42); c.fillStyle = '#5a321e'; c.fillRect(x - 16, H * 0.45, 32, 5); c.strokeStyle = 'rgba(255,255,255,0.5)'; c.lineWidth = 2; c.beginPath(); c.moveTo(x, H * 0.42); c.bezierCurveTo(x - 8, H * 0.34, x + 8, H * 0.28, x, H * 0.2); c.stroke(); }
+    if (art === 'reading') { c.fillStyle = '#7a3a2a'; c.beginPath(); c.moveTo(W * 0.5, H * 0.66); c.lineTo(W * 0.2, H * 0.58); c.lineTo(W * 0.2, H * 0.36); c.lineTo(W * 0.5, H * 0.44); c.lineTo(W * 0.8, H * 0.36); c.lineTo(W * 0.8, H * 0.58); c.closePath(); c.fill(); c.fillStyle = '#efe6d2'; c.fillRect(W * 0.23, H * 0.4, W * 0.25, H * 0.15); c.fillRect(W * 0.52, H * 0.4, W * 0.25, H * 0.15); }
+    if (art === 'cards') { [['Q', '♥', -0.18, -0.2], ['7', '♣', 0.0, 0.05], ['Q', '♠', 0.2, 0.25]].forEach(([r, su, dx, rot]) => { c.save(); c.translate(W * (0.5 + dx), H * 0.5); c.rotate(rot); c.fillStyle = '#fbf8f1'; c.fillRect(-20, -28, 40, 56); c.fillStyle = su === '♥' ? '#b8322a' : '#1e1a18'; c.font = 'bold 16px Georgia'; c.fillText(r, -15, -10); c.font = '22px Georgia'; c.fillText(su, -6, 16); c.restore(); }); }
+  } else if (art === 'pinecones' || art === 'hill' || art === 'lake' || art === 'circle') {
+    c.fillStyle = art === 'circle' ? '#e9eef4' : '#e8eef6'; c.fillRect(0, H * 0.62, W, H * 0.38);
+    if (art === 'pinecones') { c.fillStyle = '#7a5038'; c.fillRect(W * 0.46, H * 0.56, 20, 14); for (let i = 0; i < 6; i++) { c.fillStyle = '#6a4a2e'; c.beginPath(); c.ellipse(W * 0.25 + i * 24, H * 0.8 + Math.sin(i) * 6, 6, 9, 0.3, 0, 7); c.fill(); } }
+    if (art === 'hill') { c.fillStyle = '#f4f7fb'; c.beginPath(); c.ellipse(W / 2, H * 0.78, W * 0.6, H * 0.3, 0, Math.PI, 0); c.fill(); c.fillStyle = '#5a3a26'; c.fillRect(W * 0.42, H * 0.46, 36, 5); c.fillRect(W * 0.44, H * 0.47, 3, 10); c.fillRect(W * 0.56, H * 0.47, 3, 10); }
+    if (art === 'lake') { c.fillStyle = '#9fb4c6'; c.beginPath(); c.ellipse(W / 2, H * 0.78, W * 0.42, H * 0.12, 0, 0, 7); c.fill(); c.fillStyle = '#4a4a4e'; for (let i = 0; i < 5; i++) { c.beginPath(); c.ellipse(W * 0.32 + i * 26, H * 0.78 + (i % 2) * 5, 5, 3, 0, 0, 7); c.fill(); } }
+    if (art === 'circle') { c.fillStyle = '#6a9a4e'; c.beginPath(); c.ellipse(W / 2, H * 0.8, W * 0.34, H * 0.12, 0, 0, 7); c.fill(); for (let i = 0; i < 14; i++) { c.fillStyle = ['#f2e26a', '#e88aa0', '#ffffff'][i % 3]; c.beginPath(); c.arc(W * 0.24 + (i * 37) % (W * 0.52), H * 0.76 + (i * 13) % 16, 2.5, 0, 7); c.fill(); } }
   } else {
     fig(W * 0.42, H * 0.86, 1.15, '#4a4d54', '#1e140f'); fig(W * 0.6, H * 0.88, 0.98, '#e4d7c2', '#5e3a26');
   }
@@ -152,7 +171,8 @@ UI.scrapbook = (pages) => new Promise((res) => {
   let at = Math.max(0, (pages.length % 2 ? pages.length - 1 : pages.length - 2));
   at -= at % 2;
   const render = () => {
-    const page = (p) => (p ? `<div class="scrap-page"><canvas width="220" height="190" data-art="${esc(p.art)}"></canvas><div class="scrap-cap">${esc(G.fmt(p.caption))}</div></div>` : '<div class="scrap-page"><div class="scrap-empty">(Room for more.)</div></div>');
+    const pic = (p) => (p.src ? `<img class="photo" alt="" src="${esc(p.src)}">` : `<canvas width="220" height="190" data-art="${esc(p.art)}"></canvas>`);   // photographs you took, or a little painting
+    const page = (p) => (p ? `<div class="scrap-page">${pic(p)}<div class="scrap-cap">${esc(G.fmt(p.caption))}</div></div>` : '<div class="scrap-page"><div class="scrap-empty">(Room for more.)</div></div>');
     box.innerHTML = `<div class="scrap-book">${page(pages[at])}${page(pages[at + 1])}<div class="scrap-nav"><button class="btn" data-k="prev" ${at <= 0 ? 'disabled' : ''}>←</button><button class="btn" data-k="close">Close</button><button class="btn" data-k="next" ${at + 2 >= pages.length ? 'disabled' : ''}>→</button></div></div>`;
     box.querySelectorAll('canvas').forEach((cv) => paintSnap(cv, cv.dataset.art));
     box.querySelector('[data-k=prev]').onclick = () => { if (at > 0) { at -= 2; render(); } };
