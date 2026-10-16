@@ -26,7 +26,7 @@ from mathutils import Matrix, Vector, kdtree
 NAMES = ('partner', 'player')
 SOCKS = {'partner': (0.84, 0.8, 0.72), 'player': (0.13, 0.125, 0.12)}
 DROP = ('teeth',)                      # never seen in the game
-TEX = {'skin': 1024, 'hair': 1024, 'eye': 256, 'small': 256, 'knit': 512}
+TEX = {'skin': 1024, 'hair': 512, 'eye': 256, 'small': 256, 'knit': 512}
 
 
 def svc(mod, cls):
@@ -111,7 +111,10 @@ def make_socks(name):
     ob.matrix_parent_inverse = Matrix.Identity(4)
     for p in me.polygons:
         p.use_smooth = True
+    me.materials.clear()
     me.materials.append(plain('socks.' + name, SOCKS[name], rough=1.0))
+    for p in me.polygons:
+        p.material_index = 0
     return ob
 
 
@@ -394,7 +397,7 @@ def export_all(folder):
         arm.location = (0, 0, 0)
         path = os.path.join(folder, name + '.glb')
         kw = dict(filepath=path, use_selection=True, export_format='GLB', export_skins=True, export_animations=False,
-                  export_morph=False, export_apply=False, export_yup=True, export_image_format='AUTO',
+                  export_morph=False, export_apply=False, export_yup=True, export_image_format='JPEG', export_jpeg_quality=82,   # alpha textures stay PNG
                   export_def_bones=True, export_materials='EXPORT')
         try:
             bpy.ops.export_scene.gltf(**kw)
