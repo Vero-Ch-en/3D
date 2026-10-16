@@ -648,45 +648,84 @@ function hugIK(c, u, wgt) {
   c.m.updateMatrixWorld(true); o.m.updateMatrixWorld(true);
   const oc = ou.chest.getWorldPosition(new THREE.Vector3()), back = new THREE.Vector3(-Math.sin(o.yaw), 0, -Math.cos(o.yaw));
   const myC = u.chest.getWorldPosition(new THREE.Vector3());
-  const inv = _ik.m.copy(u.chest.matrixWorld).invert();
   u.arms.forEach((A, i) => {
-    const sgn = Math.sign(A.sh.position.x) || (i ? -1 : 1), R = u.armRest && u.armRest[i];   // which side this arm is on
-    const S = R ? A.sh.parent.localToWorld(A.sh.position.clone().add(R.off)) : A.sh.getWorldPosition(_ik.S);
+    const R = u.armRest && u.armRest[i];
+    const S = R ? A.sh.parent.localToWorld(A.sh.position.clone().add(R.off)) : A.sh.getWorldPosition(new THREE.Vector3());
     const side = S.clone().sub(myC); side.y = 0; side.normalize();
     // On their back: over the shoulder blades for the taller one, the small of the back for the other.
-    const T = _ik.T.copy(oc).addScaledVector(back, (tall ? 0.08 : 0.07) * ou.k).addScaledVector(side, (tall ? 0.11 : 0.15) * ou.k);
+    const T = oc.clone().addScaledVector(back, (tall ? 0.08 : 0.07) * ou.k).addScaledVector(side, (tall ? 0.11 : 0.15) * ou.k);
     T.y += (tall ? 0.04 : -0.16) * ou.k;
-    // In the chest's frame (the shoulder's parent).
-    const Sl = S.clone().applyMatrix4(inv), Tl = T.clone().applyMatrix4(inv);
-    const a = R ? R.a : Math.abs(A.el.position.y), b = R ? R.b : A.hand ? Math.abs(A.hand.position.y) : a;
-    const dv = Tl.clone().sub(Sl); const d = Math.min(Math.max(dv.length(), Math.abs(a - b) + 1e-3), a + b - 1e-3); dv.normalize();
-    // Elbow out to the side and down a little.
-    const pole = new THREE.Vector3(sgn, -0.6, -0.2).normalize(); const p = pole.sub(dv.clone().multiplyScalar(pole.dot(dv))).normalize();
-    const al = Math.acos(Math.max(-1, Math.min(1, (a * a + d * d - b * b) / (2 * a * d))));
-    const El = Sl.clone().addScaledVector(dv, Math.cos(al) * a).addScaledVector(p, Math.sin(al) * a);
-    const Hl = Sl.clone().addScaledVector(dv, d);
-    const d1 = El.clone().sub(Sl).normalize(), d2 = Hl.clone().sub(El).normalize();
-    if (R) {
-      // The model's arm: turn its rest upper arm onto d1, then the forearm (in the elbow's frame) onto d2.
-      const q1 = new THREE.Quaternion().setFromUnitVectors(R.u0, d1);
-      const w = d2.clone().applyQuaternion(q1.clone().invert());
-      const qe = new THREE.Quaternion().setFromUnitVectors(R.v0, w);
-      A.sh.quaternion.slerp(q1, wgt); A.el.quaternion.slerp(qe, wgt);
-      if (A.hand) A.hand.rotation.set(0, A.hand.rotation.y * (1 - wgt) + sgn * 0.6 * wgt, 0);
-      if (window.IKDBG) (c._ikd = c._ikd || [])[i] = { T: T.toArray().map((x) => +x.toFixed(3)), S: S.toArray().map((x) => +x.toFixed(3)), a: +a.toFixed(3), b: +b.toFixed(3) };
-      return;
-    }
-    // Upper arm along shoulder→elbow, turned about itself so the elbow's hinge bends toward the hand.
+    solveArm(c, u, A, i, T, wgt, 0.6);
+  });
+}
+/* Holding hands: the holding hand reaches for a point between the two of you, at hand height, swinging a
+ * little with the stride; both reach for the same point, so the hands actually meet. */
+function holdIK(c, u, wgt) {
+  const o = c.holdWith, ou = o.m.userData, i = c.holdArm, A = u.arms[i], oi = o.holdArm, OA = ou.arms[oi];
+  if (!A || !OA) return;
+  c.m.updateMatrixWorld(true); o.m.updateMatrixWorld(true);
+  const sh = (uu, AA, k) => { const R = uu.armRest && uu.armRest[k]; return R ? AA.sh.parent.localToWorld(AA.sh.position.clone().add(R.off)) : AA.sh.getWorldPosition(new THREE.Vector3()); };
+  const S = sh(u, A, i), OS = sh(ou, OA, oi);
+  const reach = (uu, k, AA) => { const R = uu.armRest && uu.armRest[k]; return R ? R.a + R.b : Math.abs(AA.el.position.y) + Math.abs((AA.hand || AA.el).position.y); };
+  const T = S.clone().add(OS).multiplyScalar(0.5);
+  // hand height: a little below the shorter one's straight-arm reach, so neither has to stretch
+  T.y = Math.max(S.y - reach(u, i, A) * 0.9, OS.y - reach(ou, oi, OA) * 0.9);
+  const fw = new THREE.Vector3(Math.sin(c.yaw), 0, Math.cos(c.yaw)), sw = Math.min(1, (c.speed || 0) / 1.5);
+  T.addScaledVector(fw, 0.05 + Math.sin(c.phase || 0) * 0.07 * sw);
+  solveArm(c, u, A, i, T, wgt, 0.2);
+}
+/* Two-bone IK for one arm onto a world point: on the model's own arm bones when it has them (its rest arm
+ * directions), else on the rig's. The elbow goes out and down. handTurn turns the wrist toward the body. */
+function solveArm(c, u, A, i, T, wgt, handTurn) {
+  const sgn = Math.sign(A.sh.position.x) || (i ? -1 : 1), R = u.armRest && u.armRest[i];   // which side this arm is on
+  const inv = new THREE.Matrix4().copy(u.chest.matrixWorld).invert();
+  const S = R ? A.sh.parent.localToWorld(A.sh.position.clone().add(R.off)) : A.sh.getWorldPosition(new THREE.Vector3());
+  const Sl = S.clone().applyMatrix4(inv), Tl = T.clone().applyMatrix4(inv);
+  const a = R ? R.a : Math.abs(A.el.position.y), b = R ? R.b : A.hand ? Math.abs(A.hand.position.y) : a;
+  const dv = Tl.clone().sub(Sl); const d = Math.min(Math.max(dv.length(), Math.abs(a - b) + 1e-3), a + b - 1e-3); dv.normalize();
+  const pole = new THREE.Vector3(sgn, -0.6, -0.2).normalize(); const p = pole.sub(dv.clone().multiplyScalar(pole.dot(dv))).normalize();
+  const al = Math.acos(Math.max(-1, Math.min(1, (a * a + d * d - b * b) / (2 * a * d))));
+  const El = Sl.clone().addScaledVector(dv, Math.cos(al) * a).addScaledVector(p, Math.sin(al) * a);
+  const Hl = Sl.clone().addScaledVector(dv, d);
+  const d1 = El.clone().sub(Sl).normalize(), d2 = Hl.clone().sub(El).normalize();
+  if (R) {
+    const q1 = new THREE.Quaternion().setFromUnitVectors(R.u0, d1);
+    const w = d2.clone().applyQuaternion(q1.clone().invert());
+    const qe = new THREE.Quaternion().setFromUnitVectors(R.v0, w);
+    A.sh.quaternion.slerp(q1, wgt); A.el.quaternion.slerp(qe, wgt);
+  } else {
     const q1 = new THREE.Quaternion().setFromUnitVectors(_down, d1);
     const d2s = d2.clone().applyQuaternion(q1.clone().invert());
     const bend = Math.acos(Math.max(-1, Math.min(1, d2s.dot(_down))));
-    const tw = Math.atan2(d2s.x, d2s.z);
-    const q = q1.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), tw));
+    const q = q1.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.atan2(d2s.x, d2s.z)));
     A.sh.quaternion.slerp(q, wgt);
     A.el.rotation.set(A.el.rotation.x + (-bend - A.el.rotation.x) * wgt, A.el.rotation.y * (1 - wgt), 0);
-    // Hands flat on the back.
-    if (A.hand) A.hand.rotation.set(0, A.hand.rotation.y * (1 - wgt) + sgn * 0.6 * wgt, 0);
-    if (window.IKDBG) { c.m.updateMatrixWorld(true); (c._ikd = c._ikd || [])[i] = { T: T.toArray().map((x) => +x.toFixed(3)), H: (A.hand || A.el).getWorldPosition(new THREE.Vector3()).toArray().map((x) => +x.toFixed(3)), S: S.toArray().map((x) => +x.toFixed(3)), a: +a.toFixed(3), b: +b.toFixed(3), d: +d.toFixed(3) }; }
+  }
+  if (A.hand) A.hand.rotation.set(0, A.hand.rotation.y * (1 - wgt) + sgn * handTurn * wgt, 0);
+}
+/* Feet on uneven ground (the hill, a step's edge): each foot finds the ground under it; the hips come down for
+ * the lower one and the other knee bends to lift its foot onto the higher ground. Eased, and halved walking. */
+const _pf = new THREE.Vector3();
+function plantFeet(c, u, sit, w, dt) {
+  if (c.lie || sit > 0.05 || c.angel || !G.floorAt) { c._ikOff = null; return; }
+  c.m.updateMatrixWorld(true);
+  const k = 1 - w * 0.5;
+  const raw = u.legs.map((L) => { L.ft.getWorldPosition(_pf); return Math.max(-0.25, Math.min(0.25, G.floorAt(_pf.x, _pf.z) - c.y)) * k; });
+  const off = c._ikOff || (c._ikOff = raw.slice());
+  raw.forEach((g, i) => { off[i] = G.damp(off[i], g, 10, dt); });
+  // ground under each foot relative to the body's floor; the hips drop for the lower foot
+  const drop = Math.max(0, -Math.min(...off));
+  if (drop < 0.002 && Math.max(...off) < 0.002) return;
+  u.hips.position.y -= drop;
+  u.legs.forEach((L, i) => {
+    const r = off[i] + drop;   // how much shorter this hip-to-ankle has to be
+    if (r < 0.002) return;
+    const a = Math.abs(L.kn.position.y), b = Math.abs(L.ft.position.y), th = L.kn.rotation.x;
+    const d0 = Math.sqrt(a * a + b * b + 2 * a * b * Math.cos(th));
+    const d = Math.max((a + b) * 0.55, d0 - r);
+    const th2 = Math.acos(Math.max(-1, Math.min(1, (d * d - a * a - b * b) / (2 * a * b))));
+    const dl = th2 - th;
+    L.th.rotation.x -= dl * 0.5; L.kn.rotation.x += dl; L.ft.rotation.x -= dl * 0.5;
   });
 }
 /* Neck and head on a critically damped spring toward where the pose wants them: a head moves with ease-in
@@ -714,11 +753,16 @@ G.swingCoat = (c, dt) => {
   dt = Math.min(dt, 1 / 20);
   const sp = c.lie ? 0 : (c.speed || 0), acc = (sp - (c._csp || 0)) / Math.max(dt, 1e-3); c._csp = sp;
   const turn = c.turnLean || 0, sit = c.sit || 0;
+  // Outdoors the wind gets at the hem: it presses the coat one way (the wind drifts along +x) and makes it flutter.
+  const W = G.WIND || { gust: 0 }, out = !c.lie && !(G.inside && G.inside(c.x, c.z)), gst = out ? W.gust : 0, tt = G.simT || 0;
+  const wf = Math.sin(c.yaw) * gst, ws = Math.cos(c.yaw) * gst;   // the wind against your front, and across you
   for (const S of u.springs) {
     // back (trailing) with speed, forward when slowing; out on the outside of a turn; tucked when sitting
     const ta = (-0.07 * Math.min(sp, 2.2) + 0.025 * Math.max(-3, Math.min(3, acc))) * (1 - sit) + sit * -0.25;
-    const tb = -turn * 2.2 * S.side * 0 + turn * 1.6;
-    S.va += ((ta - S.a) * 60 - S.va * 7) * dt; S.a += S.va * dt;
+    const flut = (Math.sin(tt * 7.3 + S.side * 1.7) * 0.6 + Math.sin(tt * 12.1 + S.side) * 0.4) * gst * 0.035 * (1 - sit);
+    const ta2 = ta + wf * 0.1 * (1 - sit) + flut;   // facing downwind, the hem is blown forward
+    const tb = turn * 1.6 + ws * 0.07 * (1 - sit);
+    S.va += ((ta2 - S.a) * 60 - S.va * 7) * dt; S.a += S.va * dt;
     S.vb += ((tb - S.b) * 50 - S.vb * 7) * dt; S.b += S.vb * dt;
     S.bone.quaternion.copy(S.q0).multiply(_fq.setFromAxisAngle(_sx, S.a * (u.springSign || 1))).multiply(_fq.setFromAxisAngle(_sz, S.b));
   }
@@ -996,6 +1040,7 @@ G.animate = (c, dt, t) => {
   // Hugging: each arm reaches for a point on the other one's back (two-bone IK), so the arms go round the body
   // instead of through it. The taller one wraps over the shoulders, the shorter one round the back, under the arms.
   if ((c.hug || 0) > 0.01 && c.hugWith && c.hugWith.m) hugIK(c, u, c.hug);
+  else if ((c.holdW || 0) > 0.01 && c.holdWith && c.holdWith.m && c.holdArm != null && c.holdWith.holdArm != null) holdIK(c, u, c.holdW);
   // Blinks on a natural, irregular rhythm (sometimes a double blink).
   c.blinkT = (c.blinkT == null ? Math.random() * 3 : c.blinkT) - dt;
   if (c.blinkT < -0.13) c.blinkT = Math.random() < 0.15 ? 0.18 : 2 + Math.random() * 4.5;
@@ -1025,6 +1070,7 @@ G.animate = (c, dt, t) => {
   if (mb) { u.neck.rotation.x += mb.neck[0] * hk; u.neck.rotation.y += mb.neck[1] * hk; u.neck.rotation.z += mb.neck[2] * hk; }
   u.head.rotation.set(c.lookUp * 0.6 + Math.sin(t * 0.7 + c.z) * 0.02 * (mb ? 0 : 1) + (c.headDown || 0), c.look * 0.55, (c.tilt || 0) * 0.6 + c.headSway);
   if (mb) { u.head.rotation.x += mb.head[0] * hk; u.head.rotation.y += mb.head[1] * hk; u.head.rotation.z += mb.head[2] * hk; }
+  plantFeet(c, u, sit, w, dt);
   springHead(c, u, dt);
   G.retarget(c.m);
   if (u.realEyes) aimEyes(c, u, tgt ? new THREE.Vector3(tgt.x, tgt.headY != null ? tgt.headY : c.y + u.H * 0.93, tgt.z) : null, dt);

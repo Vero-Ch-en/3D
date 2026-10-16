@@ -1017,6 +1017,7 @@ function partnerHold(p, dt, t) {
   const close = Math.hypot(PLAYER.x - p.x, PLAYER.z - p.z) < 0.75;
   // Arm 0 sits at the rig's −x: the right arm. Each holds with the hand nearest the other.
   p.holdArm = side > 0 ? 0 : 1; PLAYER.holdArm = side > 0 ? 1 : 0;
+  p.holdWith = PLAYER; PLAYER.holdWith = p;
   p.holdOn = close; PLAYER.holdOn = close && !!p.hold;
   p.lookAt = Math.sin(t * 0.3) > 0.5 ? head(PLAYER) : null;
 }

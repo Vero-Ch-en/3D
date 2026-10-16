@@ -145,6 +145,10 @@ blinks, dozing, hugs. Hats and the snow on them are handed to the model's own he
 - Pose weights (arm poses, holding hands, swaying, the hug) use `G.spring` (core.js) instead of plain damping,
   so they start gently. Sitting down and getting up take about a second, eased, with the chest going forward
   over the feet half-way.
+- Holding hands, both holding arms reach for one point between the two of you (`holdIK`, on the same two-bone
+  solver as the hug, `solveArm`), swinging a little with the stride, so the hands meet.
+- Feet follow uneven ground (`plantFeet`): the hips come down for the lower foot and the other knee bends.
+- Outdoors the wind presses the coat hems and makes them flutter (`G.swingCoat`).
 - Turning on the spot takes small steps; brisk steps in fresh snow kick a little powder off the toes (`G.kickAt`).
 - The real eyes are split into two eyeballs on pivots and turn toward what the character looks at, ahead of
   the head, with small saccades (`makeRealEyes`, `aimEyes`, people.js).
