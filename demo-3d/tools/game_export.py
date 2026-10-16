@@ -26,7 +26,7 @@ from mathutils import Matrix, Vector, kdtree
 NAMES = ('partner', 'player')
 SOCKS = {'partner': (0.84, 0.8, 0.72), 'player': (0.13, 0.125, 0.12)}
 DROP = ('teeth',)                      # never seen in the game
-TEX = {'skin': 1024, 'hair': 512, 'eye': 256, 'small': 256, 'knit': 512}
+TEX = {'skin': 2048, 'hair': 2048, 'eye': 1024, 'small': 512, 'knit': 1024}   # the look-dev resolutions: WebP keeps them small
 
 
 def svc(mod, cls):
@@ -380,6 +380,95 @@ def prepare(save_copy=True, names=NAMES):
     return report
 
 
+# ---------------------------------------------------------------- optimise (same look, less data)
+def merge_slots(ob):
+    """One material slot per distinct material, so the body (lips, nails, ears... all one skin) is one draw call."""
+    mats = [s.material for s in ob.material_slots]
+    uniq = []
+    for m in mats:
+        if m not in uniq:
+            uniq.append(m)
+    if len(uniq) == len(mats):
+        return
+    remap = [uniq.index(m) for m in mats]
+    for p in ob.data.polygons:
+        p.material_index = remap[p.material_index] if p.material_index < len(remap) else 0
+    ob.data.materials.clear()
+    for m in uniq:
+        ob.data.materials.append(m)
+
+
+def join_into(target, others):
+    if not others:
+        return
+    with bpy.context.temp_override(active_object=target, object=target, selected_objects=[target] + others, selected_editable_objects=[target] + others):
+        bpy.ops.object.join()
+
+
+def join_same_materials(name):
+    """Pieces whose materials all appear on a bigger piece join it (hair strands into the hair, the hood,
+    rim and pocket into the hoodie, the two drawstrings together): fewer draw calls, identical look."""
+    bm = body(name)
+    changed = True
+    while changed:
+        changed = False
+        obs = [o for o in parts(name) if o is not bm]
+        for o in sorted(obs, key=lambda o: len(o.data.polygons)):
+            mo = {s.material for s in o.material_slots}
+            hosts = [t for t in obs if t is not o and mo <= {s.material for s in t.material_slots}]
+            if hosts:
+                join_into(max(hosts, key=lambda t: len(t.data.polygons)), [o])
+                changed = True
+                break
+
+
+def tidy(ob, arm):
+    """Only what the game reads: bone weights (at most 4 per vertex, normalised), the UV map in use."""
+    bones = {b.name for b in arm.data.bones if b.use_deform}
+    for g in list(ob.vertex_groups):
+        if g.name not in bones:
+            ob.vertex_groups.remove(g)
+    with bpy.context.temp_override(active_object=ob, object=ob, selected_objects=[ob], selected_editable_objects=[ob]):
+        bpy.ops.object.vertex_group_clean(group_select_mode='ALL', limit=0.01)
+        bpy.ops.object.vertex_group_limit_total(group_select_mode='ALL', limit=4)
+        bpy.ops.object.vertex_group_normalize_all(group_select_mode='ALL', lock_active=False)
+    for a in list(ob.data.color_attributes):
+        ob.data.color_attributes.remove(a)
+    used = {n.uv_map for s in ob.material_slots if s.material and s.material.use_nodes for n in s.material.node_tree.nodes if n.type == 'UVMAP'}
+    keep = used or {ob.data.uv_layers.active.name if ob.data.uv_layers.active else None}
+    for uv in list(ob.data.uv_layers):
+        if uv.name not in keep and len(ob.data.uv_layers) > 1:
+            ob.data.uv_layers.remove(uv)
+
+
+def retexture():
+    """Point the game materials at copies of the ORIGINAL images at the TEX resolutions."""
+    def kind(base):
+        b = base.lower()
+        return 'skin' if 'skinned' in b else 'hair' if ('ponytail' in b or 'short0' in b) else 'eye' if 'eye.' in b or b.endswith('_eye') or 'brown_eye' in b else 'small' if ('eyebrow' in b or 'eyelash' in b) else 'knit'
+    for m in bpy.data.materials:
+        if not (m.name.endswith('.game') and m.use_nodes):
+            continue
+        for n in m.node_tree.nodes:
+            if n.type == 'TEX_IMAGE' and n.image:
+                base = n.image.name.split('@')[0]
+                orig = bpy.data.images.get(base)
+                if orig:
+                    alpha = kind(base) in ('hair', 'small')
+                    n.image = small_copy(orig, TEX[kind(base)], 'PNG' if alpha else 'JPEG')
+
+
+def optimise():
+    for name in NAMES:
+        arm = body(name).parent
+        join_same_materials(name)
+        for o in parts(name):
+            merge_slots(o)
+            tidy(o, arm)
+    retexture()
+    return {n: {o.name: (len(o.data.polygons), len(o.material_slots)) for o in parts(n)} for n in NAMES}
+
+
 def export_all(folder):
     os.makedirs(folder, exist_ok=True)
     out = {}
@@ -397,7 +486,9 @@ def export_all(folder):
         arm.location = (0, 0, 0)
         path = os.path.join(folder, name + '.glb')
         kw = dict(filepath=path, use_selection=True, export_format='GLB', export_skins=True, export_animations=False,
-                  export_morph=False, export_apply=False, export_yup=True, export_image_format='JPEG', export_jpeg_quality=82,   # alpha textures stay PNG
+                  export_morph=False, export_apply=False, export_yup=True,
+                  export_image_format='WEBP', export_image_quality=90,                     # WebP keeps alpha too
+                  export_meshopt_compression_enable=True, export_meshopt_extension='EXT_meshopt_compression',
                   export_def_bones=True, export_materials='EXPORT')
         try:
             bpy.ops.export_scene.gltf(**kw)
