@@ -118,6 +118,17 @@ The children in the prologue are child copies of the same characters
 `kid_figure()` and `export_kids()` in `tools/game_export.py`; their bobble hats
 and scarf are fitted the same way (`fitKid`).
 
+Fitted on top of that, from each model's own measurements (life.js, `fitGear`):
+- the hat comes down to just above the brows (the real eye line) and grows to cover the hair on top;
+- the scarf rests on the long coat's front neckline, sized to the collar and riding up a little at the back;
+- the coat's peaked sleeve heads are brought down onto a natural shoulder line;
+- boots are sized to the body (a child's wellies stop below the knee);
+- jumpers follow the hips, not the thighs, and their hems are let down a little (`fixTops`, people.js), so
+  sitting doesn't pull them into a point or open a gap at the waist.
+
+Hugs reach with two-bone IK on the model's own arm bones (`hugIK`, people.js): the taller one over the
+shoulders, the other round the back, hands curled on the back.
+
 The model's own jumper is hidden while the coat is on. The real heads have no blink shapes, so each eye
 gets a skin-coloured lid (`makeRealLids` in people.js) on the head bone, shown while the eyes are shut: in
 blinks, dozing, hugs. Hats and the snow on them are handed to the model's own head bone after fitting

@@ -402,11 +402,22 @@ async function attachBody(root, name, spec, bin) {
       // The coat's seams (the skirt is split front and back, each half on its own leg): vertices that share a
       // position share their skin weights too, so the seams stay closed when the legs part.
       if (spec.keepMaterials) model.traverse((o) => { if (o.isSkinnedMesh && /^coat/.test(o.name)) u.coatWelds = (u.coatWelds || 0) + weldSkin(o.geometry); });
+      // Jumpers: the hem follows the hips, not the thighs (sitting, the thighs would pull it into a point), and is a
+      // little longer, so it always overlaps the waistband.
+      if (spec.keepMaterials) u.topFixed = fixTops(model);
       // Skin that pokes through the leggings when a knee bends: the legs under them pulled in a few millimetres.
       if (spec.keepMaterials) u.tucked = tuckLegs(model);
       // Coat tails: spring bones the coat's skirt hangs from (tools/coats.py, coat_L / coat_R).
       u.springs = [];
       model.traverse((o) => { if (o.isBone && /^coat_?[LR]$/.test(o.name.replace(/[^A-Za-z_]/g, ''))) u.springs.push({ bone: o, q0: o.quaternion.clone(), side: /L$/.test(o.name) ? 1 : -1, a: 0, va: 0, b: 0, vb: 0 }); });
+      // The model's own arms at rest (for reaching with IK: its arms hang in an A-pose, the rig's straight down).
+      u.armRest = u.arms.map((A) => {
+        const e = (g) => map.find((q) => q.group === g), es = e(A.sh), ee = e(A.el), eh = A.hand && e(A.hand);
+        if (!es || !ee || !eh) return null;
+        const P = (q) => new THREE.Vector3().setFromMatrixPosition(q.boneRest);
+        const ps = P(es), pe = P(ee), ph = P(eh), shRest = A.sh.getWorldPosition(new THREE.Vector3());
+        return { off: ps.clone().sub(shRest), u0: pe.clone().sub(ps).normalize(), v0: ph.clone().sub(pe).normalize(), a: ps.distanceTo(pe), b: pe.distanceTo(ph) };
+      });
       // Bones parents before children.
       const depth = (b) => { let d = 0; for (let p = b.parent; p; p = p.parent) d++; return d; };
       map.sort((a, b) => depth(a.bone) - depth(b.bone));
@@ -435,6 +446,31 @@ function weldSkin(g) {
     n++;
   }
   I.needsUpdate = W.needsUpdate = true;
+  return n;
+}
+function fixTops(model) {
+  let n = 0;
+  model.traverse((o) => {
+    if (!o.isSkinnedMesh || !/^top/.test(o.material.name || '')) return;
+    const g = o.geometry, P = g.attributes.position, I = g.attributes.skinIndex, W = g.attributes.skinWeight, bones = o.skeleton.bones;
+    const legs = new Set(), hipsI = bones.findIndex((b) => /Hips$/.test(b.name));
+    bones.forEach((b, i) => { if (/UpLeg$|Leg$/.test(b.name)) legs.add(i); });
+    if (hipsI < 0) return;
+    const AX = ['X', 'Y', 'Z', 'W'];
+    g.computeBoundingBox(); const y0 = g.boundingBox.min.y, h = g.boundingBox.max.y - y0;
+    for (let i = 0; i < P.count; i++) {
+      let moved = 0, hipJ = -1;
+      for (let j = 0; j < 4; j++) { const b = I['get' + AX[j]](i), w = W['get' + AX[j]](i); if (b === hipsI) hipJ = j; if (legs.has(b) && w > 0) { moved += w; W['set' + AX[j]](i, 0); } }
+      if (moved > 0) {
+        if (hipJ < 0) { let jm = 0, wm = 9; for (let j = 0; j < 4; j++) { const w = W['get' + AX[j]](i); if (w < wm) { wm = w; jm = j; } } hipJ = jm; I['set' + AX[hipJ]](i, hipsI); W['set' + AX[hipJ]](i, 0); }
+        W['set' + AX[hipJ]](i, W['get' + AX[hipJ]](i) + moved); n++;
+      }
+      // the bottom few centimetres let down a little
+      const y = P.getY(i), t = 1 - (y - y0) / (0.05 * h);
+      if (t > 0) P.setY(i, y - 0.022 * h * Math.min(1, t));
+    }
+    I.needsUpdate = W.needsUpdate = P.needsUpdate = true;
+  });
   return n;
 }
 function tuckLegs(model) {
@@ -530,6 +566,54 @@ function findFingers(model) {
   }
   return out;
 }
+const _ik = { S: new THREE.Vector3(), T: new THREE.Vector3(), E: new THREE.Vector3(), v: new THREE.Vector3(), q: new THREE.Quaternion(), m: new THREE.Matrix4() };
+const _down = new THREE.Vector3(0, -1, 0);
+function hugIK(c, u, wgt) {
+  const o = c.hugWith, ou = o.m.userData, tall = u.H >= ou.H;
+  c.m.updateMatrixWorld(true); o.m.updateMatrixWorld(true);
+  const oc = ou.chest.getWorldPosition(new THREE.Vector3()), back = new THREE.Vector3(-Math.sin(o.yaw), 0, -Math.cos(o.yaw));
+  const myC = u.chest.getWorldPosition(new THREE.Vector3());
+  const inv = _ik.m.copy(u.chest.matrixWorld).invert();
+  u.arms.forEach((A, i) => {
+    const sgn = Math.sign(A.sh.position.x) || (i ? -1 : 1), R = u.armRest && u.armRest[i];   // which side this arm is on
+    const S = R ? A.sh.parent.localToWorld(A.sh.position.clone().add(R.off)) : A.sh.getWorldPosition(_ik.S);
+    const side = S.clone().sub(myC); side.y = 0; side.normalize();
+    // On their back: over the shoulder blades for the taller one, the small of the back for the other.
+    const T = _ik.T.copy(oc).addScaledVector(back, (tall ? 0.08 : 0.07) * ou.k).addScaledVector(side, (tall ? 0.11 : 0.15) * ou.k);
+    T.y += (tall ? 0.04 : -0.16) * ou.k;
+    // In the chest's frame (the shoulder's parent).
+    const Sl = S.clone().applyMatrix4(inv), Tl = T.clone().applyMatrix4(inv);
+    const a = R ? R.a : Math.abs(A.el.position.y), b = R ? R.b : A.hand ? Math.abs(A.hand.position.y) : a;
+    const dv = Tl.clone().sub(Sl); const d = Math.min(Math.max(dv.length(), Math.abs(a - b) + 1e-3), a + b - 1e-3); dv.normalize();
+    // Elbow out to the side and down a little.
+    const pole = new THREE.Vector3(sgn, -0.6, -0.2).normalize(); const p = pole.sub(dv.clone().multiplyScalar(pole.dot(dv))).normalize();
+    const al = Math.acos(Math.max(-1, Math.min(1, (a * a + d * d - b * b) / (2 * a * d))));
+    const El = Sl.clone().addScaledVector(dv, Math.cos(al) * a).addScaledVector(p, Math.sin(al) * a);
+    const Hl = Sl.clone().addScaledVector(dv, d);
+    const d1 = El.clone().sub(Sl).normalize(), d2 = Hl.clone().sub(El).normalize();
+    if (R) {
+      // The model's arm: turn its rest upper arm onto d1, then the forearm (in the elbow's frame) onto d2.
+      const q1 = new THREE.Quaternion().setFromUnitVectors(R.u0, d1);
+      const w = d2.clone().applyQuaternion(q1.clone().invert());
+      const qe = new THREE.Quaternion().setFromUnitVectors(R.v0, w);
+      A.sh.quaternion.slerp(q1, wgt); A.el.quaternion.slerp(qe, wgt);
+      if (A.hand) A.hand.rotation.set(0, A.hand.rotation.y * (1 - wgt) + sgn * 0.6 * wgt, 0);
+      if (window.IKDBG) (c._ikd = c._ikd || [])[i] = { T: T.toArray().map((x) => +x.toFixed(3)), S: S.toArray().map((x) => +x.toFixed(3)), a: +a.toFixed(3), b: +b.toFixed(3) };
+      return;
+    }
+    // Upper arm along shoulder→elbow, turned about itself so the elbow's hinge bends toward the hand.
+    const q1 = new THREE.Quaternion().setFromUnitVectors(_down, d1);
+    const d2s = d2.clone().applyQuaternion(q1.clone().invert());
+    const bend = Math.acos(Math.max(-1, Math.min(1, d2s.dot(_down))));
+    const tw = Math.atan2(d2s.x, d2s.z);
+    const q = q1.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), tw));
+    A.sh.quaternion.slerp(q, wgt);
+    A.el.rotation.set(A.el.rotation.x + (-bend - A.el.rotation.x) * wgt, A.el.rotation.y * (1 - wgt), 0);
+    // Hands flat on the back.
+    if (A.hand) A.hand.rotation.set(0, A.hand.rotation.y * (1 - wgt) + sgn * 0.6 * wgt, 0);
+    if (window.IKDBG) { c.m.updateMatrixWorld(true); (c._ikd = c._ikd || [])[i] = { T: T.toArray().map((x) => +x.toFixed(3)), H: (A.hand || A.el).getWorldPosition(new THREE.Vector3()).toArray().map((x) => +x.toFixed(3)), S: S.toArray().map((x) => +x.toFixed(3)), a: +a.toFixed(3), b: +b.toFixed(3), d: +d.toFixed(3) }; }
+  });
+}
 /* Neck and head on a critically damped spring toward where the pose wants them: a head moves with ease-in
  * and ease-out, never jumps, whatever sets its target (a glance, a new look-at, a doze, a hug, a clip change).
  * A cut (a long frame, or c.snapHead) puts it straight there. */
@@ -569,7 +653,7 @@ const CURL = { Thumb: [0.1, 0.15, 0.15], Index: [0.18, 0.28, 0.2], Middle: [0.24
 G.curlFingers = (c, dt) => {
   const u = c.m.userData; if (!u.fingers || !u.fingers.length) return;
   const pz = c.forcePose || c.pose;
-  const grip = c.carry || pz === 'carry' ? 1 : (c.holdPose || pz === 'cup' || pz === 'read') ? 0.75 : pz === 'cold' ? 0.85 : pz === 'pockets' || pz === 'coatPockets' ? 0.6 : c.holdOn ? 0.45 : 0;
+  const grip = c.carry || pz === 'carry' ? 1 : (c.holdPose || pz === 'cup' || pz === 'read') ? 0.75 : pz === 'cold' ? 0.85 : pz === 'pockets' || pz === 'coatPockets' ? 0.6 : c.holdOn ? 0.45 : (c.hug || 0) > 0.3 ? 0.4 : 0;
   c.grip = G.damp(c.grip || 0, grip, 6, dt);
   const fid = Math.sin((c.breath || 0) * 0.5) * 0.04;   // the smallest restlessness, so hands never look carved
   for (const F of u.fingers) {
@@ -834,6 +918,9 @@ G.animate = (c, dt, t) => {
     A.sh.rotation.set(sx, sy + twist * 0.35, sz); A.el.rotation.set(ex, twist * 0.4, 0);
     if (A.hand) A.hand.rotation.set(0, twist * 0.45, 0);
   });
+  // Hugging: each arm reaches for a point on the other one's back (two-bone IK), so the arms go round the body
+  // instead of through it. The taller one wraps over the shoulders, the shorter one round the back, under the arms.
+  if ((c.hug || 0) > 0.01 && c.hugWith && c.hugWith.m) hugIK(c, u, c.hug);
   // Blinks on a natural, irregular rhythm (sometimes a double blink).
   c.blinkT = (c.blinkT == null ? Math.random() * 3 : c.blinkT) - dt;
   if (c.blinkT < -0.13) c.blinkT = Math.random() < 0.15 ? 0.18 : 2 + Math.random() * 4.5;

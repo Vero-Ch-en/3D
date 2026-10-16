@@ -1176,6 +1176,7 @@ async function hug(kind = 'hug', line) {
   // Step in toward each other over a few frames instead of snapping, then settle out of any wall.
   const mx = (PLAYER.x + PARTNER.x) / 2, mz = (PLAYER.z + PARTNER.z) / 2;
   STATE.hugIn = { p: [mx - Math.sin(a) * 0.17, mz - Math.cos(a) * 0.17], q: [mx + Math.sin(a) * 0.17, mz + Math.cos(a) * 0.17], yaw: a };
+  PLAYER.hugWith = PARTNER; PARTNER.hugWith = PLAYER;
   STATE.hugging = true; PARTNER.lidsClosed = true; PARTNER.tiltTarget = kiss ? -0.38 : -0.2;
   if (kiss) { STATE.hugIn.p = [mx - Math.sin(a) * 0.2, mz - Math.cos(a) * 0.2]; STATE.hugIn.q = [mx + Math.sin(a) * 0.2, mz + Math.cos(a) * 0.2]; PLAYER.leanTarget = 0.14; PLAYER.tiltTarget = 0.18; PLAYER.lidsClosed = true; PARTNER.headDown = -0.12; }
   // Side-on to the hug, favouring her face; try both sides and a closer fallback so walls never block it.
@@ -1196,7 +1197,7 @@ G.hug = hug;
 /* A slow dance in the kitchen to the radio: close, swaying, the camera drifting round. Any move ends it. */
 async function dance() {
   if (busy() || Math.hypot(PARTNER.x - PLAYER.x, PARTNER.z - PLAYER.z) > 1.8 || PARTNER.sit > 0.2 || PLAYER.sit > 0.2) return false;
-  STATE.busy = true; STATE.kiss = false; STATE.dancing = true;
+  STATE.busy = true; STATE.kiss = false; STATE.dancing = true; PLAYER.hugWith = PARTNER; PARTNER.hugWith = PLAYER;
   if (PARTNER.hold) G.setHold(false);
   if (PARTNER.task) endTask(PARTNER);
   const a = Math.atan2(PARTNER.x - PLAYER.x, PARTNER.z - PLAYER.z), mx = (PLAYER.x + PARTNER.x) / 2, mz = (PLAYER.z + PARTNER.z) / 2;

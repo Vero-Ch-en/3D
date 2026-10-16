@@ -139,6 +139,20 @@ function fitGear(c) {
     const hr = local(hat, f.hair, (q) => q.y > 0.1 * r0 && q.length() < 1.6 * r0).map((q) => q.length() / r0);
     const sH = clamp(pct(hr, 0.95) * 1.02, 0.85, 1.15), c0 = hat.position.clone();
     hp.forEach((p) => { p.position.sub(c0).multiplyScalar(sH).add(c0); p.scale.multiplyScalar(sH); });
+    // Then down to the forehead: the brim just above the brows (the real heads' eye line), and big enough over
+    // the hair on top that it's worn, not perched.
+    const lid = (u.realLids || [])[0];
+    if (lid) {
+      m.updateMatrixWorld(true);
+      const W = (o) => o.getWorldPosition(new THREE.Vector3());
+      const brim = hp[1], dy2 = W(lid).y + 0.052 * k - W(brim).y;
+      hp.forEach((p) => { p.position.y += dy2; }); g.snow.forEach((s2) => { if (s2.parent === u.head) s2.position.y += dy2; });
+      m.updateMatrixWorld(true);
+      const dc = W(hat), hTop = f.hair.reduce((mx, _, i) => (i % 3 === 1 && Math.hypot(f.hair[i - 1] - dc.x, f.hair[i + 1] - dc.z) < 0.06 ? Math.max(mx, f.hair[i]) : mx), f.skinTop);
+      const need = clamp((hTop + 0.014 - dc.y) / (r0 * hat.scale.y), 1, 1.28), c1 = brim.position.clone();
+      if (need > 1) hp.forEach((p) => { p.position.sub(c1).multiplyScalar(need).add(c1); p.scale.multiplyScalar(need); });
+      out.hatDrop = +dy2.toFixed(3); out.hatGrow = +need.toFixed(3);
+    }
     const dyScarf = clamp(f.neck - (f.chestY + 0.15 * k), -0.012, 0.015);   // never down into the coat's collar, nor up over the mouth
     const sB = f.footLen > 0.1 ? clamp(f.footLen / (0.266 * k) * 1.06, 0.9, 1.4) : 1;
     const arm = (p) => u.arms.some((a) => a.sh === p || a.el === p), foot = (p) => u.legs.some((l) => l.ft === p);
@@ -157,6 +171,38 @@ function fitGear(c) {
     // The model's own long coat wears the same wool and colour as the built-on one did.
     // Over the long coat's own collar the scarf sits a little lower and wider, wrapped round it, not the chin.
     if ((u.realCoat || []).length) g.parts.forEach((p) => { if (p.parent === u.chest && p.material !== g.coatM && !p.userData.coatPiece) { p.position.y -= 0.035 * k; p.scale.x *= 1.08; p.scale.z *= 1.1; } });
+    // The scarf down onto the long coat's collar and round it: measured from the coat itself (the collar's top at
+    // the front and back, where there are no shoulder points, and how wide it is just below).
+    if ((u.realCoat || []).length) {
+      const cv = []; const vv = new THREE.Vector3();
+      u.realCoat.forEach((o) => { o.updateMatrixWorld(true); const P = o.geometry.attributes.position; for (let i = 0; i < P.count; i += 2) { vv.fromBufferAttribute(P, i).applyMatrix4(o.matrixWorld); cv.push(vv.clone()); } });
+      const cz0 = cv.filter((q) => q.y > f.chestY).reduce((a2, q, _, A) => a2 + q.z / A.length, 0);
+      const front = cv.filter((q) => Math.abs(q.x) < 0.05 && q.z > cz0 && q.y > f.chestY), backC = cv.filter((q) => Math.abs(q.x) < 0.06 && q.z < cz0 && q.y > f.chestY);
+      const fTop = pct(front.map((q) => q.y), 0.98), bTop = pct(backC.map((q) => q.y), 0.97);
+      // Square, peaked sleeve heads: anything above a natural shoulder line (sloping ~20° down from the neck)
+      // is brought most of the way down onto it, so the shoulders read round.
+      const yMax = (ax) => fTop - 0.025 * k - Math.max(0, ax - 0.07 * k) * 0.36;
+      u.realCoat.forEach((o) => {
+        const P = o.geometry.attributes.position, iw = new THREE.Matrix4().copy(o.matrixWorld).invert(); let n = 0;
+        for (let i = 0; i < P.count; i++) { vv.fromBufferAttribute(P, i).applyMatrix4(o.matrixWorld); const ax = Math.abs(vv.x); if (ax > 0.07 * k && ax < 0.3 * k) { const ym = yMax(ax); if (vv.y > ym) { vv.y = ym + (vv.y - ym) * 0.3; vv.applyMatrix4(iw); P.setXYZ(i, vv.x, vv.y, vv.z); n++; } } }
+        P.needsUpdate = true; o.geometry.computeVertexNormals(); out.folded = (out.folded || 0) + n;
+      });
+      const band = cv.filter((q) => q.y > fTop - 0.04 && q.y < fTop + 0.01 && Math.hypot(q.x, q.z - cz0) < 0.16);
+      const rx = pct(band.map((q) => Math.abs(q.x)), 0.9), rz = pct(band.map((q) => Math.abs(q.z - cz0)), 0.9);
+      const ring = g.parts.find((p) => p.parent === u.chest && p.geometry.type === 'TorusGeometry');
+      const tail = g.parts.find((p) => p.userData.scarfTail);
+      if (ring && rx > 0.03) {
+        const P = ring.geometry.parameters, inner = P.radius - P.tube * 0.6;
+        ring.scale.x = clamp((rx * 1.04) / inner, 0.8, 1.6); ring.scale.y = clamp((Math.max(rz, rx * 0.8) * 1.04) / inner, 0.8, 1.6);
+        // Resting on the front of the collar, riding up a little at the back of the neck.
+        ring.rotation.x = Math.PI / 2 - clamp(Math.atan2((bTop - fTop) * 0.45, rz * 2 + 0.01), 0.1, 0.4);
+        u.chest.updateMatrixWorld(true);
+        const at = ring.getWorldPosition(new THREE.Vector3()), want = fTop + P.tube * ring.scale.z * 0.55 + (bTop - fTop) * 0.2;
+        ring.position.y += want - at.y; ring.position.z += cz0 - at.z;
+        if (tail) { tail.position.y = ring.position.y - 0.11 * k; tail.position.z = ring.position.z + (P.radius + P.tube * 0.5) * ring.scale.y; tail.position.x = 0.35 * rx; }
+        out.collar = [+fTop.toFixed(3), +bTop.toFixed(3), +rx.toFixed(3), +rz.toFixed(3), +(want - at.y).toFixed(3)];
+      }
+    }
     (u.realCoat || []).forEach((o) => { const mt = g.coatM.clone(); mt.skinning = true; mt.side = THREE.DoubleSide; mt.map = G.rep(G.TX.jersey, 4, 4); G.MATS && G.MATS.push(mt); o.material = mt; });
     out.flare = +(torso.userData.flare || 1).toFixed(3);
     need.forEach((s, p) => { out[p.parent === u.spine ? 'coat' : (out.sl = (out.sl || 0) + 1, 'sleeve' + out.sl)] = +s.toFixed(3); });
@@ -189,8 +235,10 @@ function fitBoots(m, boots) {
     const gs = fit(sole); sole.position.set(c.x, lowY + 0.004, c.z); sole.scale.set((w * 2.1) / gs.x, 1, (sz.z + 0.03) / gs.z);
     // Shaft: up the shin from the ankle, wide enough for the sock's top.
     // A real calf widens above the ankle: the shaft flares to fit it (unit cylinder, top half as wide again).
-    if (!shaft.userData.flared) { shaft.geometry = new THREE.CylinderGeometry(0.5 * 1.5, 0.5, 1, 18, 1, true); shaft.material.side = THREE.DoubleSide; shaft.userData.flared = true; }
-    const sh = new THREE.Vector3(1, 1, 1), top = box.max.y + 0.2, bot = lowY + 0.03, rr = w * 1.08;   // to mid-calf, well over the leggings' hem (the shaft tips with the foot)
+    // Sized to the body: a child's wellies come to below the knee, not up to it.
+    const bs = Math.max(0.5, Math.min(1.15, (u.H || 1.7) / 1.7)), kid = bs < 0.85;
+    if (!shaft.userData.flared) { shaft.geometry = new THREE.CylinderGeometry(0.5 * (kid ? 1.22 : 1.5), 0.5, 1, 18, 1, true); shaft.material.side = THREE.DoubleSide; shaft.userData.flared = true; }
+    const sh = new THREE.Vector3(1, 1, 1), top = box.max.y + (kid ? 0.1 : 0.2) * bs, bot = lowY + 0.03 * bs, rr = w * 1.08;   // to mid-calf, well over the leggings' hem (the shaft tips with the foot)
     shaft.position.set(c.x, (top + bot) / 2, c.z - sz.z * 0.22); shaft.scale.set((rr * 2) / sh.x, (top - bot) / sh.y, (rr * 2) / sh.z);
     out.push([+sz.x.toFixed(3), +sz.y.toFixed(3), +sz.z.toFixed(3)]);
   });
