@@ -281,6 +281,21 @@ G.loadRealModel = async (name, spec, embeddedOnly) => {
   const all = await loadEmbeddedReal();
   return all[name] ? Uint8Array.from(atob(all[name]), (c) => c.charCodeAt(0)).buffer : null;
 };
+/* A few facts for Stats, to see from a screenshot why a device shows the characters differently. */
+G.ERRS = [];
+window.addEventListener('error', (e) => { G.ERRS.push(String(e.message).slice(0, 60)); });
+const _ce = console.error.bind(console), _cw = console.warn.bind(console);
+console.error = (...a) => { G.ERRS.push(a.map(String).join(' ').slice(0, 70)); _ce(...a); };
+console.warn = (...a) => { if (/characters|GLTF|THREE/.test(String(a[0]))) G.ERRS.push(a.map(String).join(' ').slice(0, 70)); _cw(...a); };
+let diagT = 0, diagS = '';
+G.diag = () => {
+  const now = performance.now(); if (now - diagT < 1000) return diagS; diagT = now;
+  const R = G.renderer, cap = R.capabilities, gl = R.getContext();
+  const per = (m) => { let n = 0, vis = 0, tex = 0, bones = 0; m.traverse((o) => { if (o.isSkinnedMesh) { n++; if (o.visible) vis++; if (o.material.map && o.material.map.image) tex++; bones = Math.max(bones, o.skeleton.bones.length); } }); const u = m.userData; return `${vis}/${n} vis ${tex} tex ${bones} bones top ${(u.realTop || []).map((o) => (o.visible ? 1 : 0)).join('')} fit ${u.gearFitted ? 1 : 0}`; };
+  const ext = gl.getExtension('WEBGL_debug_renderer_info');
+  diagS = `\nHim ${per(G.PLAYER.m)}\nHer ${per(G.PARTNER.m)}\nGPU ${ext ? String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)).slice(0, 34) : '?'}\nWebGL${cap.isWebGL2 ? 2 : 1} vtex ${cap.floatVertexTextures ? 1 : 0} vuni ${cap.maxVertexUniforms} tex ${cap.maxTextureSize} dressed ${G.PLAYER.dressed ? 1 : 0}${G.PARTNER.dressed ? 1 : 0}` + G.ERRS.slice(-3).map((e) => '\n! ' + e).join('');
+  return diagS;
+};
 /* Which body each character got, and why (shown in Stats). */
 G.CHAR_STATUS = {};
 G.attachBlenderBody = async (root, name, opts = {}) => {

@@ -1481,7 +1481,7 @@ let fpsAcc = 0, fpsN = 0, fps = 60, lowT = 0;
 function toggleStats() { const s = $('stats'); s.hidden = !s.hidden; }
 function stats() {
   const s = $('stats');
-  if (!s.hidden) { const i = G.renderer.info.render; s.textContent = `${fps.toFixed(0)} FPS  ${(1000 / Math.max(1, fps)).toFixed(1)} ms\nDraw calls ${i.calls}   Tris ${(i.triangles / 1000).toFixed(0)}k\nQuality ${G.qName}  DOF ${G.Q.dof ? 'on' : 'off'}  AO ${G.Q.ssao ? 'on' : 'off'}\nBodies ${G.CHAR_STATUS ? (G.CHAR_STATUS.player || '?') + ' / ' + (G.CHAR_STATUS.partner || '?') : '?'}`; }
+  if (!s.hidden) { const i = G.renderer.info.render; s.textContent = `${fps.toFixed(0)} FPS  ${(1000 / Math.max(1, fps)).toFixed(1)} ms\nDraw calls ${i.calls}   Tris ${(i.triangles / 1000).toFixed(0)}k\nQuality ${G.qName}  DOF ${G.Q.dof ? 'on' : 'off'}  AO ${G.Q.ssao ? 'on' : 'off'}\nBodies ${G.CHAR_STATUS ? (G.CHAR_STATUS.player || '?') + ' / ' + (G.CHAR_STATUS.partner || '?') : '?'}${G.diag ? G.diag() : ''}`; }
   if (STATE.started && fps < 24) { lowT += 0.5; if (lowT > 5 && G.qName !== 'Low') { G.qName = G.qName === 'Epic' ? 'High' : 'Low'; G.applyQuality(); hint('Quality lowered to ' + G.qName + ' for smoother play.', 4); lowT = 0; } } else lowT = 0;
 }
 
