@@ -137,7 +137,7 @@ function fitGear(c) {
     const hr = local(hat, f.hair, (q) => q.y > 0.1 * r0 && q.length() < 1.6 * r0).map((q) => q.length() / r0);
     const sH = clamp(pct(hr, 0.95) * 1.02, 0.85, 1.15), c0 = hat.position.clone();
     hp.forEach((p) => { p.position.sub(c0).multiplyScalar(sH).add(c0); p.scale.multiplyScalar(sH); });
-    const dyScarf = clamp(f.neck - (f.chestY + 0.15 * k), -0.05, 0.06);
+    const dyScarf = clamp(f.neck - (f.chestY + 0.15 * k), -0.012, 0.06);   // never down into the coat's collar
     const sB = f.footLen > 0.1 ? clamp(f.footLen / (0.266 * k) * 1.06, 0.9, 1.4) : 1;
     const arm = (p) => u.arms.some((a) => a.sh === p || a.el === p), foot = (p) => u.legs.some((l) => l.ft === p);
     for (const p of g.parts) {
@@ -179,6 +179,19 @@ function fitKid(m) {
     const sH = clamp(pct(hr, 0.95) * 1.02, 0.85, 1.25), c0 = hat.position.clone();
     hp.forEach((p) => { p.position.sub(c0).multiplyScalar(sH).add(c0); p.scale.multiplyScalar(sH); });
     const dyScarf = clamp(f.neck - (f.chestY + 0.15 * k), -0.05, 0.05);
+    const sB = f.footLen > 0.05 ? clamp(f.footLen / (0.266 * k) * 1.08, 0.85, 1.4) : 1;
+    (u.kidBoots || []).forEach((p) => { p.position.multiplyScalar(sB); p.scale.multiplyScalar(sB); });
+    // A child's legs are shorter than the rig they ride on: put each boot where that model's own ankle is.
+    const R = u.retarget, bootOff = [];
+    if (R) u.legs.forEach((lg) => {
+      const e = R.map.find((q) => q.group === lg.ft); if (!e) return;
+      const want = new THREE.Vector3().setFromMatrixPosition(e.boneRest);
+      lg.ft.updateMatrixWorld(true); inv.copy(lg.ft.matrixWorld).invert();
+      const d = want.applyMatrix4(inv); d.y = Math.min(d.y, 0.02); bootOff.push(+d.length().toFixed(3));
+      for (const p of u.kidBoots) if (p.parent === lg.ft) { p.position.x += d.x; p.position.y += d.y; p.position.z += d.z; }
+    });
+    u.bootOff = bootOff;
+    u.scarfDy = dyScarf;   // kept: the scarf can change hands in the prologue (story.js, moveScarf)
     u.kidScarf.forEach((p) => { p.position.y += dyScarf; });
     return { sH: +sH.toFixed(3), dyHat: +dyHat.toFixed(3), dyScarf: +dyScarf.toFixed(3), centre: cn ? [+(cx / cn).toFixed(3), +(cz / cn).toFixed(3)] : null };
   });
@@ -285,7 +298,7 @@ A.rewire('coats', async () => {
   if (!PLAYER.dressed) {
     setDressed(PLAYER, true);
     await N(A.cyc('coatOn', ['(Coat. Boots. The red scarf, wound twice. You look like a parcel somebody loves.)', '(Coat, boots, scarf. Ready for whatever the weather has in mind.)']));
-    if (!S.flags.scarfTalk && A.canHear() && !PARTNER.lie) { S.flags.scarfTalk = 1; await Pt('You’ve had that red scarf as long as I’ve known you.'); }
+    if (!S.flags.scarfTalk && A.canHear() && !PARTNER.lie) { S.flags.scarfTalk = 1; await Pt(S.flags.scarfGiven ? 'You lent me that red scarf once, you know. At the lantern fair. I did give it back. Eventually.' : 'You’ve had that red scarf as long as I’ve known you.'); }
     return;
   }
   setDressed(PLAYER, false);

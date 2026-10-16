@@ -524,6 +524,7 @@ G.buildNav = buildNav;
 G.navOpen = (x, z) => { if (!NAV.open) buildNav(); const [i, j] = cellOf(x, z); return isOpen(i, j); };
 // Add a solid thing to the world after boot (a snowman): a collider, closed off on the nav grid too.
 G.addCollider = (b) => { G.COLL.push(b); if (NAV.open) navClose(b); };
+G.removeCollider = (b) => { const i = G.COLL.indexOf(b); if (i >= 0) { G.COLL.splice(i, 1); NAV.open = null; } };   // the nav grid is rebuilt on next use
 const cellOf = (x, z) => [Math.floor((x - NAV.x0) / NAV.cs), Math.floor((z - NAV.z0) / NAV.cs)];
 const cellPos = (i, j) => ({ x: NAV.x0 + (i + 0.5) * NAV.cs, z: NAV.z0 + (j + 0.5) * NAV.cs });
 const inGrid = (i, j) => i >= 0 && j >= 0 && i < NAV.nx && j < NAV.nz;
@@ -1051,9 +1052,13 @@ const Story = (G.Story = {
     // The snow globe on the mantle doubles as a music box.
     const tune = G.Audio.musicBox();
     await G.say(null, '(She winds the snow globe on the mantle. It plays its little tune, a touch slow, and she hums along, off-key and completely sure of herself.)', { shot: cakeShot, auto: Math.max(5, tune + 0.4) });
+    // The same tune the lantern fair played, the night you met (the prologue).
+    if (G.S.flags.fairTune) await G.say(null, '(It’s the tune from the lantern fair. You realised that years ago. Neither of you has ever said so.)', { shot: cakeShot });
     await G.say('partner', 'Wait. Make a wish first. A proper one. Not a sensible one.');
     await G.say('player', 'What counts as sensible?');
     await G.say('partner', '“More sleep.” “A new kettle.” Anything you’d be willing to say out loud.');
+    if (G.S.flags.fairWish === 'secret') await G.say(null, '(You make the same wish you made under the sky lanterns, a long time ago. You still haven’t said it out loud.)', { shot: cakeShot });
+    else if (G.S.flags.fairWish === 'snow') await G.say('partner', 'And not “snow every day”. We tried that one. Look where it got us.', { shot: cakeShot });
     G.Audio.blow(); G.CAKE.lit = false;
     await G.say(null, '(You blow them out. All five, first try.)', { shot: cakeShot });
     await G.say('partner', 'Happy first snow, {giant}.');
@@ -1553,7 +1558,7 @@ function warmUp() {
 }
 
 /* ---------- the prologue's children ---------- */
-function kidDress(root, hatCol, scarfCol) {
+function kidDress(root, hatCol, scarfCol, bootCol) {
   const u = root.userData, k = u.k;
   const knit = G.std({ map: G.rep(G.TX.knitCream, 2, 1), color: hatCol, bumpMap: G.TX.knitB, bumpScale: 0.004, roughness: 1 });
   const hat = new THREE.Mesh(new THREE.SphereGeometry(0.094 * k, 24, 12, 0, Math.PI * 2, 0, Math.PI * 0.55), knit);
@@ -1561,14 +1566,27 @@ function kidDress(root, hatCol, scarfCol) {
   const brim = new THREE.Mesh(new THREE.TorusGeometry(0.088 * k, 0.014 * k, 8, 28), knit); brim.rotation.x = Math.PI / 2 + 0.12; brim.position.set(0, 0.045 * k, -0.004 * k); brim.scale.set(1.04, 1.1, 1); u.head.add(brim);
   const pom = new THREE.Mesh(new THREE.SphereGeometry(0.03 * k, 12, 8), knit); pom.position.set(0, 0.145 * k, -0.02 * k); u.head.add(pom);
   // Kept when a realistic body replaces the procedural one (people.js), and fitted to it (life.js, fitKid).
+  // Wellies.
+  u.kidBoots = [];
+  if (bootCol) {
+    const bm = G.std({ color: bootCol, roughness: 0.45, env: 0.5 }), sole = G.shared({ color: '#221c18', roughness: 0.9 });
+    const fl = 0.152 * 1.75, ank = 0.039 * 1.75;
+    const put = (m, parent, x, y, z) => { m.position.set(x * k, y * k, z * k); m.castShadow = true; parent.add(m); u.kidBoots.push(m); return m; };
+    u.legs.forEach((lg) => {
+      put(new THREE.Mesh(new THREE.CylinderGeometry(0.047 * k, 0.05 * k, 0.2 * k, 16), bm), lg.ft, 0, 0.05, -0.004);
+      put(new THREE.Mesh(new THREE.SphereGeometry(1, 20, 12), bm), lg.ft, 0, -ank + 0.034, fl * 0.5 - 0.058).scale.set(0.052 * k, 0.041 * k, fl * 0.53 * k);
+      put(new THREE.Mesh(new THREE.BoxGeometry(0.098 * k, 0.022 * k, fl * 1.06 * k), sole), lg.ft, 0, -ank + 0.008, fl * 0.5 - 0.058);
+    });
+  }
   u.kidHat = [hat, brim, pom]; u.kidScarf = [];
   if (scarfCol) {
     const sm = G.std({ map: G.rep(G.TX.knitCream, 3, 1), color: scarfCol, bumpMap: G.TX.knitB, bumpScale: 0.004, roughness: 1 });
     const sc = new THREE.Mesh(new THREE.TorusGeometry(0.068 * k, 0.03 * k, 10, 24), sm); sc.rotation.x = Math.PI / 2 - 0.1; sc.position.set(0, 0.14 * k, 0.005 * k); sc.scale.set(1, 1.15, 0.9); u.chest.add(sc);
     const tail = new THREE.Mesh(new THREE.BoxGeometry(0.06 * k, 0.2 * k, 0.025 * k), sm); tail.position.set(0.04 * k, 0.04 * k, 0.1 * k); tail.rotation.set(0.12, 0, 0.1); u.chest.add(tail);
     u.kidScarf = [sc, tail];
+    u.kidScarf.forEach((o) => { o.userData.base = [o.position.x / k, o.position.y / k, o.position.z / k]; o.userData.baseScale = o.scale.clone(); o.userData.k0 = k; });
   }
-  u.kidHat.concat(u.kidScarf).forEach((o) => { o.userData.gear = true; o.castShadow = true; });
+  u.kidHat.concat(u.kidScarf, u.kidBoots).forEach((o) => { o.userData.gear = true; o.castShadow = true; });
 }
 G.useKids = (on) => {
   const K = G.KIDS;
@@ -1598,7 +1616,7 @@ function boot() {
     player: G.makeHuman({ height: 1.14, skin: '#dcae90', outfit: 'hoodie', top: '#34506e', legs: '#2a2c33', hair: '#1e140f', hairStyle: 'shaggy', socks: '#3a3a40', seed: 12 }),
     partner: G.makeHuman({ height: 1.04, fem: true, skin: '#eac2a8', outfit: 'hoodie', top: '#c08a3e', legs: '#3a2e2a', hair: '#5e3a26', hairStyle: 'bun', socks: '#e6dccd', eyes: '#4a3020', lips: '#c98078', seed: 24 }),
   });
-  kidDress(KIDS.player, '#3e5f8a', '#b8322a'); kidDress(KIDS.partner, '#e9e2d4', null);
+  kidDress(KIDS.player, '#3e5f8a', '#b8322a', '#2d4a66'); kidDress(KIDS.partner, '#e9e2d4', null, '#b5413a');
   KIDS.player.visible = KIDS.partner.visible = false;
   KIDS.adults = { player: PLAYER.m, partner: PARTNER.m };
   buildNav();

@@ -454,10 +454,12 @@ function measureFit(model, u) {
 
 /* Run fn with a character in its rest pose at the origin (as measured above), then put everything back. */
 G.atRest = (root, fn) => {
-  const u = root.userData, saved = [];
-  root.traverse((o) => { saved.push([o, o.position.clone(), o.rotation.clone()]); });
+  const u = root.userData;
+  // Only the root and the rig's joints are posed (and put back): anything fitted onto them in fn stays.
+  const joints = [u.hips, u.spine, u.chest, u.neck, u.head].concat(...u.arms.map((a) => [a.sh, a.el, a.hand]), ...u.legs.map((l) => [l.th, l.kn, l.ft]));
+  const saved = [root].concat(joints).map((o) => [o, o.position.clone(), o.rotation.clone()]);
   root.position.set(0, 0, 0); root.rotation.set(0, 0, 0);
-  [u.hips, u.spine, u.chest, u.neck, u.head].concat(...u.arms.map((a) => [a.sh, a.el, a.hand]), ...u.legs.map((l) => [l.th, l.kn, l.ft])).forEach((g) => g.rotation.set(0, 0, 0));
+  joints.forEach((g) => g.rotation.set(0, 0, 0));
   u.hips.position.y = u.hipY;
   root.updateMatrixWorld(true);
   try { return fn(); } finally { saved.forEach(([o, p, r]) => { o.position.copy(p); o.rotation.copy(r); }); root.updateMatrixWorld(true); }
