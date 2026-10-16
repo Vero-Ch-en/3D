@@ -559,6 +559,19 @@ const ARM_POSES = (G.ARM_POSES = {
   coatPockets: [-0.16, 0.06, -0.5, -0.35], // hands in the coat's side pockets
 });
 const ONE_ARM = { throw: 0, water: 0, wave: 1 };
+/* Motion capture (js/mocap.js, from the CMU motion capture database): looping idle, walk and seated clips,
+ * already in this rig's joint angles. Sampled with linear interpolation; mixed by walk speed and sitting. */
+const MC_KEYS = ['hips', 'hipsPos', 'spine', 'spineW', 'chest', 'neck', 'head', 'sh0', 'sh1', 'el0', 'el1', 'th0', 'th1', 'kn0', 'kn1', 'ft0', 'ft1'];
+const mcSample = (clip, f, out) => {
+  const n = clip.n, a = ((Math.floor(f) % n) + n) % n, b = (a + 1) % n, t = f - Math.floor(f);
+  for (const k of MC_KEYS) {
+    const A = clip[k][a], B = clip[k][b];
+    if (typeof A === 'number') out[k] = A + (B - A) * t;
+    else { const o = out[k] || (out[k] = [0, 0, 0]); for (let i = 0; i < 3; i++) o[i] = A[i] + (B[i] - A[i]) * t; }
+  }
+  return out;
+};
+const mcMix = (a, b, t, out) => { for (const k of MC_KEYS) { if (typeof a[k] === 'number') out[k] = a[k] + (b[k] - a[k]) * t; else { const o = out[k] || (out[k] = [0, 0, 0]); for (let i = 0; i < 3; i++) o[i] = a[k][i] + (b[k][i] - a[k][i]) * t; } } return out; };
 G.animate = (c, dt, t) => {
   const u = c.m.userData, k = u.k, { lerp: L, clamp, damp } = G;
   c.m.position.set(c.x, c.y, c.z);
@@ -588,6 +601,19 @@ G.animate = (c, dt, t) => {
   const sd = c.seedT, raw = Math.sin(t * 0.21 + sd) * 0.75 + Math.sin(t * 0.083 + sd * 1.7) * 0.45;
   const shift = Math.max(-1, Math.min(1, raw * 1.3)) * idle;
   const small = u.H < 1.3;   // a child
+  // The recorded base pose for this frame (null without the clips, or for poses the clips don't cover).
+  const MC = window.CBS_MOCAP && G.MOCAP_ON !== false && !c.lie && !c.angel ? window.CBS_MOCAP : null;
+  let mb = null;
+  if (MC) {
+    const S = c._mc || (c._mc = { i: {}, w: {}, s: {}, m: {}, m2: {} });
+    // Each person through the idle at their own point and pace; children a touch quicker.
+    mcSample(MC.idle, (t * (small ? 1.12 : 0.96) + sd * 9) * MC.idle.fps, S.i);
+    // The walk follows the stride phase: right foot furthest forward at ph = 1.5π (as the footsteps expect).
+    const wu = (((ph - 1.5 * Math.PI) / (2 * Math.PI)) % 1 + 1) % 1;
+    mcSample(MC.walk, wu * MC.walk.n, S.w);
+    mb = mcMix(S.i, S.w, w, S.m);
+    if (sit > 0.01) { mcSample(MC.sit, (t * 0.9 + sd * 5) * MC.sit.fps, S.s); mb = mcMix(mb, S.s, sit, S.m2); }
+  }
   u.legs.forEach((Lg, i) => {
     const p = ph + (i ? Math.PI : 0), s = i ? 1 : -1;
     const bend = Math.max(0, s * shift) * 0.2;   // the unloaded leg softens at the knee and turns out a little
@@ -596,6 +622,15 @@ G.animate = (c, dt, t) => {
     Lg.th.rotation.set(L(Math.sin(p) * 0.55 * w - bend * 0.45, -1.42, sit), L(s * bend * 0.35, s * 0.1, sit), L(-s * 0.025 * idle - s * Math.max(0, -s * shift) * 0.03, s * 0.09, sit));
     Lg.kn.rotation.x = L(Math.max(0, -Math.sin(p + 0.6)) * 1.0 * w + 0.04 + bend, 1.4 + dang, sit);
     Lg.ft.rotation.x = L(Math.sin(p) * 0.2 * w - bend * 0.5, -0.12 - dang * 0.5, sit);
+    if (mb) {
+      // Walking legs from the recording (index 0 is the right leg, as here). Standing and sitting keep this
+      // rig's own legs: the recording's standing knees aren't trustworthy, and a seat decides sitting legs.
+      const S = c._mc, k2 = w * (1 - sit), th = S.w['th' + i];
+      const r = Lg.th.rotation;
+      r.set(L(r.x, th[0], k2), L(r.y, th[1], k2), L(r.z, th[2], k2));
+      Lg.kn.rotation.x = L(Lg.kn.rotation.x, S.w['kn' + i], k2);
+      Lg.ft.rotation.x = L(Lg.ft.rotation.x, S.w['ft' + i], k2);
+    }
     if (c.angel) { Lg.th.rotation.set(0, 0, s * (0.05 + 0.32 * (0.5 - 0.5 * Math.cos(t * 2.4)))); Lg.kn.rotation.x = 0.04; }
   });
   u.hips.position.y = L(u.hipY, (c.seatY || 0.6) - c.y + 0.03, sit) - Math.abs(Math.sin(ph)) * 0.03 * w - Math.abs(shift) * 0.012;
@@ -607,6 +642,16 @@ G.animate = (c, dt, t) => {
   u.spine.rotation.z = shift * 0.075;
   u.spine.rotation.x = 0.04 * w * (sp > 1.2 ? 2.5 : 1) + sit * 0.1 + (c.lean || 0) + Math.sin(t * 0.17 + sd) * 0.012 * idle;
   u.chest.rotation.z = shift * 0.02;
+  if (mb) {
+    // Hips and spine from the recording: height relative to standing, sway about the path; sitting keeps the seat's.
+    // Hip height and pelvis only from the walk (standing keeps the weight shift above); upper body from all.
+    const S = c._mc, hp = S.w.hipsPos, k2 = w * (1 - sit);
+    // (hip height stays this rig's own, with its bob: the recording's is tied to its over-bent knees)
+    u.hips.position.x = L(u.hips.position.x, hp[0] * u.hipY, k2);
+    u.hips.rotation.set(L(u.hips.rotation.x, S.w.hips[0] - 0.02, k2), L(u.hips.rotation.y, S.w.hips[1], k2), L(u.hips.rotation.z, S.w.hips[2], k2));
+    // With the recorded pelvis (walking) the spine is relative to it; without, against the upright body.
+    u.spine.rotation.set(L(mb.spineW[0], mb.spine[0], k2) + (c.lean || 0) + sit * 0.1, L(mb.spineW[1], mb.spine[1], k2), L(mb.spineW[2], mb.spine[2], k2));
+  }
   // Swaying to music (the radio, or a slow dance): weight rocks side to side on the beat.
   c.swayW = damp(c.swayW || 0, c.swayTarget || 0, 2, dt);
   c.headSway = 0;
@@ -622,6 +667,7 @@ G.animate = (c, dt, t) => {
   const br = Math.sin(c.breath) * 0.012;
   u.chest.scale.set(1 + br, 1 + br * 0.4, 1 + br);
   u.chest.rotation.x = -br * 1.2;
+  if (mb) { u.chest.rotation.x += mb.chest[0]; u.chest.rotation.y = mb.chest[1]; u.chest.rotation.z = mb.chest[2]; }
   // Arm poses fade in and out instead of popping.
   const pw = c.poseW || (c.poseW = {});
   const want = c.forcePose || c.pose;
@@ -638,6 +684,8 @@ G.animate = (c, dt, t) => {
     let sz = s * (0.11 + 0.012 * Math.sin(c.breath)) * idle + s * 0.06 * w + s * shift * (i ? -0.035 : 0.035);
     let ex = -(0.3 + own) * idle - (0.3 + Math.max(0, -swing) * 0.45 + Math.max(0, swing) * 0.1) * w, sy = s * 0.12 * idle;
     if (sit > 0.5) { sx = -0.42 + own; ex = -0.95; sz = s * 0.16; sy = s * 0.25; }   // hands resting on the thighs
+    // Standing and walking arms from the recording; seated, the hands stay in the lap (its seated arms are up at the face).
+    if (mb) { const a = mb['sh' + i], ka = 1 - sit; sx = L(sx, a[0], ka); sy = L(sy, a[1] * 0.6, ka); sz = L(sz, a[2] + s * (c.dressed ? 0.1 : 0.06), ka); ex = L(ex, mb['el' + i], ka); }
     for (const name in ARM_POSES) {
       const wgt = pw[name] * (name === 'read' || name === 'cup' ? 1 : 1 - sit) * (name === 'warm' ? idle : 1);   // a book or a mug works sitting down too
       if (wgt < 0.001 || (ONE_ARM[name] != null && i !== ONE_ARM[name])) continue;   // one arm throws, or waves
@@ -658,7 +706,7 @@ G.animate = (c, dt, t) => {
     // Only for the realistic bodies (the built-in ones are modelled that way already); poses take it back.
     const tw = u.real ? -s * 0.65 * (1 - Math.max(c.hug || 0, c.holdW || 0)) * (1 - sit * 0.4) : 0;
     let posed = 0; for (const name in ARM_POSES) posed = Math.max(posed, pw[name] || 0);
-    const twist = tw * (1 - posed * 0.7);
+    const twist = tw * (1 - posed * 0.7) * (mb ? 0.55 : 1);   // the recording already turns the arms some way
     A.sh.rotation.set(sx, sy + twist * 0.35, sz); A.el.rotation.set(ex, twist * 0.4, 0);
     if (A.hand) A.hand.rotation.set(0, twist * 0.45, 0);
   });
@@ -683,7 +731,11 @@ G.animate = (c, dt, t) => {
     c.lookUp = damp(c.lookUp || 0, clamp(-Math.atan2(dy, Math.hypot(dx, dz)), -0.4, 0.4), 4, dt);
   } else if (!c.lie) { c.look = damp(c.look || 0, 0, 3, dt); c.lookUp = damp(c.lookUp || 0, 0, 3, dt); }
   u.neck.rotation.set(c.lookUp * 0.4, c.look * 0.45 + Math.sin(ph) * 0.06 * w, (c.tilt || 0) - shift * 0.05);   // walking, the head stays steady over a turning chest
-  u.head.rotation.set(c.lookUp * 0.6 + Math.sin(t * 0.7 + c.z) * 0.02 + (c.headDown || 0), c.look * 0.55, (c.tilt || 0) * 0.6 + c.headSway);
+  // Recorded head and neck motion under the look-at: kept small when looking at something, so the gaze holds.
+  const hk = tgt ? 0.35 : 1;
+  if (mb) { u.neck.rotation.x += mb.neck[0] * hk; u.neck.rotation.y += mb.neck[1] * hk; u.neck.rotation.z += mb.neck[2] * hk; }
+  u.head.rotation.set(c.lookUp * 0.6 + Math.sin(t * 0.7 + c.z) * 0.02 * (mb ? 0 : 1) + (c.headDown || 0), c.look * 0.55, (c.tilt || 0) * 0.6 + c.headSway);
+  if (mb) { u.head.rotation.x += mb.head[0] * hk; u.head.rotation.y += mb.head[1] * hk; u.head.rotation.z += mb.head[2] * hk; }
   G.retarget(c.m);
   G.curlFingers(c, dt);
 };

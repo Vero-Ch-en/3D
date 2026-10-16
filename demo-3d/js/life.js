@@ -29,9 +29,10 @@ function buildGear(m, o) {
   const coatM = G.std({ map: G.rep(G.TX.jersey, 2, 2), color: o.coat, bumpMap: G.TX.jerseyB, bumpScale: 0.004, roughness: 1, env: 0.2 });
   const knit = (c) => G.std({ map: G.rep(G.TX.knitCream, 2, 1), color: c, bumpMap: G.TX.knitB, bumpScale: 0.004, roughness: 1 });
   const bust = fem ? 0.012 : 0, c = 1.17;
-  // A wool coat to mid-thigh over the jumper.
+  // A hip-length wool jacket over the jumper: it ends above where the thighs swing, so walking legs
+  // never come through it (a rigid mid-thigh coat can't move with the legs).
   const coat = add(new THREE.Mesh(lathe([
-    [W.hip * 1.22, -0.26], [W.hip * 1.19, -0.17], [W.hip * c, -0.05], [W.waist * 1.2, 0.1], [(W.waist + W.chest) / 2 * c, 0.18],
+    [W.hip * 1.21, -0.165], [W.hip * 1.19, -0.11], [W.hip * c, -0.04], [W.waist * 1.2, 0.1], [(W.waist + W.chest) / 2 * c, 0.18],
     [(W.chest + bust) * c, 0.27], [W.chest * 1.18, 0.38], [W.sh * c, 0.43], [W.sh * 1.0, 0.475], [0.118, 0.505], [0.088, 0.522], [0.0, 0.526],
   ], 36), coatM), u.spine);
   coat.scale.z = fem ? 0.72 : 0.69;
@@ -137,7 +138,7 @@ function fitGear(c) {
     const hr = local(hat, f.hair, (q) => q.y > 0.1 * r0 && q.length() < 1.6 * r0).map((q) => q.length() / r0);
     const sH = clamp(pct(hr, 0.95) * 1.02, 0.85, 1.15), c0 = hat.position.clone();
     hp.forEach((p) => { p.position.sub(c0).multiplyScalar(sH).add(c0); p.scale.multiplyScalar(sH); });
-    const dyScarf = clamp(f.neck - (f.chestY + 0.15 * k), -0.012, 0.06);   // never down into the coat's collar
+    const dyScarf = clamp(f.neck - (f.chestY + 0.15 * k), -0.012, 0.015);   // never down into the coat's collar, nor up over the mouth
     const sB = f.footLen > 0.1 ? clamp(f.footLen / (0.266 * k) * 1.06, 0.9, 1.4) : 1;
     const arm = (p) => u.arms.some((a) => a.sh === p || a.el === p), foot = (p) => u.legs.some((l) => l.ft === p);
     for (const p of g.parts) {
@@ -147,13 +148,48 @@ function fitGear(c) {
       else if (arm(par)) { const s = sibling(p); p.scale.x *= s; p.scale.z *= s; }
       else if (par === u.spine || (par === u.chest && p.material === g.coatM)) { p.position.x *= sT; p.position.z = p.position.z * sT + (par === u.spine ? dzT : 0); p.scale.x *= sT; p.scale.z *= sT; }
       else if (par === u.chest) { p.position.set(p.position.x * sT, p.position.y + dyScarf, p.position.z * sT); p.scale.x *= sT; p.scale.z *= sT; }
-      else if (foot(par)) { p.position.multiplyScalar(sB); p.scale.multiplyScalar(sB); }
+      else if (foot(par)) { /* boots: fitted to the feet below */ }
     }
     g.snow.forEach((s) => { if (s.parent === u.head) s.position.y += dyHat; else { s.position.x *= sT; s.position.z *= sT; } });
+    out.boots = fitBoots(m, g.parts.filter((p) => foot(p.parent)));
     out.flare = +(torso.userData.flare || 1).toFixed(3);
     need.forEach((s, p) => { out[p.parent === u.spine ? 'coat' : (out.sl = (out.sl || 0) + 1, 'sleeve' + out.sl)] = +s.toFixed(3); });
     return Object.assign(out, { sH: +sH.toFixed(3), dyHat: +dyHat.toFixed(3), dyScarf: +dyScarf.toFixed(3), sB: +sB.toFixed(3) });
   });
+}
+/* Boots built round a realistic model's own feet. Each boot is [shaft, foot, sole] on the rig's foot group;
+ * every part is sized and placed from the sock it covers, measured in that foot's frame, then handed to the
+ * model's own foot bone so it moves exactly with that foot (the rig's foot is longer and higher, and a child's
+ * shins are shorter than the rig's). Call with the body at rest (inside G.atRest). */
+function fitBoots(m, boots) {
+  const u = m.userData, f = u.fit, R = u.retarget, out = [];
+  if (!f || !f.socks || !f.socks.length || !boots || !boots.length) return out;
+  const inv = new THREE.Matrix4(), v = new THREE.Vector3();
+  u.legs.forEach((lg, i) => {
+    lg.ft.updateMatrixWorld(true); inv.copy(lg.ft.matrixWorld).invert();
+    const side = Math.sign(new THREE.Vector3().setFromMatrixPosition(lg.ft.matrixWorld).x - m.position.x) || (i ? 1 : -1);
+    const box = new THREE.Box3();
+    for (let j = 0; j < f.socks.length; j += 3) { if (Math.sign(f.socks[j] - m.position.x) !== side) continue; box.expandByPoint(v.set(f.socks[j], f.socks[j + 1], f.socks[j + 2]).applyMatrix4(inv)); }
+    const mine = boots.filter((p) => p.parent === lg.ft);
+    if (box.isEmpty() || mine.length < 3) return;
+    const c = box.getCenter(new THREE.Vector3()), sz = box.getSize(new THREE.Vector3());
+    const [shaft, foot, sole] = mine;
+    const lowY = box.min.y, w = Math.max(sz.x, 0.05) * 0.5 + 0.008, fh = Math.min(sz.y, 0.09);
+    // Foot: an ellipsoid round the sock, toe to heel (the geometry is a unit sphere).
+    foot.position.set(c.x, lowY + fh * 0.42, c.z); foot.scale.set(w * 1.05, fh * 0.5 + 0.006, sz.z * 0.5 + 0.012);
+    const fit = (mesh) => { mesh.scale.set(1, 1, 1); mesh.geometry.computeBoundingBox(); return mesh.geometry.boundingBox.getSize(new THREE.Vector3()); };
+    // Sole: under it.
+    const gs = fit(sole); sole.position.set(c.x, lowY + 0.004, c.z); sole.scale.set((w * 2.1) / gs.x, 1, (sz.z + 0.03) / gs.z);
+    // Shaft: up the shin from the ankle, wide enough for the sock's top.
+    const sh = fit(shaft), top = box.max.y + 0.17, bot = lowY + 0.03, rr = w * 1.06;   // to mid-calf, over the leggings' hem
+    shaft.position.set(c.x, (top + bot) / 2, c.z - sz.z * 0.22); shaft.scale.set((rr * 2) / sh.x, (top - bot) / sh.y, (rr * 2) / sh.z);
+    out.push([+sz.x.toFixed(3), +sz.y.toFixed(3), +sz.z.toFixed(3)]);
+  });
+  if (R) {
+    G.retarget(m); m.updateMatrixWorld(true);
+    u.legs.forEach((lg) => { const e = R.map.find((q) => q.group === lg.ft); if (!e) return; for (const p of boots.slice()) if (p.parent === lg.ft) e.bone.attach(p); });
+  }
+  return out;
 }
 /* The children's bobble hats and scarf (game.js, kidDress), moved onto a realistic child's head and collar. */
 function fitKid(m) {
@@ -179,41 +215,7 @@ function fitKid(m) {
     const sH = clamp(pct(hr, 0.95) * 1.02, 0.85, 1.25), c0 = hat.position.clone();
     hp.forEach((p) => { p.position.sub(c0).multiplyScalar(sH).add(c0); p.scale.multiplyScalar(sH); });
     const dyScarf = clamp(f.neck - (f.chestY + 0.15 * k), -0.05, 0.05);
-    // Wellies built round this model's own feet: each part sized and placed from the sock it covers,
-    // measured in that foot's frame (the rig's idea of a foot is longer-toed and higher than a child's).
-    const R = u.retarget, bootOff = [];
-    if (f.socks && f.socks.length) u.legs.forEach((lg, i) => {
-      lg.ft.updateMatrixWorld(true); inv.copy(lg.ft.matrixWorld).invert();
-      const side = Math.sign(new THREE.Vector3().setFromMatrixPosition(lg.ft.matrixWorld).x - m.position.x) || (i ? 1 : -1);
-      const box = new THREE.Box3();
-      for (let j = 0; j < f.socks.length; j += 3) { if (Math.sign(f.socks[j] - m.position.x) !== side) continue; box.expandByPoint(v.set(f.socks[j], f.socks[j + 1], f.socks[j + 2]).applyMatrix4(inv)); }
-      if (box.isEmpty()) return;
-      const c = box.getCenter(new THREE.Vector3()), sz = box.getSize(new THREE.Vector3());
-      const mine = u.kidBoots.filter((p) => p.parent === lg.ft);   // [shaft, foot, sole]
-      const [shaft, foot, sole] = mine;
-      const lowY = box.min.y, w = Math.max(sz.x, 0.05) * 0.5 + 0.008;
-      // Foot: an ellipsoid round the sock below the ankle, toe to heel.
-      const fy = lowY + Math.min(sz.y, 0.09) * 0.42;
-      foot.position.set(c.x, fy, c.z); foot.scale.set(w * 1.05, Math.min(sz.y, 0.09) * 0.5 + 0.006, sz.z * 0.5 + 0.012);
-      // Sole: under it.
-      sole.geometry.computeBoundingBox(); const gb = sole.geometry.boundingBox, gs = gb.getSize(new THREE.Vector3());
-      sole.position.set(c.x, lowY + 0.004, c.z); sole.scale.set((w * 2.1) / gs.x, 1, (sz.z + 0.03) / gs.z);
-      // Shaft: up the shin from the ankle, wide enough for the sock's top.
-      shaft.geometry.computeBoundingBox(); const sb = shaft.geometry.boundingBox, sh = sb.getSize(new THREE.Vector3());
-      const top = box.max.y + 0.06, bot = lowY + 0.03, rr = w * 1.02;
-      shaft.position.set(c.x, (top + bot) / 2, c.z - sz.z * 0.22); shaft.scale.set((rr * 2) / sh.x, (top - bot) / sh.y, (rr * 2) / sh.z);
-      bootOff.push([+sz.x.toFixed(3), +sz.y.toFixed(3), +sz.z.toFixed(3)]);
-    });
-    u.bootOff = bootOff;
-    // Then hand each boot to the model's own foot bone, keeping where it is now (the rest pose), so it moves
-    // exactly with that foot: a child's shins are shorter than the rig's, and a dangling foot shows it.
-    if (R) {
-      G.retarget(m); m.updateMatrixWorld(true);
-      u.legs.forEach((lg) => {
-        const e = R.map.find((q) => q.group === lg.ft); if (!e) return;
-        for (const p of u.kidBoots.slice()) if (p.parent === lg.ft) e.bone.attach(p);
-      });
-    }
+    u.bootOff = fitBoots(m, u.kidBoots);
     u.scarfDy = dyScarf;   // kept: the scarf can change hands in the prologue (story.js, moveScarf)
     u.kidScarf.forEach((p) => { p.position.y += dyScarf; });
     return { sH: +sH.toFixed(3), dyHat: +dyHat.toFixed(3), dyScarf: +dyScarf.toFixed(3), centre: cn ? [+(cx / cn).toFixed(3), +(cz / cn).toFixed(3)] : null };
