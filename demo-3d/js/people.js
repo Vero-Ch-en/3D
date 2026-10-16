@@ -395,6 +395,8 @@ async function attachBody(root, name, spec, bin) {
       });
       // A realistic model: measure it in the rest pose, so outdoor clothes can be fitted around it (life.js).
       if (spec.fit) u.fit = measureFit(model, u);
+      // Fingers (the rig doesn't drive them): found and measured now, in the rest pose, curled every frame.
+      u.fingers = findFingers(model);
       // Bones parents before children.
       const depth = (b) => { let d = 0; for (let p = b.parent; p; p = p.parent) d++; return d; };
       map.sort((a, b) => depth(a.bone) - depth(b.bone));
@@ -408,6 +410,69 @@ async function attachBody(root, name, spec, bin) {
     }, (err) => { console.error('model', name, err); resolve(false); });
   });
 }
+/* Finger chains of a Mixamo-style hand, with the axis that curls each one toward the palm.
+ * The palm side is the side the thumb sits on; the axis is whichever local one moves the fingertip that way. */
+function findFingers(model) {
+  const by = {}; model.traverse((o) => { if (o.isBone) by[o.name.replace(/[^A-Za-z0-9]/g, '')] = o; });
+  const out = [];
+  for (const side of ['Left', 'Right']) {
+    const hand = by['mixamorig' + side + 'Hand']; if (!hand) continue;
+    const W = (o) => o.getWorldPosition(new THREE.Vector3());
+    const h = W(hand), idx = by['mixamorig' + side + 'HandIndex1'], pky = by['mixamorig' + side + 'HandPinky1'], th = by['mixamorig' + side + 'HandThumb1'];
+    if (!idx || !pky || !th) continue;
+    let n = W(idx).sub(h).cross(W(pky).sub(h)).normalize();
+    if (W(th).sub(h).dot(n) < 0) n.negate();   // n points out of the palm
+    for (const f of ['Thumb', 'Index', 'Middle', 'Ring', 'Pinky']) {
+      const chain = [1, 2, 3].map((i) => by['mixamorig' + side + 'Hand' + f + i]).filter(Boolean);
+      if (chain.length < 2) continue;
+      const b0 = chain[0], tip = chain[chain.length - 1], q0 = b0.quaternion.clone();
+      let best = null;
+      for (const ax of [new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, 1, 0)]) {
+        const before = W(tip);
+        b0.quaternion.copy(q0).multiply(new THREE.Quaternion().setFromAxisAngle(ax, 0.5)); b0.updateMatrixWorld(true);
+        const d = W(tip).sub(before).dot(n);
+        b0.quaternion.copy(q0); b0.updateMatrixWorld(true);
+        if (!best || Math.abs(d) > Math.abs(best.d)) best = { ax, d };
+      }
+      const sgn = best.d >= 0 ? 1 : -1;
+      // And the axis that closes the finger toward the middle one (the base mesh is modelled splayed).
+      let close = null;
+      const mid = by['mixamorig' + side + 'HandMiddle1'];
+      if (f !== 'Middle' && f !== 'Thumb' && mid) {
+        const toMid = W(mid).sub(W(b0));
+        for (const ax of [new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, 1, 0)]) {
+          if (Math.abs(ax.dot(best.ax)) > 0.9) continue;
+          const before = W(tip);
+          b0.quaternion.copy(q0).multiply(new THREE.Quaternion().setFromAxisAngle(ax, 0.3)); b0.updateMatrixWorld(true);
+          const d = W(tip).sub(before).dot(toMid);
+          b0.quaternion.copy(q0); b0.updateMatrixWorld(true);
+          if (!close || Math.abs(d) > Math.abs(close.d)) close = { ax, d };
+        }
+      }
+      const spread = { Index: 0.1, Ring: 0.08, Pinky: 0.2 }[f] || 0;
+      chain.forEach((b, j) => out.push({ bone: b, q0: b.quaternion.clone(), ax: best.ax.clone().multiplyScalar(sgn), finger: f, j, side,
+        adx: j === 0 && close ? close.ax.clone().multiplyScalar(close.d >= 0 ? 1 : -1) : null, ad: spread }));
+    }
+  }
+  return out;
+}
+const _fq = new THREE.Quaternion();
+// How far each finger curls, per joint, for a relaxed hand; holding something closes them further.
+const CURL = { Thumb: [0.1, 0.15, 0.15], Index: [0.18, 0.28, 0.2], Middle: [0.24, 0.34, 0.24], Ring: [0.3, 0.4, 0.27], Pinky: [0.36, 0.45, 0.3] };
+G.curlFingers = (c, dt) => {
+  const u = c.m.userData; if (!u.fingers || !u.fingers.length) return;
+  const pz = c.forcePose || c.pose;
+  const grip = c.carry || pz === 'carry' ? 1 : (c.holdPose || pz === 'cup' || pz === 'read') ? 0.75 : pz === 'cold' ? 0.85 : pz === 'pockets' || pz === 'coatPockets' ? 0.6 : c.holdOn ? 0.45 : 0;
+  c.grip = G.damp(c.grip || 0, grip, 6, dt);
+  const fid = Math.sin((c.breath || 0) * 0.5) * 0.04;   // the smallest restlessness, so hands never look carved
+  for (const F of u.fingers) {
+    const base = CURL[F.finger][F.j] || 0.3;
+    const a = base * (1 + c.grip * (F.finger === 'Thumb' ? 0.6 : 1.3)) + fid * (F.j + 1) * 0.5;
+    F.bone.quaternion.copy(F.q0);
+    if (F.adx) F.bone.quaternion.multiply(_fq.setFromAxisAngle(F.adx, F.ad * (1 - c.grip * 0.3)));
+    F.bone.quaternion.multiply(_fq.setFromAxisAngle(F.ax, a));
+  }
+};
 function isRealGlb(buf) {
   try {
     if (buf.byteLength < 20 || new TextDecoder().decode(new Uint8Array(buf, 0, 4)) !== 'glTF') return false;
@@ -449,7 +514,7 @@ function measureFit(model, u) {
   // The raw rest-pose points too (every 2nd vertex, plenty), for fitting the coat and hat around them.
   const thin = (a) => { const r = []; for (let i = 0; a && i < a.length; i += 6) r.push(a[i], a[i + 1], a[i + 2]); return new Float32Array(r); };
   return { headY: head.y, chestY: chest.y, skinTop, headHalfW, halfD, neck, footLen: (side(1) + side(-1)) / 2,
-    body: thin(cat.skin.concat(cat.legs || [])), hair: thin((cat.hair || []).concat(skull.flat())), skull: thin(skull.flat()) };
+    body: thin(cat.skin.concat(cat.legs || [])), hair: thin((cat.hair || []).concat(skull.flat())), skull: thin(skull.flat()), socks: thin(cat.socks || []) };
 }
 
 /* Run fn with a character in its rest pose at the origin (as measured above), then put everything back. */
@@ -491,6 +556,7 @@ const ARM_POSES = (G.ARM_POSES = {
   water: [-1.05, 0.05, -0.55, 0.1],     // one arm out, tipping a watering can (arm 0 only)
   wave: [-2.7, -0.3, -0.7, 0.1],        // one hand up (arm 1 only): hello, and a pose for photographs
   cup: [-0.55, 0.28, -1.3, -0.7],      // a mug cradled in both hands
+  coatPockets: [-0.16, 0.06, -0.5, -0.35], // hands in the coat's side pockets
 });
 const ONE_ARM = { throw: 0, water: 0, wave: 1 };
 G.animate = (c, dt, t) => {
@@ -516,22 +582,31 @@ G.animate = (c, dt, t) => {
     const cy = Math.cos(c.yaw), sy = Math.sin(c.yaw);
     c.stepEvent = { leg, x: c.x + lx * cy + fz * sy, z: c.z - lx * sy + fz * cy, yaw: c.yaw };
   }
-  // Idle weight shift: hips drift over one foot then the other every few seconds.
-  const shift = Math.sin(t * 0.45 + (c.seedT || 0)) * idle;
+  // Idle weight shift: most of the weight on one leg, drifting to the other now and then (two slow,
+  // unrelated rhythms, so it never looks like a metronome), and each person settles their own way.
+  if (c.seedT == null) c.seedT = Math.random() * 20;
+  const sd = c.seedT, raw = Math.sin(t * 0.21 + sd) * 0.75 + Math.sin(t * 0.083 + sd * 1.7) * 0.45;
+  const shift = Math.max(-1, Math.min(1, raw * 1.3)) * idle;
+  const small = u.H < 1.3;   // a child
   u.legs.forEach((Lg, i) => {
     const p = ph + (i ? Math.PI : 0), s = i ? 1 : -1;
-    const bend = Math.max(0, s * shift) * 0.09;   // the unloaded leg softens at the knee
-    Lg.th.rotation.set(L(Math.sin(p) * 0.55 * w - bend * 0.5, -1.5, sit), 0, L(-s * 0.02 * idle, 0, sit));
-    Lg.kn.rotation.x = L(Math.max(0, -Math.sin(p + 0.6)) * 1.0 * w + 0.03 + bend, 1.55, sit);
-    Lg.ft.rotation.x = L(Math.sin(p) * 0.2 * w - bend * 0.5, -0.05, sit);
+    const bend = Math.max(0, s * shift) * 0.2;   // the unloaded leg softens at the knee and turns out a little
+    // Sitting: knees a little apart; a child's feet, off the ground, swing.
+    const dang = small && sit > 0.5 ? Math.sin(t * 1.6 + i * 2.1 + sd) * 0.14 * Math.max(0, Math.sin(t * 0.23 + sd)) : 0;
+    Lg.th.rotation.set(L(Math.sin(p) * 0.55 * w - bend * 0.45, -1.42, sit), L(s * bend * 0.35, s * 0.1, sit), L(-s * 0.025 * idle - s * Math.max(0, -s * shift) * 0.03, s * 0.09, sit));
+    Lg.kn.rotation.x = L(Math.max(0, -Math.sin(p + 0.6)) * 1.0 * w + 0.04 + bend, 1.4 + dang, sit);
+    Lg.ft.rotation.x = L(Math.sin(p) * 0.2 * w - bend * 0.5, -0.12 - dang * 0.5, sit);
     if (c.angel) { Lg.th.rotation.set(0, 0, s * (0.05 + 0.32 * (0.5 - 0.5 * Math.cos(t * 2.4)))); Lg.kn.rotation.x = 0.04; }
   });
-  u.hips.position.y = L(u.hipY, (c.seatY || 0.6) - c.y + 0.03, sit) - Math.abs(Math.sin(ph)) * 0.03 * w - Math.abs(shift) * 0.006;
-  u.hips.position.x = shift * 0.018 * k;
-  u.hips.rotation.set(0, Math.sin(ph) * 0.1 * w, -shift * 0.035);
-  u.spine.rotation.y = -Math.sin(ph) * 0.15 * w;
-  u.spine.rotation.z = shift * 0.045;
-  u.spine.rotation.x = 0.04 * w * (sp > 1.2 ? 2.5 : 1) - sit * 0.08 + (c.lean || 0);
+  u.hips.position.y = L(u.hipY, (c.seatY || 0.6) - c.y + 0.03, sit) - Math.abs(Math.sin(ph)) * 0.03 * w - Math.abs(shift) * 0.012;
+  // Walking, the hips sway over the planted foot; standing, they sit out over the loaded leg.
+  u.hips.position.x = shift * 0.03 * k + Math.sin(ph) * 0.012 * w * k;
+  u.hips.rotation.set(0, Math.sin(ph) * 0.12 * w + shift * 0.06, -shift * 0.06 - Math.sin(ph) * 0.03 * w);
+  // The chest counters the hips (contrapposto), and a little slump when sitting.
+  u.spine.rotation.y = -Math.sin(ph) * 0.17 * w - shift * 0.04;
+  u.spine.rotation.z = shift * 0.075;
+  u.spine.rotation.x = 0.04 * w * (sp > 1.2 ? 2.5 : 1) + sit * 0.1 + (c.lean || 0) + Math.sin(t * 0.17 + sd) * 0.012 * idle;
+  u.chest.rotation.z = shift * 0.02;
   // Swaying to music (the radio, or a slow dance): weight rocks side to side on the beat.
   c.swayW = damp(c.swayW || 0, c.swayTarget || 0, 2, dt);
   c.headSway = 0;
@@ -556,10 +631,13 @@ G.animate = (c, dt, t) => {
     const s = i ? 1 : -1, p = ph + (i ? 0 : Math.PI);
     const swing = Math.sin(p);
     // Relaxed hang: slight forward set and soft elbows; the forearm bends more on the forward swing.
-    let sx = swing * 0.45 * w - 0.06 * idle + Math.sin(c.breath) * 0.015 * idle;
-    let sz = s * (0.08 + 0.01 * Math.sin(c.breath)) + s * shift * (i ? -0.02 : 0.02);
-    let ex = -0.22 * idle - (0.25 + Math.max(0, -swing) * 0.35) * w, sy = 0;
-    if (sit > 0.5) { sx = -0.3; ex = -0.75; sz = s * 0.1; }
+    // Relaxed: arms a touch forward and out from the hips, elbows soft, each a little different, and the
+    // arm on the loaded side hanging a fraction further out (the hip pushes it).
+    const own = Math.sin(t * 0.37 + sd + i * 1.3) * 0.03;
+    let sx = swing * 0.42 * w - (0.1 + own) * idle + Math.sin(c.breath) * 0.018 * idle;
+    let sz = s * (0.11 + 0.012 * Math.sin(c.breath)) * idle + s * 0.06 * w + s * shift * (i ? -0.035 : 0.035);
+    let ex = -(0.3 + own) * idle - (0.3 + Math.max(0, -swing) * 0.45 + Math.max(0, swing) * 0.1) * w, sy = s * 0.12 * idle;
+    if (sit > 0.5) { sx = -0.42 + own; ex = -0.95; sz = s * 0.16; sy = s * 0.25; }   // hands resting on the thighs
     for (const name in ARM_POSES) {
       const wgt = pw[name] * (name === 'read' || name === 'cup' ? 1 : 1 - sit) * (name === 'warm' ? idle : 1);   // a book or a mug works sitting down too
       if (wgt < 0.001 || (ONE_ARM[name] != null && i !== ONE_ARM[name])) continue;   // one arm throws, or waves
@@ -576,7 +654,13 @@ G.animate = (c, dt, t) => {
       sx = L(sx, hp[0], c.hug); sz = L(sz, -s * hp[1], c.hug); ex = L(ex, hp[2], c.hug); sy = L(sy, s * hp[3], c.hug);
     }
     if (i === c.holdArm && (c.holdW || 0) > 0.001) { const hw = c.holdW; sx = L(sx, -0.14 + (c.holdReach || 0), hw); sz = L(sz, -s * 0.14, hw); ex = L(ex, -0.18, hw); sy = L(sy, s * 0.2, hw); }
-    A.sh.rotation.set(sx, sy, sz); A.el.rotation.set(ex, 0, 0);
+    // Palms toward the thighs, not facing forward: the turn spread over upper arm, forearm and wrist.
+    // Only for the realistic bodies (the built-in ones are modelled that way already); poses take it back.
+    const tw = u.real ? -s * 0.65 * (1 - Math.max(c.hug || 0, c.holdW || 0)) * (1 - sit * 0.4) : 0;
+    let posed = 0; for (const name in ARM_POSES) posed = Math.max(posed, pw[name] || 0);
+    const twist = tw * (1 - posed * 0.7);
+    A.sh.rotation.set(sx, sy + twist * 0.35, sz); A.el.rotation.set(ex, twist * 0.4, 0);
+    if (A.hand) A.hand.rotation.set(0, twist * 0.45, 0);
   });
   // Blinks on a natural, irregular rhythm (sometimes a double blink).
   c.blinkT = (c.blinkT == null ? Math.random() * 3 : c.blinkT) - dt;
@@ -598,8 +682,9 @@ G.animate = (c, dt, t) => {
     const dy = (tgt.headY || 1.5) - (c.y + u.H * 0.93);
     c.lookUp = damp(c.lookUp || 0, clamp(-Math.atan2(dy, Math.hypot(dx, dz)), -0.4, 0.4), 4, dt);
   } else if (!c.lie) { c.look = damp(c.look || 0, 0, 3, dt); c.lookUp = damp(c.lookUp || 0, 0, 3, dt); }
-  u.neck.rotation.set(c.lookUp * 0.4, c.look * 0.45, c.tilt || 0);
+  u.neck.rotation.set(c.lookUp * 0.4, c.look * 0.45 + Math.sin(ph) * 0.06 * w, (c.tilt || 0) - shift * 0.05);   // walking, the head stays steady over a turning chest
   u.head.rotation.set(c.lookUp * 0.6 + Math.sin(t * 0.7 + c.z) * 0.02 + (c.headDown || 0), c.look * 0.55, (c.tilt || 0) * 0.6 + c.headSway);
   G.retarget(c.m);
+  G.curlFingers(c, dt);
 };
 })();

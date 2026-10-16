@@ -1320,9 +1320,19 @@ function ambientPoses(dt) {
     else if (STATE.hugging || (c.sit || 0) > 0.2 || c.script || c.lie || c.holdOn) pose = null;
     else if (nearFire && c === PARTNER && c.idleT > 1.2 && !busy()) pose = 'warm';   // not mid-conversation
     else if (nearFire && c === PLAYER && c.idleT > 2.5 && Math.abs(facing) < 1.0) pose = 'warm';
-    else if (out && c === PARTNER && (STATE.tod > 0.35 || c.idleT > 5)) pose = 'cold';
     else if (c === PLAYER && (c.cold || 0) > 0.6 && c.idleT > 1.2 && !c.holdOn) pose = 'cold';   // shivering
-    else if (out && c === PLAYER && c.idleT > 3.5) pose = 'pockets';
+    else if (out && c.idleT > 1.5) {
+      // Standing about outside: nobody holds one pose. Every so often they settle into another: arms wrapped
+      // round themselves (more often the colder it is), hands in pockets, or just arms loose.
+      c.moodT = (c.moodT == null ? Math.random() * 4 : c.moodT) - dt;
+      if (c.moodT <= 0) {
+        c.moodT = 6 + Math.random() * 9;
+        const cold = c === PARTNER ? (STATE.tod > 0.35 ? 0.5 : 0.25) : 0.12 + clamp(c.cold || 0, 0, 1) * 0.6;
+        const r = Math.random();
+        c.mood = r < cold ? 'cold' : r < cold + 0.4 ? (c.dressed ? 'coatPockets' : 'pockets') : null;
+      }
+      pose = c.mood;
+    }
     c.pose = pose;
   }
 }

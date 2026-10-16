@@ -179,18 +179,41 @@ function fitKid(m) {
     const sH = clamp(pct(hr, 0.95) * 1.02, 0.85, 1.25), c0 = hat.position.clone();
     hp.forEach((p) => { p.position.sub(c0).multiplyScalar(sH).add(c0); p.scale.multiplyScalar(sH); });
     const dyScarf = clamp(f.neck - (f.chestY + 0.15 * k), -0.05, 0.05);
-    const sB = f.footLen > 0.05 ? clamp(f.footLen / (0.266 * k) * 1.08, 0.85, 1.4) : 1;
-    (u.kidBoots || []).forEach((p) => { p.position.multiplyScalar(sB); p.scale.multiplyScalar(sB); });
-    // A child's legs are shorter than the rig they ride on: put each boot where that model's own ankle is.
+    // Wellies built round this model's own feet: each part sized and placed from the sock it covers,
+    // measured in that foot's frame (the rig's idea of a foot is longer-toed and higher than a child's).
     const R = u.retarget, bootOff = [];
-    if (R) u.legs.forEach((lg) => {
-      const e = R.map.find((q) => q.group === lg.ft); if (!e) return;
-      const want = new THREE.Vector3().setFromMatrixPosition(e.boneRest);
+    if (f.socks && f.socks.length) u.legs.forEach((lg, i) => {
       lg.ft.updateMatrixWorld(true); inv.copy(lg.ft.matrixWorld).invert();
-      const d = want.applyMatrix4(inv); d.y = Math.min(d.y, 0.02); bootOff.push(+d.length().toFixed(3));
-      for (const p of u.kidBoots) if (p.parent === lg.ft) { p.position.x += d.x; p.position.y += d.y; p.position.z += d.z; }
+      const side = Math.sign(new THREE.Vector3().setFromMatrixPosition(lg.ft.matrixWorld).x - m.position.x) || (i ? 1 : -1);
+      const box = new THREE.Box3();
+      for (let j = 0; j < f.socks.length; j += 3) { if (Math.sign(f.socks[j] - m.position.x) !== side) continue; box.expandByPoint(v.set(f.socks[j], f.socks[j + 1], f.socks[j + 2]).applyMatrix4(inv)); }
+      if (box.isEmpty()) return;
+      const c = box.getCenter(new THREE.Vector3()), sz = box.getSize(new THREE.Vector3());
+      const mine = u.kidBoots.filter((p) => p.parent === lg.ft);   // [shaft, foot, sole]
+      const [shaft, foot, sole] = mine;
+      const lowY = box.min.y, w = Math.max(sz.x, 0.05) * 0.5 + 0.008;
+      // Foot: an ellipsoid round the sock below the ankle, toe to heel.
+      const fy = lowY + Math.min(sz.y, 0.09) * 0.42;
+      foot.position.set(c.x, fy, c.z); foot.scale.set(w * 1.05, Math.min(sz.y, 0.09) * 0.5 + 0.006, sz.z * 0.5 + 0.012);
+      // Sole: under it.
+      sole.geometry.computeBoundingBox(); const gb = sole.geometry.boundingBox, gs = gb.getSize(new THREE.Vector3());
+      sole.position.set(c.x, lowY + 0.004, c.z); sole.scale.set((w * 2.1) / gs.x, 1, (sz.z + 0.03) / gs.z);
+      // Shaft: up the shin from the ankle, wide enough for the sock's top.
+      shaft.geometry.computeBoundingBox(); const sb = shaft.geometry.boundingBox, sh = sb.getSize(new THREE.Vector3());
+      const top = box.max.y + 0.06, bot = lowY + 0.03, rr = w * 1.02;
+      shaft.position.set(c.x, (top + bot) / 2, c.z - sz.z * 0.22); shaft.scale.set((rr * 2) / sh.x, (top - bot) / sh.y, (rr * 2) / sh.z);
+      bootOff.push([+sz.x.toFixed(3), +sz.y.toFixed(3), +sz.z.toFixed(3)]);
     });
     u.bootOff = bootOff;
+    // Then hand each boot to the model's own foot bone, keeping where it is now (the rest pose), so it moves
+    // exactly with that foot: a child's shins are shorter than the rig's, and a dangling foot shows it.
+    if (R) {
+      G.retarget(m); m.updateMatrixWorld(true);
+      u.legs.forEach((lg) => {
+        const e = R.map.find((q) => q.group === lg.ft); if (!e) return;
+        for (const p of u.kidBoots.slice()) if (p.parent === lg.ft) e.bone.attach(p);
+      });
+    }
     u.scarfDy = dyScarf;   // kept: the scarf can change hands in the prologue (story.js, moveScarf)
     u.kidScarf.forEach((p) => { p.position.y += dyScarf; });
     return { sH: +sH.toFixed(3), dyHat: +dyHat.toFixed(3), dyScarf: +dyScarf.toFixed(3), centre: cn ? [+(cx / cn).toFixed(3), +(cz / cn).toFixed(3)] : null };
