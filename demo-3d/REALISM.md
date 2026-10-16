@@ -92,7 +92,9 @@ The realistic MPFB characters are in `models/real/partner.glb` and
 They are compressed with meshopt geometry and WebP textures; `lib/meshopt_decoder.js`
 decodes them. **To change a character, edit the `.blend` and export again;
 don't edit the GLB.** `js/models_real.js` holds the same two files as base64,
-for hosts that can't serve `.glb` (regenerate it after a new export). The
+for hosts that can't serve `.glb`. They're stored decompressed (`node tools/unmeshopt.js`)
+so they load without WebAssembly. Regenerate it after a new export. Stats shows
+which body each character got. The
 children keep the built-in bodies.
 
 Outdoor clothes are fitted to whatever body is loaded. `people.js`
