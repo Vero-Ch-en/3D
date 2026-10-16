@@ -107,6 +107,10 @@ These are deliberately cheap approximations, each in one place:
 | Radio music, humming, sound effects | synthesised in `game.js` (`G.Audio`) | recorded audio through the same placed sources |
 | Gerald (the bullfinch) | primitive shapes (`fx.js`) | a small rigged bird with a few animation clips |
 | Front door | hinged box, swings by proximity | modelled door with the same pivot (`G.FRONT_DOOR`) |
+| Outdoor clothes | coat, hat, scarf and boots built over the body (`life.js`, `buildGear`) | clothing on the character model, swapped by a visibility flag |
+| Snow on shoulders, frost | small snow caps; a frosted overlay drawn on a canvas | snow accumulation in the cloth shader; lens frost post-effect |
+| Snowman, snow angels, the summer circle | spheres, decals, instanced tufts and flowers (`play.js`, `walk.js`) | sculpted snow, deformable snow, scanned grass and flowers |
+| Props in hands (book, mug, logs, watering can) | attached to the chest or hand of the procedural rig | attached to hand bones of the model with proper grips |
 
 ## Performance budget
 

@@ -1429,9 +1429,9 @@ function step(dt, t) {
     }
     // Breath shows on each exhale whenever you're out in the cold.
     const cyc = Math.floor((c.breath || 0) / (2 * Math.PI));
-    if (cyc !== c._cyc) { c._cyc = cyc; if (!G.inside(c.x, c.z)) G.breathe(c, (c.speed > 2 ? 1.3 : 1) * (1 + (c.cold || 0) * 0.7)); }   // colder, heavier
+    if (cyc !== c._cyc) { c._cyc = cyc; if (!G.inside(c.x, c.z) && !(G.noBreath && G.noBreath(c))) G.breathe(c, (c.speed > 2 ? 1.3 : 1) * (1 + (c.cold || 0) * 0.7)); }   // colder, heavier
   }
-  PLAYER.lookAt = Math.hypot(PARTNER.x - PLAYER.x, PARTNER.z - PLAYER.z) < 3 && !PARTNER.hidden ? head(PARTNER) : null;
+  PLAYER.lookAt = PLAYER.lookFix || (Math.hypot(PARTNER.x - PLAYER.x, PARTNER.z - PLAYER.z) < 3 && !PARTNER.hidden ? head(PARTNER) : null);   // lookFix: a scene wants you looking at something
   // Interaction prompt
   const it = free ? nearest() : null;
   // You look at what you're about to use; she glances at whatever you're doing.

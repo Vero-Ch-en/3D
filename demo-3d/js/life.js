@@ -24,7 +24,8 @@ function buildGear(m, o) {
   const W = fem ? { hip: 0.172, waist: 0.13, chest: 0.155, sh: 0.16 } : { hip: 0.162, waist: 0.15, chest: 0.18, sh: 0.19 };
   const parts = [];
   const add = (mesh, parent, x = 0, y = 0, z = 0) => { mesh.position.set(x * k, y * k, z * k); mesh.castShadow = true; mesh.receiveShadow = true; mesh.visible = false; mesh.userData.warm = true; parent.add(mesh); parts.push(mesh); return mesh; };
-  const lathe = (pts, seg = 32) => new THREE.LatheGeometry(pts.map(([r, y]) => new THREE.Vector2(Math.max(0.0005, r) * k, y * k)), seg);
+  // Profiles must run bottom to top, or the lathe's faces point inward and get culled.
+  const lathe = (pts, seg = 32) => { const P = pts[0][1] > pts[pts.length - 1][1] ? pts.slice().reverse() : pts; return new THREE.LatheGeometry(P.map(([r, y]) => new THREE.Vector2(Math.max(0.0005, r) * k, y * k)), seg); };
   const coatM = G.std({ map: G.rep(G.TX.jersey, 2, 2), color: o.coat, bumpMap: G.TX.jerseyB, bumpScale: 0.004, roughness: 1, env: 0.2 });
   const knit = (c) => G.std({ map: G.rep(G.TX.knitCream, 2, 1), color: c, bumpMap: G.TX.knitB, bumpScale: 0.004, roughness: 1 });
   const bust = fem ? 0.012 : 0, c = 1.17;
@@ -130,8 +131,9 @@ function updateCold(dt) {
   const storm = G.WEATHER.kind === 'heavy' ? 1 : 0;
   for (const c of [PLAYER, PARTNER]) {
     c.cold = c.cold || 0;
-    if (outside(c)) {
-      let rate = (0.0032 + 0.0045 * STATE.tod + 0.004 * storm + (G.onIce(c.x, c.z) ? 0.002 : 0)) * (c.dressed ? 1 : 3.4) * (c.speed > 2 ? 0.75 : 1);
+    if (G.inCircle && G.inCircle(c.x, c.z)) c.cold = Math.max(0, c.cold - dt * 0.05);   // warm air, inexplicably
+    else if (outside(c)) {
+      let rate = (0.0026 + 0.0045 * STATE.tod + 0.004 * storm + (G.onIce(c.x, c.z) ? 0.002 : 0)) * (c.dressed ? 1 : 3.4) * (c.speed > 2 ? 0.75 : 1);
       if (c.lie) rate *= 2.2;   // lying in the snow
       c.cold = Math.min(1, c.cold + rate * dt);
     } else if (G.inside(c.x, c.z)) {
@@ -152,8 +154,9 @@ function updateCold(dt) {
     COLD.outing = false;
     if (PLAYER.cold > 0.45 && S.chapter !== 'prologue') wait2(1.2, () => freeBark(pick(['You’re frozen! Come and stand by the fire.', 'Look at you. Fire. Now. I insist.']), 3));
   }
-  if (out && PLAYER.cold > 0.72 && !COLD.warned.a) { COLD.warned.a = 1; freeBark(pick(['Your nose has gone from pink to blue. Inside soon?', 'I can’t feel my face. Can you feel yours?']), 3); }
-  if (out && PLAYER.cold > 0.9 && !COLD.warned.b) {
+  const strange = G.inCircle && G.inCircle(PLAYER.x, PLAYER.z);
+  if (out && !strange && PLAYER.cold > 0.72 && !COLD.warned.a) { COLD.warned.a = 1; freeBark(pick(['Your nose has gone from pink to blue. Inside soon?', 'I can’t feel my face. Can you feel yours?']), 3); }
+  if (out && !strange && PLAYER.cold > 0.9 && !COLD.warned.b) {
     COLD.warned.b = 1;
     if (!G.busy() && dist() < 3 && PARTNER.mode === 'follow' && !PARTNER.hold && !PARTNER.task && !PARTNER.lead) { G.setHold(true); PARTNER.holdTimer = 16; G.bark('Your hands are ice. Give them here.', 2.8); }
   }
@@ -181,13 +184,31 @@ A.rewire('coats', async () => {
 REACTadd('coats', ['Hang mine next to yours, please. They like to be together.', 'The unclaimed scarf stays on the hook. It’s a free scarf.']);
 function REACTadd(id, lines) { const R = A.REACT[id] || (A.REACT[id] = { lines: [] }); R.lines = R.lines.concat(lines); }
 
+const HANG = { id: 'hang', spot: { x: 5.6, z: 3.85 }, yaw: 0, dur: [0.6, 0.8], look: { x: 5.5, y: 1.4, z: 4.4 } };
 /* Partner dresses herself on the way out and hangs her coat up a few seconds after coming in. */
 function updatePartnerGear(dt) {
   const p = PARTNER;
   if (S.chapter === 'prologue') return;
   if (!G.inside(p.x, p.z) && !p.dressed && !p.hidden) setDressed(p, true);
-  if (G.inside(p.x, p.z) && p.dressed && !p.sit) { p.inT = (p.inT || 0) + dt; if (p.inT > 3.5 && p.x > 4.8 && p.x < 7.4) { setDressed(p, false); p.inT = 0; if (p.snowyT > 1) PUDDLE.wet = 1; p.snowAcc = 0; if (Math.random() < 0.6) freeBark(pick(['*hangs her coat beside yours*', '*kicks her boots onto the mat*']), 2); } }
-  else if (!G.inside(p.x, p.z)) p.inT = 0;
+  // Indoors in her coat: she goes over to the hooks by the door and hangs it up (wherever she came in from).
+  if (G.inside(p.x, p.z) && p.dressed) {
+    p.inT = (p.inT || 0) + dt;
+    const nearHooks = Math.hypot(p.x - 5.6, p.z - 3.85) < 0.9;
+    if (p.inT > 1.5 && (nearHooks || p.inT > 40) && !p.sit) { setDressed(p, false); p.inT = 0; if (p.snowyT > 1) PUDDLE.wet = 1; p.snowAcc = 0; if (Math.random() < 0.6) freeBark(pick(['*hangs her coat beside yours*', '*kicks her boots onto the mat*']), 2); }
+    else if (p.inT > 1.5 && !p.task && !p.lead && !p.hold && !p.hidden && p.mode === 'follow' && !G.busy()) p.task = { o: HANG, phase: 'go', t: 0 };
+  } else if (!G.inside(p.x, p.z)) p.inT = 0;
+  // Coming in from the snow, you hang your coat up by the door on the way past (or soon after).
+  if (PLAYER.dressed && G.inside(PLAYER.x, PLAYER.z) && L.cameIn) {
+    L.pInT = (L.pInT || 0) + dt;
+    const byDoor = Math.hypot(PLAYER.x - 5.6, PLAYER.z - 3.9) < 2.4;
+    if (!G.busy() && !(PLAYER.sit > 0.1) && ((byDoor && L.pInT > 1.2) || L.pInT > 7)) {
+      setDressed(PLAYER, false); L.cameIn = false; L.pInT = 0;
+      if (PLAYER.snowyT > 1 || PLAYER.snowAcc > 0.05) PUDDLE.wet = 1;
+      PLAYER.snowAcc = 0;
+      G.hint('(You hang up your coat and kick your boots onto the mat.)', 3);
+    }
+  }
+  if (!G.inside(PLAYER.x, PLAYER.z)) { L.cameIn = PLAYER.dressed; L.pInT = 0; }
   // Still in your coat by the fire after a while: she notices.
   if (PLAYER.dressed && G.inside(PLAYER.x, PLAYER.z)) { L.coatInT = (L.coatInT || 0) + dt; if (L.coatInT > 50 && !L.coatTease) { L.coatTease = 1; freeBark('Are you planning to wear that coat all evening, Partner?', 3); } } else L.coatInT = 0;
   // The puddle on the mat dries; drips while it's fresh.
@@ -325,7 +346,7 @@ function updateWeather(dt) {
  * Partner's own time: things she does when you leave her to it
  * ===================================================================== */
 const book = (() => {
-  const u = ADULT.partner.userData, k = u.k, g = new THREE.Group(); g.position.set(0, -0.06 * k, 0.22 * k); g.rotation.x = -0.9; g.visible = false; g.userData.warm = true; u.chest.add(g);
+  const u = ADULT.partner.userData, k = u.k, g = new THREE.Group(); g.position.set(0, -0.12 * k, 0.22 * k); g.rotation.x = -0.75; g.visible = false; g.userData.warm = true; u.chest.add(g);
   const cover = G.std({ color: '#3a5a6a', roughness: 0.8 });
   for (const s of [-1, 1]) { const half = new THREE.Mesh(new THREE.BoxGeometry(0.085, 0.004, 0.13), cover); half.position.set(s * 0.045, 0, 0); half.rotation.z = -s * 0.25; g.add(half); const pg = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.012, 0.12), G.shared({ color: '#efe6d2', roughness: 0.9 })); pg.position.set(s * 0.043, 0.007, 0); pg.rotation.z = -s * 0.25; g.add(pg); }
   g.traverse((o) => { o.userData.warm = true; o.castShadow = true; });

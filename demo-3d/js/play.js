@@ -122,9 +122,11 @@ async function selfie() {
   await Promise.all([G.slideTo(PLAYER, mx - rx * 0.24, mz - rz * 0.24, bestA, 0.5), G.slideTo(PARTNER, mx + rx * 0.24, mz + rz * 0.24, bestA, 0.5)]);
   const hy = G.headPos(PARTNER).y;
   STATE.sceneShot = true;
-  const cam = V(mx + fx * 1.05, hy + 0.05, mz + fz * 1.05), look = V(mx, hy - 0.08, mz);
-  G.setShot(fixed(cam, look, 44, 0.006));
-  PARTNER.tiltTarget = 0.22; PLAYER.tiltTarget = -0.12; PLAYER.forcePose = 'wave';
+  const cam = V(mx + fx * 1.1, hy - 0.02, mz + fz * 1.1), look = V(mx, hy - 0.12, mz);
+  G.setShot(fixed(cam, look, 46, 0.006));
+  // Both of you look at the lens, heads together.
+  PARTNER.mode = 'still'; PARTNER.yaw = bestA; PARTNER.stillLook = { x: cam.x, z: cam.z, headY: cam.y };
+  PARTNER.tiltTarget = 0.22; PLAYER.tiltTarget = -0.12; PLAYER.lookFix = { x: cam.x, z: cam.z, headY: cam.y };
   G.bark(pick(['Wait — is my hair all right? Don’t answer.', 'Closer. You’re enormous. Crouch.', 'On three. Not after three. On three.']), 2.4);
   await wait(1.2);
   for (const n of ['3', '2', '1']) { G.hint(n + '…', 0.7); G.Audio.tone(900, 0.03, 0.02); await wait(0.75); }
@@ -135,7 +137,7 @@ async function selfie() {
   S.mem.photos = (S.mem.photos || 0) + 1; S.mem.affection++; addBond(0.3);
   await wait(0.9);
   G.bark(pick(['Let me see. …Oh. We look happy. How embarrassing.', 'That one’s going on the fridge.', 'You blinked. It’s perfect.']), 3);
-  PARTNER.tiltTarget = 0; PLAYER.tiltTarget = 0; PLAYER.forcePose = null;
+  PARTNER.tiltTarget = 0; PLAYER.tiltTarget = 0; PLAYER.lookFix = null; PARTNER.mode = 'follow'; PARTNER.stillLook = null;
   await wait(1.2);
   STATE.sceneShot = false; G.releaseCamera(); STATE.busy = false;
 }
@@ -354,7 +356,7 @@ G.TOGETHER_EXTRA.push({ id: 'angels', t: 'Make snow angels', when: (c) => c.out 
  * Cocoa
  * ===================================================================== */
 function mugFor(m, col) {
-  const u = m.userData, k = u.k, g = new THREE.Group(); g.position.set(0.0, -0.1 * k, 0.2 * k); g.visible = false; g.userData.warm = true; u.chest.add(g);
+  const u = m.userData, k = u.k, g = new THREE.Group(); g.position.set(0.0, -0.13 * k, 0.2 * k); g.visible = false; g.userData.warm = true; u.chest.add(g);
   const body = new THREE.Mesh(new THREE.CylinderGeometry(0.042, 0.038, 0.095, 16), G.shared({ color: col, roughness: 0.3, env: 0.8 })); g.add(body);
   const top = new THREE.Mesh(new THREE.CylinderGeometry(0.037, 0.037, 0.004, 14), G.shared({ color: '#5a321e', roughness: 0.25 })); top.position.y = 0.043; g.add(top);
   const h = new THREE.Mesh(new THREE.TorusGeometry(0.025, 0.007, 6, 12, Math.PI), body.material); h.position.set(0.045, 0, 0); h.rotation.z = -Math.PI / 2; g.add(h);
@@ -411,7 +413,7 @@ A.REACT.kettle.lines.push('Cocoa? You read my mind.');
  * Reading together on the sofa
  * ===================================================================== */
 const myBook = (() => {
-  const u = (G.KIDS ? G.KIDS.adults.player : PLAYER.m).userData, k = u.k, g = G.PARTNER_BOOK.clone(); g.position.set(0, -0.07 * k, 0.24 * k); g.rotation.x = -0.95; g.visible = false; g.traverse((o) => { o.userData.warm = true; }); u.chest.add(g);
+  const u = (G.KIDS ? G.KIDS.adults.player : PLAYER.m).userData, k = u.k, g = G.PARTNER_BOOK.clone(); g.position.set(0, -0.12 * k, 0.23 * k); g.rotation.x = -0.75; g.visible = false; g.traverse((o) => { o.userData.warm = true; }); u.chest.add(g);
   g.children.forEach((c, i) => { if (i % 2 === 0) c.material = G.std({ color: '#7a3a2a', roughness: 0.8 }); });
   return g;
 })();

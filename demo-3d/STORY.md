@@ -37,9 +37,19 @@ changed again?
   circle**: a perfect ring of green grass and wildflowers in the snow, warm
   air, and two sets of children's footprints coming from opposite sides and
   stopping face to face. Partner is frightened; they go home hand in hand at
-  sunset. *(next)*
+  sunset. *(done)*
 
-## Act II · Something Strange — the evening
+Around the story, the cabin is lived in: coats, hats and boots by the door
+(she wears the cream bobble hat she had at the fair; he still has the red
+scarf), the cold creeping in if you stay out too long, a fire that burns down
+and a woodpile on the porch, weather that comes and goes, and Partner's own
+routines when you leave her to it (reading in the armchair until she dozes
+off, watering Basil and the herbs, the radio). Things to do together: snowball
+fights, a snowman (the sad lemon from the fridge becomes his nose), snow
+angels, cocoa, reading aloud on the sofa, cards at the kitchen table (there is
+a queen up her sleeve), and photographs that end up on the fridge.
+
+## Act II · Something Strange — the evening *(next)*
 
 - Home at dusk, every window lit. Partner tries hard to be normal.
 - The reveal she kept all day: she hadn't forgotten what day it is. The cake,

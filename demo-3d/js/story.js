@@ -703,7 +703,7 @@ function flipAnim(m, color) {
 }
 function quiet() {
   // Clear anything a previous scene left running.
-  for (const c of [PLAYER, PARTNER]) { c.script = null; c.slide = null; c.lie = false; c.sit = c.sitTarget = 0; c.freeSit = null; c.rise = null; c.task = null; c.lead = null; c.speed = 0; c.nav = null; c.lidsClosed = false; c.tilt = c.tiltTarget = 0; c.angel = false; c.holdPose = null; c.forcePose = null; c.lieTilt = null; c.dozing = false; }
+  for (const c of [PLAYER, PARTNER]) { c.script = null; c.slide = null; c.lie = false; c.sit = c.sitTarget = 0; c.freeSit = null; c.rise = null; c.task = null; c.lead = null; c.speed = 0; c.nav = null; c.lidsClosed = false; c.tilt = c.tiltTarget = 0; c.angel = false; c.holdPose = null; c.forcePose = null; c.lieTilt = null; c.dozing = false; c.lookFix = null; c.extraMul = 1; }
   if (G.onQuiet) G.onQuiet();
   G.setHold(false); PARTNER.hidden = false; PARTNER.m.visible = true; PARTNER.mode = 'follow';
   STATE.busy = false; STATE.sceneShot = false; STATE.noControl = false; STATE.autonomy = false; STATE.bounds = null;
