@@ -155,7 +155,11 @@ function fitGear(c) {
     return Object.assign(out, { sH: +sH.toFixed(3), dyHat: +dyHat.toFixed(3), dyScarf: +dyScarf.toFixed(3), sB: +sB.toFixed(3) });
   });
 }
-(G.onBodies = G.onBodies || []).push(() => { G.GEAR_FIT = { player: fitGear(PLAYER), partner: fitGear(PARTNER) }; });
+(G.onBodies = G.onBodies || []).push(() => {
+  G.GEAR_FIT = { player: fitGear(PLAYER), partner: fitGear(PARTNER) };
+  // Already dressed when the bodies arrived (a save outdoors): put the jumper under the coat now.
+  [PLAYER, PARTNER].forEach((c) => { if (c.dressed) setDressed(c, true); });
+});
 function setDressed(c, on) {
   c.dressed = on;
   const g = gearOf(c);

@@ -2279,6 +2279,44 @@
 			let hasAlpha = true;
 			if ( source.mimeType === 'image/jpeg' ) hasAlpha = false;
 
+			// [Snowed In patch] Images inside the file are decoded straight from their bytes with createImageBitmap,
+			// without a blob: URL, which some hosts' content security policy blocks (the textures then go missing).
+			// Falls back to the stock path below if that fails.
+			if ( source.bufferView !== undefined && typeof createImageBitmap !== 'undefined' && ! parser._noDirectImages ) {
+
+				return parser.getDependency( 'bufferView', source.bufferView ).then( function ( bufferView ) {
+
+					const blob = new Blob( [ bufferView ], { type: source.mimeType } );
+					return createImageBitmap( blob, { premultiplyAlpha: 'none', colorSpaceConversion: 'none' } ).catch( function () {
+
+						return createImageBitmap( blob );
+
+					} );
+
+				} ).then( function ( bitmap ) {
+
+					const texture = new THREE.CanvasTexture( bitmap );
+					texture.flipY = false;
+					if ( textureDef.name ) texture.name = textureDef.name;
+					const samplers = json.samplers || {};
+					const sampler = samplers[ textureDef.sampler ] || {};
+					texture.magFilter = WEBGL_FILTERS[ sampler.magFilter ] || THREE.LinearFilter;
+					texture.minFilter = WEBGL_FILTERS[ sampler.minFilter ] || THREE.LinearMipmapLinearFilter;
+					texture.wrapS = WEBGL_WRAPPINGS[ sampler.wrapS ] || THREE.RepeatWrapping;
+					texture.wrapT = WEBGL_WRAPPINGS[ sampler.wrapT ] || THREE.RepeatWrapping;
+					parser.associations.set( texture, { type: 'textures', index: textureIndex } );
+					return texture;
+
+				} ).catch( function ( e ) {
+
+					console.warn( 'THREE.GLTFLoader: direct image decode failed, using a URL', e );
+					parser._noDirectImages = true;
+					return parser.loadTextureImage( textureIndex, source, loader );
+
+				} );
+
+			}
+
 			if ( source.bufferView !== undefined ) {
 
 				// Load binary image data from bufferView, if provided.
