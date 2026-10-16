@@ -167,9 +167,9 @@ def copy_weights(src, dst, k=4):
             if j is not None:
                 W[v.index, j] = g.weight
     kd.balance()
-    for g in list(dst.vertex_groups):
-        if g.name in names:
-            dst.vertex_groups.remove(g)
+    # Garments cut from a copy of the body still carry its weight data under stale group indices;
+    # clearing every group also drops that, so nothing old leaks into the new weights.
+    dst.vertex_groups.clear()
     groups = [dst.vertex_groups.new(name=n) for n in names]
     dw = dst.matrix_world
     for v in dst.data.vertices:
