@@ -1,0 +1,193 @@
+"""Knee-length wool coats for the realistic characters, built round each body (run in Blender after
+game_export.prepare/optimise, in cozy_characters_game.blend). make_coat(name) adds coat_<name>; skin_coat
+weights it to the rig (upper coat like the body, the skirt from the hips onto its own thigh and a spring bone)."""
+import bpy, math
+from mathutils import Vector
+from game_export import rig, parts, full_body, copy_weights
+
+def coat_body(name, color=(0.36, 0.37, 0.39), knee_drop=0.06, ease=0.014, flare=0.11, nseg=40):
+    """A knee-length wool coat built round this character's own body: two halves (left, right) that meet
+    down the front and back, closed above the waist, open below it so each side can follow its leg.
+    Upper coat weighted like the body; the skirt blends from the hips onto its own thigh and a spring bone."""
+    import bmesh, math
+    from mathutils import Vector
+    arm = rig(name); W = arm.matrix_world; B = arm.data.bones
+    P = lambda b: W @ B['mixamorig:' + b].head_local
+    hips, spine, neck = P('Hips'), P('Spine'), P('Neck')
+    zNeck = neck.z - 0.015; zKnee = P('LeftLeg').z - knee_drop; zCrotch = P('LeftUpLeg').z - 0.06; zWaist = spine.z + 0.02
+    cx, cy = hips.x, (hips.y + spine.y) / 2
+    for o in list(bpy.data.objects):
+        if o.name.startswith('coat_' + name):
+            bpy.data.objects.remove(o, do_unlink=True)
+    # Sample the body: skin, jumper, leggings (not arms: they get sleeves).
+    pts = []
+    for p in parts(name):
+        n = p.name.lower()
+        if not any(s in n for s in ('human_' + name, 'sweater', 'leggings', 'cord')) or any(s in n for s in ('eye', 'brow', 'lash', 'hair', 'poly', 'tail', 'fringe', 'short')):
+            continue
+        gi = {g.index: g.name for g in p.vertex_groups}
+        mw = p.matrix_world
+        for v in p.data.vertices:
+            best = max(v.groups, key=lambda g: g.weight, default=None)
+            if best and any(s in gi.get(best.group, '') for s in ('Arm', 'Hand')) and best.weight > 0.45:
+                continue
+            q = mw @ v.co
+            if zKnee - 0.05 < q.z < zNeck + 0.03:
+                pts.append(q)
+    # Rings: radius per angle = furthest body point in that slice and direction, eased and smoothed.
+    nr = 30
+    zs = [zNeck - (zNeck - zKnee) * (i / (nr - 1)) for i in range(nr)]
+    R = []
+    for zi, z in enumerate(zs):
+        dz = (zs[0] - zs[-1]) / (nr - 1) * 0.8 + 0.01
+        rad = [0.0] * nseg
+        for q in pts:
+            if abs(q.z - z) > dz:
+                continue
+            a = math.atan2(q.x - cx, -(q.y - cy))   # 0 = front (-y), + toward the character's left (+x)
+            b = int(((a / (2 * math.pi)) % 1) * nseg) % nseg
+            r = math.hypot(q.x - cx, q.y - cy)
+            if r > rad[b]:
+                rad[b] = r
+        R.append(rad)
+    # fill empty bins, enclose (the skirt goes round both legs), smooth round and down
+    for zi in range(nr):
+        rad = R[zi]
+        for b in range(nseg):
+            if rad[b] == 0:
+                rad[b] = max(rad[(b - 1) % nseg], rad[(b + 1) % nseg], 0.06)
+    for it in range(3):
+        for zi in range(nr):
+            rad = R[zi]; R[zi] = [max(rad[b], (rad[(b - 1) % nseg] + rad[(b + 1) % nseg]) / 2) for b in range(nseg)]
+    for zi in range(nr):
+        z = zs[zi]
+        below = max(0.0, (zCrotch - z) / max(0.01, zCrotch - zKnee))
+        R[zi] = [r + ease + flare * below ** 1.2 * (0.6 + 0.4 * abs(math.cos(b / nseg * 2 * math.pi))) for b, r in enumerate(R[zi])]
+    # monotone below the waist: a coat hangs, it doesn't follow the backs of the knees
+    for zi in range(1, nr):
+        if zs[zi] < zWaist - 0.05:
+            R[zi] = [max(R[zi][b], R[zi - 1][b] * 0.995) for b in range(nseg)]
+    for it in range(2):
+        R = [R[0]] + [[(R[zi - 1][b] + 2 * R[zi][b] + R[zi + 1][b]) / 4 for b in range(nseg)] for zi in range(1, nr - 1)] + [R[-1]]
+    me = bpy.data.meshes.new('coat_' + name); ob = bpy.data.objects.new('coat_' + name, me)
+    for c in arm.users_collection:
+        c.objects.link(ob)
+    bm = bmesh.new(); uvl = bm.loops.layers.uv.new()
+    # Two halves: right (angles -pi..0) and left (0..pi); each half shares its seam positions with the other.
+    halves = {}
+    for side, (a0, a1) in (('R', (-math.pi, 0.0)), ('L', (0.0, math.pi))):
+        n = nseg // 2
+        rows = []
+        for zi, z in enumerate(zs):
+            row = []
+            for j in range(n + 1):
+                a = a0 + (a1 - a0) * j / n
+                b = (a / (2 * math.pi)) % 1 * nseg
+                b0 = int(b) % nseg; t = b - int(b); r = R[zi][b0] * (1 - t) + R[zi][(b0 + 1) % nseg] * t
+                # the left front laps over the right a little, as a coat does
+                if side == 'L' and j == 0: r += 0.004
+                row.append(bm.verts.new((cx + math.sin(a) * r, cy - math.cos(a) * r, z)))
+            rows.append(row)
+        for zi in range(nr - 1):
+            for j in range(n):
+                f = bm.faces.new((rows[zi][j], rows[zi + 1][j], rows[zi + 1][j + 1], rows[zi][j + 1]))
+                for l, (u, v) in zip(f.loops, ((j / n, zi), (j / n, zi + 1), ((j + 1) / n, zi + 1), ((j + 1) / n, zi))):
+                    l[uvl].uv = ((u * 0.5 + (0.5 if side == 'L' else 0)) * 3, -v / (nr - 1) * 3)
+        halves[side] = rows
+    bm.normal_update(); bm.to_mesh(me); bm.free()
+    for p in me.polygons:
+        p.use_smooth = True
+    # Material: wool, both sides visible (the inside shows at the hem and the opening).
+    mat = bpy.data.materials.get('coat_' + name) or bpy.data.materials.new('coat_' + name)
+    mat.use_nodes = True; bsdf = mat.node_tree.nodes.get('Principled BSDF')
+    bsdf.inputs['Base Color'].default_value = (*color, 1); bsdf.inputs['Roughness'].default_value = 0.92
+    mat.use_backface_culling = False
+    me.materials.clear(); me.materials.append(mat)
+    # Normals out: faces were wound for the right half; flip the left if needed by checking one face.
+    bm = bmesh.new(); bm.from_mesh(me); bmesh.ops.recalc_face_normals(bm, faces=bm.faces); bm.to_mesh(me); bm.free()
+    return ob, {'zs': [zs[0], zs[-1]], 'zCrotch': zCrotch, 'zWaist': zWaist, 'pts': len(pts), 'cx': cx, 'cy': cy}
+
+
+def make_coat(name, color=(0.36, 0.37, 0.39), **kw):
+    import bmesh, math
+    from mathutils import Vector
+    ob, info = coat_body(name, color=color, **kw)
+    arm = rig(name); W = arm.matrix_world; B = arm.data.bones
+    P = lambda b: W @ B['mixamorig:' + b].head_local
+    cx, cy = info['cx'], info['cy']
+    neck = P('Neck'); zNeck = info['zs'][0]
+    zSh = (P('LeftArm').z + P('RightArm').z) / 2
+    shHalf = (abs(P('LeftArm').x - cx) + abs(P('RightArm').x - cx)) / 2 + 0.03
+    rNeck = 0.062 * (zNeck - P('Hips').z) / 0.54
+    # Shoulders: above the shoulder joints the coat narrows to the neck (a slope, not a shelf).
+    me = ob.data
+    for v in me.vertices:
+        z = v.co.z
+        if z > zSh - 0.03:
+            t = min(1, max(0, (z - (zSh - 0.03)) / (zNeck - (zSh - 0.03))))
+            dx, dy = v.co.x - cx, v.co.y - cy
+            r = math.hypot(dx, dy) or 1e-6
+            side = abs(dx) / r                     # 1 at the shoulder points, 0 front and back
+            cap = rNeck + (1 - t) ** 0.8 * ((shHalf - rNeck) * side + (r - rNeck) * (1 - side) * 0.9)
+            capd = rNeck * 1.15 + (1 - t) * (r - rNeck * 1.15)
+            lim = min(r, cap if side > 0.5 else max(cap, capd))
+            v.co.x = cx + dx / r * lim; v.co.y = cy + dy / r * lim
+    # Sleeves: a tube along each arm, sized from the jumper sleeve round it, from the shoulder to the wrist.
+    # sleeve sizes from the arm part of the jumper (and arm skin) only, not its body
+    spts = []
+    for s in [o for o in parts(name) if 'sweater' in o.name or o.name == 'human_' + name]:
+        gi = {g.index: g.name for g in s.vertex_groups}
+        for v in s.data.vertices:
+            best = max(v.groups, key=lambda g: g.weight, default=None)
+            if best and any(k in gi.get(best.group, '') for k in ('Arm', 'Hand')) and best.weight > 0.5:
+                spts.append(s.matrix_world @ v.co)
+    bm = bmesh.new(); bm.from_mesh(me); uvl = bm.loops.layers.uv.verify()
+    for S in ('Left', 'Right'):
+        a0, a1, a2 = P(S + 'Arm'), P(S + 'ForeArm'), P(S + 'Hand')
+        out = (a0 - Vector((cx, cy, a0.z))).normalized()
+        chain = [(a0 - out * 0.035 + Vector((0, 0, 0.02)), a0), (a0, a1), (a1, a2)]
+        rings = []
+        nseg, ns = 16, 7
+        pts_axis = []
+        for (p, q) in chain[1:]:
+            for i in range(ns):
+                pts_axis.append(p + (q - p) * (i / ns))
+        pts_axis.append(a2 - (a2 - a1).normalized() * 0.02)
+        pts_axis.insert(0, chain[0][0])
+        for k, c in enumerate(pts_axis):
+            d = (pts_axis[min(k + 1, len(pts_axis) - 1)] - pts_axis[max(k - 1, 0)]).normalized()
+            u = d.cross(Vector((0, 1, 0))).normalized(); w = d.cross(u).normalized()
+            rad = 0.03
+            for q in spts:
+                rel = q - c
+                if abs(rel.dot(d)) < 0.025:
+                    rr = (rel - d * rel.dot(d)).length
+                    if rr < 0.075 and rr > rad: rad = rr
+            rad += 0.012 + (0.008 if k > len(pts_axis) - 4 else 0)   # a little wider at the cuff
+            ring = [bm.verts.new(c + (u * math.cos(j / nseg * 2 * math.pi) + w * math.sin(j / nseg * 2 * math.pi)) * rad) for j in range(nseg)]
+            rings.append(ring)
+        for k in range(len(rings) - 1):
+            for j in range(nseg):
+                f = bm.faces.new((rings[k][j], rings[k][(j + 1) % nseg], rings[k + 1][(j + 1) % nseg], rings[k + 1][j]))
+                for l, (uu, vv) in zip(f.loops, ((j, k), (j + 1, k), (j + 1, k + 1), (j, k + 1))):
+                    l[uvl].uv = (uu / nseg * 1.5, -vv / len(rings) * 2.5)
+    # Collar: a band standing round the neck from the coat's top edge, opening at the front.
+    top = [v for v in bm.verts if abs(v.co.z - zNeck) < 1e-4]
+    top.sort(key=lambda v: math.atan2(v.co.x - cx, -(v.co.y - cy)))
+    col = []
+    for v in top:
+        d = Vector((v.co.x - cx, v.co.y - cy, 0)); r = d.length or 1e-6
+        col.append(bm.verts.new((cx + d.x / r * (r + 0.012), cy + d.y / r * (r + 0.012), zNeck + 0.045)))
+    for i in range(len(top) - 1):
+        a = math.atan2(top[i].co.x - cx, -(top[i].co.y - cy))
+        if abs(a) < 0.25:   # open at the front
+            continue
+        try:
+            bm.faces.new((top[i], top[i + 1], col[i + 1], col[i]))
+        except ValueError:
+            pass
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    bm.to_mesh(me); bm.free()
+    for p in me.polygons: p.use_smooth = True
+    info['shHalf'] = shHalf; info['verts'] = len(me.vertices)
+    return ob, info
