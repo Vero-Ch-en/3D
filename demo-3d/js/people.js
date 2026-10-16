@@ -285,8 +285,11 @@ G.attachBlenderBody = async (root, name, opts = {}) => {
   if (!bin) { spec = null; bin = await G.loadModelBuffer(name); }
   if (!bin) return false;
   root.userData.real = !!spec;
+  // The realistic models are meshopt-compressed (EXT_meshopt_compression) with WebP textures.
+  const loader = new THREE.GLTFLoader();
+  if (window.MeshoptDecoder) { await MeshoptDecoder.ready; loader.setMeshoptDecoder(MeshoptDecoder); }
   return new Promise((resolve) => {
-    new THREE.GLTFLoader().parse(bin, '', (gltf) => {
+    loader.parse(bin, '', (gltf) => {
       const u = root.userData, k = u.k;
       const model = gltf.scene;
       // A model from the asset manifest can bring its own materials and proportions; the built-in ones
@@ -334,6 +337,8 @@ G.attachBlenderBody = async (root, name, opts = {}) => {
           o.geometry.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
         }
       });
+      // A realistic model: measure it in the rest pose, so outdoor clothes can be fitted around it (life.js).
+      if (spec.fit) u.fit = measureFit(model, u);
       // Bones parents before children.
       const depth = (b) => { let d = 0; for (let p = b.parent; p; p = p.parent) d++; return d; };
       map.sort((a, b) => depth(a.bone) - depth(b.bone));
@@ -346,6 +351,50 @@ G.attachBlenderBody = async (root, name, opts = {}) => {
       resolve(true);
     }, (err) => { console.error('model', name, err); resolve(false); });
   });
+};
+/* Rest-pose measurements of a realistic model, in the character's own space (root at the origin, facing +z):
+ * the top and width of the skull, the depth of the knitwear through the chest, the collar, the feet. */
+function measureFit(model, u) {
+  const v = new THREE.Vector3(), cat = { top: [], skin: [], socks: [] };
+  model.updateMatrixWorld(true);
+  model.traverse((o) => {
+    if (!o.isMesh) return;
+    const n = o.name.toLowerCase();
+    const key = /sweater|hood|cord|pocket/.test(n) ? 'top' : /sock/.test(n) ? 'socks' : /^human_(partner|player)$/.test(n) ? 'skin'
+      : /legging|trouser|jean/.test(n) ? 'legs' : /hair|ponytail|fringe|short|bun|braid/.test(n) ? 'hair' : null;
+    if (!key) return;
+    cat[key] = cat[key] || [];
+    if (key === 'top') u.realTop = (u.realTop || []).concat(o);
+    const p = o.geometry.attributes.position;
+    for (let i = 0; i < p.count; i++) { v.fromBufferAttribute(p, i).applyMatrix4(o.matrixWorld); cat[key].push(v.x, v.y, v.z); }
+  });
+  const pts = (a, f) => { const r = []; for (let i = 0; i < a.length; i += 3) if (f(a[i], a[i + 1], a[i + 2])) r.push([a[i], a[i + 1], a[i + 2]]); return r; };
+  const w = (o) => o.getWorldPosition(new THREE.Vector3());
+  const head = w(u.head), chest = w(u.chest);
+  const skull = pts(cat.skin, (x, y) => Math.abs(x) < 0.13 && y > head.y - 0.02);
+  const skinTop = skull.reduce((m, q) => Math.max(m, q[1]), head.y);
+  const band = skull.filter((q) => q[1] > skinTop - 0.1 && q[1] < skinTop - 0.05);
+  const headHalfW = band.reduce((m, q) => Math.max(m, Math.abs(q[0] - head.x)), 0.06);
+  const torso = pts(cat.top, (x, y) => Math.abs(x) < 0.07 && y > chest.y - 0.12 && y < chest.y + 0.02);
+  const zs = torso.map((q) => q[2]);
+  const halfD = zs.length ? (Math.max(...zs) - Math.min(...zs)) / 2 : 0;
+  const neck = pts(cat.top, (x) => Math.abs(x) < 0.1).reduce((m, q) => Math.max(m, q[1]), chest.y);
+  const feet = pts(cat.socks, (x, y) => y < 0.12), side = (s) => { const z = feet.filter((q) => Math.sign(q[0]) === s).map((q) => q[2]); return z.length ? Math.max(...z) - Math.min(...z) : 0; };
+  // The raw rest-pose points too (every 2nd vertex, plenty), for fitting the coat and hat around them.
+  const thin = (a) => { const r = []; for (let i = 0; a && i < a.length; i += 6) r.push(a[i], a[i + 1], a[i + 2]); return new Float32Array(r); };
+  return { headY: head.y, chestY: chest.y, skinTop, headHalfW, halfD, neck, footLen: (side(1) + side(-1)) / 2,
+    body: thin(cat.skin.concat(cat.legs || [])), hair: thin((cat.hair || []).concat(skull.flat())) };
+}
+
+/* Run fn with a character in its rest pose at the origin (as measured above), then put everything back. */
+G.atRest = (root, fn) => {
+  const u = root.userData, saved = [];
+  root.traverse((o) => { saved.push([o, o.position.clone(), o.rotation.clone()]); });
+  root.position.set(0, 0, 0); root.rotation.set(0, 0, 0);
+  [u.hips, u.spine, u.chest, u.neck, u.head].concat(...u.arms.map((a) => [a.sh, a.el, a.hand]), ...u.legs.map((l) => [l.th, l.kn, l.ft])).forEach((g) => g.rotation.set(0, 0, 0));
+  u.hips.position.y = u.hipY;
+  root.updateMatrixWorld(true);
+  try { return fn(); } finally { saved.forEach(([o, p, r]) => { o.position.copy(p); o.rotation.copy(r); }); root.updateMatrixWorld(true); }
 };
 const _m = new THREE.Matrix4(), _pi = new THREE.Matrix4();
 G.retarget = (root) => {

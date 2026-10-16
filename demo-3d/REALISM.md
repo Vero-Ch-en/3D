@@ -86,8 +86,25 @@ rig joint's motion onto the matching bone.
 - Export in a relaxed A-pose or T-pose with the feet on the ground at the
   origin, facing +z.
 
-The MPFB characters from the Blender sessions (`demo-3d/tools/mpfb_characters.py`
-on the `claude/character-models` branch) are the natural first candidates.
+The realistic MPFB characters are in `models/real/partner.glb` and
+`models/real/player.glb`, made in Blender by `tools/game_export.py` on the
+`claude/character-models` branch (`prepare()`, `optimise()`, `export_all()`).
+They are compressed with meshopt geometry and WebP textures; `lib/meshopt_decoder.js`
+decodes them. **To change a character, edit the `.blend` and export again;
+don't edit the GLB.** `js/models_real.js` holds the same two files as base64,
+for hosts that can't serve `.glb` (regenerate it after a new export). The
+children keep the built-in bodies.
+
+Outdoor clothes are fitted to whatever body is loaded. `people.js`
+(`measureFit`) measures the model in its rest pose. `life.js` (`fitGear`) then
+uses those measurements to:
+- widen each sleeve to clear its arm;
+- flare the coat hem over the thighs and centre the coat on the body;
+- set the hat on that skull and over the hair;
+- move the scarf to the collar and size the boots to the feet.
+
+The model's own jumper is hidden while the coat is on. The real faces don't
+blink yet.
 
 ## Stand-ins to replace later
 

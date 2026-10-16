@@ -1610,6 +1610,7 @@ function boot() {
   CAM.shot = titleShot; CAM.cut = true;
   // Keep the loading screen up until the character bodies are in (with a safety timeout).
   Promise.race([bodies, new Promise((r) => setTimeout(r, 8000))]).then(() => {
+    (G.onBodies || []).forEach((f) => { try { f(); } catch (e) { console.error('[onBodies]', e); } });   // e.g. fit the outdoor clothes to a realistic body
     try { warmUp(); } catch (e) { console.warn('warm-up skipped', e); }
     G.BOOT_MS.total = Math.round(performance.now());
     $('loading').classList.add('done');

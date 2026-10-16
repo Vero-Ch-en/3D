@@ -71,7 +71,7 @@ function buildGear(m, o) {
   for (const a of u.arms) flake(u.chest, a.sh.position.x / k * 0.72, 0.138, -0.005, 0.05, 0.018, 0.045).userData.ys = [0.138, 0.122];
   flake(u.chest, 0, 0.13, -0.075, 0.07, 0.013, 0.042).userData.ys = [0.13, 0.112];
   flake(u.head, 0, 0.115, -0.012, 0.055, 0.02, 0.055);
-  return { parts, snow, hat, hatParts };
+  return { parts, snow, hat, hatParts, coatM };
 }
 const ADULT = G.KIDS ? G.KIDS.adults : { player: PLAYER.m, partner: PARTNER.m };
 const GEAR = {
@@ -79,12 +79,91 @@ const GEAR = {
   partner: buildGear(ADULT.partner, { fem: true, coat: '#a8875e', hat: '#ece4d6', scarf: '#7a4a5e', boots: '#6b4a32', pom: true }),
 };
 const gearOf = (c) => (c === PLAYER ? GEAR.player : GEAR.partner);
+/* A realistic body (assets.js manifest) is shaped differently from the procedural one the gear was built on:
+ * a bigger knit jumper, a different skull. Once it's loaded and measured (people.js, measureFit), the coat is
+ * widened to clear the knitwear, the hat moved and sized to sit on that head, the scarf to that collar, the
+ * boots to those feet. */
+function fitGear(c) {
+  const m = c === PLAYER ? ADULT.player : ADULT.partner, u = m.userData, f = u.fit;
+  if (!f || u.gearFitted) return null;
+  u.gearFitted = true;
+  const g = gearOf(c), k = u.k, out = {};
+  return G.atRest(m, () => {
+    const inv = new THREE.Matrix4(), v = new THREE.Vector3();
+    const local = (mesh, P, keep) => { mesh.updateMatrixWorld(true); inv.copy(mesh.matrixWorld).invert(); const r = []; for (let i = 0; i < P.length; i += 3) { v.set(P[i], P[i + 1], P[i + 2]).applyMatrix4(inv); if (keep(v)) r.push(v.clone()); } return r; };
+    const pct = (a, q) => { if (!a.length) return 0; a.sort((x, y) => x - y); return a[Math.min(a.length - 1, Math.floor(a.length * q))]; };
+    // How much wider must a lathe piece (coat body, sleeve) be to clear the body inside it, at every height?
+    const latheNeed = (mesh) => {
+      const pr = mesh.geometry.parameters.points, rAt = (y) => { if (y < pr[0].y) return pr[0].x; for (let i = 1; i < pr.length; i++) if (y <= pr[i].y) { const a = pr[i - 1], b = pr[i], t = (y - a.y) / (b.y - a.y || 1); return a.x + (b.x - a.x) * t; } return 0; };
+      const y0 = pr[0].y, y1 = pr[pr.length - 1].y, h = y1 - y0;
+      const P = local(mesh, mesh === torso ? bodyNoArms : armOf(mesh) >= 0 ? armPts[armOf(mesh)] : f.body, (q) => q.y > y0 + (mesh === torso ? 0 : h * 0.04) && q.y < y1 - h * 0.08);
+      // The real body may sit forward or back of where the procedural one did: centre the piece on it first.
+      let dz = 0;
+      if (mesh === torso) { const zs = P.filter((q) => Math.abs(q.x) < 0.08 * k).map((q) => q.z); if (zs.length) dz = (pct(zs, 0.99) + pct(zs, 0.01)) / 2; mesh.userData.dz = dz; }
+      const ratios = [], hem = [], yH = y0 + h * 0.18;
+      P.forEach((q) => { const r = rAt(q.y); if (r > 0.01 * k) { const t = Math.hypot(q.x, q.z - dz) / r; if (t < 1.4) (mesh === torso && q.y < yH ? hem : ratios).push(t); } });
+      const s = clamp(pct(ratios, mesh === torso ? 0.997 : 0.98) * 1.04, 1, 1.4);
+      // The hem of the coat flares out over the thighs instead of the whole coat growing to clear them.
+      if (mesh === torso && hem.length) {
+        const fl = clamp(pct(hem, 0.995) * 1.06 / s, 1, 1.35), yR = y0 + h * 0.4, pos = mesh.geometry.attributes.position;
+        if (fl > 1.001) { for (let j = 0; j < pos.count; j++) { const y = pos.getY(j); if (y < yR) { const t = 1 + (fl - 1) * smooth(yR, y0, y); pos.setX(j, pos.getX(j) * t); pos.setZ(j, pos.getZ(j) * t); } } pos.needsUpdate = true; mesh.geometry.computeVertexNormals(); mesh.geometry.computeBoundingSphere(); }
+        mesh.userData.flare = fl;
+      }
+      return s;
+    };
+    const need = new Map(), torso = g.parts[0];
+    // The arms hang at the sides in the rest pose, hands by the hips: the coat body mustn't try to swallow them.
+    const segs = [], wp = (o) => o.getWorldPosition(new THREE.Vector3());
+    u.arms.forEach((A) => { const a = wp(A.sh), e = wp(A.el), hd = wp(A.hand); segs.push([a, e], [e, hd], [hd, hd.clone().add(hd.clone().sub(e).multiplyScalar(0.8))]); });
+    const ln = new THREE.Line3(), cp = new THREE.Vector3(), pt = new THREE.Vector3(), B = f.body, keepIdx = [], armIdx = [[], []];
+    const near = (sg) => { ln.set(sg[0], sg[1]); ln.closestPointToPoint(pt, true, cp); return cp.distanceTo(pt); };
+    for (let i = 0; i < B.length; i += 3) {
+      pt.set(B[i], B[i + 1], B[i + 2]);
+      const d = segs.map(near), j = d.indexOf(Math.min(...d));
+      if (d[j] < 0.1 * k) { if (d[j] < 0.075 * k) armIdx[Math.floor(j / 3)].push(B[i], B[i + 1], B[i + 2]); } else keepIdx.push(B[i], B[i + 1], B[i + 2]);
+    }
+    const bodyNoArms = new Float32Array(keepIdx), armPts = armIdx.map((a) => new Float32Array(a));
+    const armOf = (mesh) => u.arms.findIndex((A) => A.sh === mesh.parent || A.el === mesh.parent);
+    g.parts.forEach((p) => { if (p.material === g.coatM && p.geometry.type === 'LatheGeometry') need.set(p, latheNeed(p)); });
+    // Left and right sleeves alike (the rest pose is symmetric; any difference is just a stray vertex or two).
+    const sl = [...need.keys()].filter((p) => p !== torso), half = sl.length / 2;
+    sl.slice(0, half).forEach((p, i) => { const q = sl[i + half], m = Math.min(need.get(p), need.get(q)); need.set(p, m); need.set(q, m); });
+    const sT = need.get(torso) || 1, dzT = (torso.userData.dz || 0) * torso.scale.z;
+    const sibling = (p) => { for (const [q, s] of need) if (q !== torso && q.parent === p.parent) return s; return sT; };
+    // Hat: down onto this skull (it was built for a rounder procedural head), then big enough to sit over the hair.
+    const hp = g.hatParts, hat = hp[0], dyHat = (f.skinTop + 0.016) - (f.headY + 0.12 * k);
+    hp.forEach((p) => { p.position.y += dyHat; });
+    const r0 = hat.geometry.parameters.radius;
+    const hr = local(hat, f.hair, (q) => q.y > 0.1 * r0 && q.length() < 1.6 * r0).map((q) => q.length() / r0);
+    const sH = clamp(pct(hr, 0.95) * 1.02, 0.85, 1.15), c0 = hat.position.clone();
+    hp.forEach((p) => { p.position.sub(c0).multiplyScalar(sH).add(c0); p.scale.multiplyScalar(sH); });
+    const dyScarf = clamp(f.neck - (f.chestY + 0.15 * k), -0.05, 0.06);
+    const sB = f.footLen > 0.1 ? clamp(f.footLen / (0.266 * k) * 1.06, 0.9, 1.4) : 1;
+    const arm = (p) => u.arms.some((a) => a.sh === p || a.el === p), foot = (p) => u.legs.some((l) => l.ft === p);
+    for (const p of g.parts) {
+      const par = p.parent;
+      if (hp.includes(p)) continue;
+      if (need.has(p)) { p.scale.x *= need.get(p); p.scale.z *= need.get(p); if (p === torso) p.position.z += dzT; }
+      else if (arm(par)) { const s = sibling(p); p.scale.x *= s; p.scale.z *= s; }
+      else if (par === u.spine || (par === u.chest && p.material === g.coatM)) { p.position.x *= sT; p.position.z = p.position.z * sT + (par === u.spine ? dzT : 0); p.scale.x *= sT; p.scale.z *= sT; }
+      else if (par === u.chest) { p.position.set(p.position.x * sT, p.position.y + dyScarf, p.position.z * sT); p.scale.x *= sT; p.scale.z *= sT; }
+      else if (foot(par)) { p.position.multiplyScalar(sB); p.scale.multiplyScalar(sB); }
+    }
+    g.snow.forEach((s) => { if (s.parent === u.head) s.position.y += dyHat; else { s.position.x *= sT; s.position.z *= sT; } });
+    out.flare = +(torso.userData.flare || 1).toFixed(3);
+    need.forEach((s, p) => { out[p.parent === u.spine ? 'coat' : (out.sl = (out.sl || 0) + 1, 'sleeve' + out.sl)] = +s.toFixed(3); });
+    return Object.assign(out, { sH: +sH.toFixed(3), dyHat: +dyHat.toFixed(3), dyScarf: +dyScarf.toFixed(3), sB: +sB.toFixed(3) });
+  });
+}
+(G.onBodies = G.onBodies || []).push(() => { G.GEAR_FIT = { player: fitGear(PLAYER), partner: fitGear(PARTNER) }; });
 function setDressed(c, on) {
   c.dressed = on;
   const g = gearOf(c);
   g.parts.forEach((p) => { p.visible = on && !(c === PLAYER && L.hatGiven && g.hatParts.includes(p)); });   // the snowman has his hat
   if (G.HOOK_COATS) G.HOOK_COATS[c === PLAYER ? 0 : 1].visible = !on;
   BOOTS[c === PLAYER ? 0 : 1].visible = !on;
+  // A realistic body's own jumper would poke through the coat: it goes under it, out of sight.
+  ((c === PLAYER ? ADULT.player : ADULT.partner).userData.realTop || []).forEach((o) => { o.visible = !on; });
 }
 G.setDressed = setDressed;
 
