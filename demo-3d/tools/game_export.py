@@ -529,3 +529,153 @@ def export_all(folder):
         arm.location = loc
         out[name] = os.path.getsize(path)
     return out
+
+
+# ---------------------------------------------------------------- children (the prologue)
+# Run after prepare()/optimise() in cozy_characters_game.blend, then save a copy (cozy_characters_kids.blend):
+#   for n, fr, hp in (('partner', 0.72, 0.1), ('player', 0.88, 0.03)): make_kid(n); kid_figure('kid_' + n, fr, hp)
+#   export_kids(folder)
+# The adult objects are only read, never changed (only copies are edited); export_kids writes kid_*.glb only.
+KIDS = ('kid_partner', 'kid_player')
+
+
+def make_kid(name, leg=0.86, arm=0.9, jaw=0.84):
+    """A child version of a prepared game character: copies of every part on a copy of the rig
+    (rig_game_kid_<name>), with shorter legs and arms, a smaller lower face and a slightly rounder skull.
+    The game scales it to the child's height and enlarges the head bone (game.js, useKids)."""
+    src_arm, src = rig(name), body(name)
+    kn = 'kid_' + name
+    adult = set(o.name for o in [src_arm] + parts(name))
+    for o in list(bpy.data.objects):
+        if o.name in adult:
+            continue
+        a0 = o.find_armature() if o.type == 'MESH' else None
+        if o.name == 'rig_game_' + kn or (a0 and a0.name == 'rig_game_' + kn) or (o.type == 'MESH' and kn in o.name):
+            bpy.data.objects.remove(o, do_unlink=True)
+    for o in bpy.context.selected_objects:
+        o.select_set(False)
+    a = src_arm.copy(); a.data = src_arm.data.copy(); a.name = 'rig_game_' + kn
+    cols = list(src_arm.users_collection)
+    for c in cols:
+        c.objects.link(a)
+    copies = []
+    for p in parts(name):
+        m = p.copy(); m.data = p.data.copy()
+        m.name = ('human_' + kn + p.name[len('human_' + name):]) if p.name.startswith('human_' + name) else p.name.replace('_' + name, '_' + kn)
+        for c in cols:
+            c.objects.link(m)
+        for md in m.modifiers:
+            if md.type == 'ARMATURE':
+                md.object = a
+        copies.append((p, m))
+    km = copies[0][1]
+    for p, m in copies:
+        mw = p.matrix_world.copy()
+        m.parent = a if p is src else km
+        m.matrix_world = mw
+    a.location.y += 1.2
+    bpy.context.view_layer.update()
+    bpy.context.view_layer.objects.active = a
+    a.select_set(True)
+    bpy.ops.object.mode_set(mode='POSE')
+    for pb in a.pose.bones:
+        pb.scale = (1, 1, 1)
+        if pb.name.endswith('UpLeg'):
+            pb.scale = (1.04, leg, 1.04)
+        elif pb.name.endswith(('LeftArm', 'RightArm')):
+            pb.scale = (1.03, arm, 1.03)
+    bpy.ops.object.mode_set(mode='OBJECT')
+    meshes = [m for _, m in copies]
+    apply_rest(a, meshes)
+    # Face: the lower face drawn up and in towards the eyes (eyes and lids left alone), the skull a touch rounder.
+    hb = a.data.bones['mixamorig:Head']
+    W = a.matrix_world
+    h0, h1 = W @ hb.head_local, W @ hb.tail_local
+    up = (h1 - h0).normalized(); hl = (h1 - h0).length
+    eye = h0 + up * hl * 0.42
+    start = hl * 0.06
+    out = {}
+    for m in meshes:
+        n = m.name.lower()
+        if 'high-poly' in n or 'eyelash' in n:
+            continue
+        gi = m.vertex_groups.get('mixamorig:Head')
+        if not gi:
+            continue
+        mw, mwi = m.matrix_world, m.matrix_world.inverted()
+        k = 0
+        for v in m.data.vertices:
+            w = 0.0
+            for g in v.groups:
+                if g.group == gi.index:
+                    w = g.weight
+            if w < 0.05:
+                continue
+            p = mw @ v.co; d = p - eye; h = d.dot(up)
+            if h < -start:
+                t = min(1.0, (-h - start) / (hl * 0.5)); t = t * t * (3 - 2 * t)
+                hh = -start + (h + start) * (1 - (1 - jaw) * t * w)
+                q = eye + up * hh + (d - up * h) * (1 - (1 - jaw) * 0.5 * t * w)
+            elif h > 0:
+                q = eye + d * (1 + 0.04 * w * min(1.0, h / (hl * 0.4)))
+            else:
+                continue
+            v.co = mwi @ q; k += 1
+        m.data.update(); out[m.name] = k
+    return out
+
+
+def kid_figure(kn, front=0.75, hips=0.1):
+    """A child's figure on a kid copy: everything in front of the spine, hips to neck, drawn back
+    (no bust, no tummy; clothing layers keep their order), and the hips narrowed. Kid objects only."""
+    a = bpy.data.objects['rig_game_' + kn]
+    W = a.matrix_world; B = a.data.bones
+    zh = (W @ B['mixamorig:Hips'].head_local).z
+    z0 = (W @ B['mixamorig:Spine'].head_local).z
+    z2 = (W @ B['mixamorig:Neck'].head_local).z
+    yc = (W @ B['mixamorig:Spine2'].head_local).y
+    xc = (W @ B['mixamorig:Hips'].head_local).x
+    lo, hi, fd = zh - 0.06, z2 - 0.02, 0.07
+    out = {}
+    for m in [o for o in bpy.data.objects if o.type == 'MESH' and o.find_armature() is a]:
+        mw, mwi = m.matrix_world, m.matrix_world.inverted(); k = 0
+        for v in m.data.vertices:
+            p = mw @ v.co
+            if not (lo < p.z < hi):
+                continue
+            f = min(1.0, (p.z - lo) / fd, (hi - p.z) / fd); f = f * f * (3 - 2 * f)
+            ch = False
+            if p.y < yc and abs(p.x - xc) < 0.2:
+                p.y = yc + (p.y - yc) * (1 - (1 - front) * f); ch = True
+            if hips and p.z < z0 + 0.05:
+                g = min(1.0, max(0.0, (z0 + 0.05 - p.z) / 0.12)) * f
+                p.x = xc + (p.x - xc) * (1 - hips * g); ch = True
+            if ch:
+                v.co = mwi @ p; k += 1
+        m.data.update(); out[m.name] = k
+    return out
+
+
+def export_kids(folder):
+    """Export the children (kid_partner.glb, kid_player.glb) like the adults. Only kid objects are selected."""
+    os.makedirs(folder, exist_ok=True)
+    out = {}
+    for kn in KIDS:
+        arm = bpy.data.objects['rig_game_' + kn]
+        for o in bpy.context.selected_objects:
+            o.select_set(False)
+        arm.select_set(True)
+        for o in parts(kn):
+            o.hide_set(False)
+            o.select_set(True)
+        bpy.context.view_layer.objects.active = arm
+        loc = arm.location.copy(); arm.location = (0, 0, 0)
+        path = os.path.join(folder, kn + '.glb')
+        bpy.ops.export_scene.gltf(filepath=path, use_selection=True, export_format='GLB', export_skins=True,
+                                  export_animations=False, export_morph=False, export_apply=False, export_yup=True,
+                                  export_image_format='WEBP', export_image_quality=88,
+                                  export_meshopt_compression_enable=True, export_meshopt_extension='EXT_meshopt_compression',
+                                  export_def_bones=True, export_materials='EXPORT')
+        arm.location = loc
+        out[kn] = os.path.getsize(path)
+    return out
