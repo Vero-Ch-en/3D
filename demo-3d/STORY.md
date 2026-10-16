@@ -25,8 +25,22 @@ changed again?
 
 ## Act I · Shared Life — the first snow day
 
-- **Prologue.** The lantern fair, as children. Walk down the path to the girl
-  sitting alone on a log by the lake. White-out. *(done)*
+- **Prologue.** The lantern fair, as children (their child selves are the same
+  characters, younger). Music from a music box somewhere among the stalls. You
+  can take a paper lantern from the lantern man and buy one small bag of
+  roasted chestnuts before going to find the girl on the log, who is watching
+  the snow, the fair, her own boots. *"Are you lost?" / "Is this seat taken?"
+  "It's a log."* / or just sitting down. The lantern stood in the snow, the
+  chestnuts split exactly in half (she checks). Her nose is pink and she has no
+  scarf; you can give her yours. Sky lanterns go up from the fair and over
+  them; a wish, out loud or secret. She makes up the three-note whistle, *if I
+  get lost*, and you whistle it back, make your own, or get it wrong. Someone
+  calls her name: *"Will you be here tomorrow?"* A promise (or a little
+  finger). You walk her back to the lanterns, hand in hand. White-out. *(done)*
+  Later the day only half-remembers it: the snow globe's tune sounds like
+  somewhere else for a moment; she has *a feeling* that scarf was hers once,
+  for about an hour; a wish feels like one made before. Neither of them is
+  ever sure.
 - **Morning.** Snowed in. The bed, the blanket, pancakes, tea, breakfast with
   its choices, the house and its small stories. Partner behaves as if it's an
   ordinary snow day and keeps slipping into the locked study ("private"). An
