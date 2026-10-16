@@ -118,8 +118,10 @@ The children in the prologue are child copies of the same characters
 `kid_figure()` and `export_kids()` in `tools/game_export.py`; their bobble hats
 and scarf are fitted the same way (`fitKid`).
 
-The model's own jumper is hidden while the coat is on. The real faces don't
-blink yet.
+The model's own jumper is hidden while the coat is on. The real heads have no blink shapes, so each eye
+gets a skin-coloured lid (`makeRealLids` in people.js) on the head bone, shown while the eyes are shut: in
+blinks, dozing, hugs. Hats and the snow on them are handed to the model's own head bone after fitting
+(`toHeadBone` in life.js), so they stay on when the head turns. Blend-shape blinks from the `.blend` would be better.
 
 ## Stand-ins to replace later
 

@@ -397,6 +397,8 @@ async function attachBody(root, name, spec, bin) {
       if (spec.fit) u.fit = measureFit(model, u);
       // Fingers (the rig doesn't drive them): found and measured now, in the rest pose, curled every frame.
       u.fingers = findFingers(model);
+      // Eyelids: the real heads have no blink shapes, so each eye gets a skin-coloured lid that rides the head bone.
+      if (spec.keepMaterials) u.realLids = makeRealLids(model);
       // Coat tails: spring bones the coat's skirt hangs from (tools/coats.py, coat_L / coat_R).
       u.springs = [];
       model.traverse((o) => { if (o.isBone && /^coat_?[LR]$/.test(o.name.replace(/[^A-Za-z_]/g, ''))) u.springs.push({ bone: o, q0: o.quaternion.clone(), side: /L$/.test(o.name) ? 1 : -1, a: 0, va: 0, b: 0, vb: 0 }); });
@@ -412,6 +414,36 @@ async function attachBody(root, name, spec, bin) {
       resolve(true);
     }, (err) => { console.error('model', name, err); resolve(false); });
   });
+}
+/* Eyelids for a model whose head has no blink shapes: a cap over each eyeball (the eyes mesh split left and right),
+ * attached to the head bone, in the face's average skin colour; shown while the eyes are shut. */
+function makeRealLids(model) {
+  let eyes = null, skin = null, head = null;
+  model.traverse((o) => { if (o.isMesh && /high-?poly/i.test(o.name)) eyes = o; if (o.isMesh && /^base/i.test(o.name)) skin = o; if (o.isBone && /Head$/.test(o.name)) head = o; });
+  if (!eyes || !head) return null;
+  const col = new THREE.Color(0xdcae98).convertSRGBToLinear();
+  try {   // average the skin texture (mostly skin), slightly darkened like a lid in the eye's shadow
+    const img = skin && skin.material.map && skin.material.map.image;
+    if (img) { const cv = document.createElement('canvas'); cv.width = cv.height = 16; const cx = cv.getContext('2d'); cx.drawImage(img, 0, 0, 16, 16); const d = cx.getImageData(0, 0, 16, 16).data; let r = 0, g = 0, b = 0, n = 0; for (let i = 0; i < d.length; i += 4) if (d[i] > 40) { r += d[i]; g += d[i + 1]; b += d[i + 2]; n++; } if (n) col.setRGB(r / n / 255, g / n / 255, b / n / 255).convertSRGBToLinear().multiplyScalar(0.75); }
+  } catch (e) { /* keep the default */ }
+  const mat = new THREE.MeshStandardMaterial({ color: col, roughness: 0.9, envMapIntensity: 0.35 });
+  G.MATS && G.MATS.push(mat);
+  const pos = eyes.geometry.attributes.position, v = new THREE.Vector3(), out = [];
+  eyes.updateMatrixWorld(true);
+  for (const side of [1, -1]) {
+    const pts = [];
+    for (let i = 0; i < pos.count; i++) { v.fromBufferAttribute(pos, i).applyMatrix4(eyes.matrixWorld); if (Math.sign(v.x) === side) pts.push(v.clone()); }
+    if (pts.length < 8) continue;
+    const box = new THREE.Box3().setFromPoints(pts), c = box.getCenter(new THREE.Vector3()), sz = box.getSize(new THREE.Vector3());
+    const r = Math.max(sz.x, sz.y) * 0.5;
+    // the cap: top 100° of a sphere just over the cornea, turned forward so it closes over the front of the eye
+    const lid = new THREE.Mesh(new THREE.SphereBufferGeometry(r * 1.13, 20, 10, 0, Math.PI * 2, 0, Math.PI * 0.56), mat);
+    lid.position.copy(c); lid.position.z -= r * 0.08; lid.rotation.x = Math.PI / 2 + 0.12;
+    lid.castShadow = false; lid.visible = false; lid.userData.lid = true;
+    model.parent.add(lid); lid.updateMatrixWorld(true); head.attach(lid);
+    out.push(lid);
+  }
+  return out.length ? out : null;
 }
 /* Finger chains of a Mixamo-style hand, with the axis that curls each one toward the palm.
  * The palm side is the side the thumb sits on; the axis is whichever local one moves the fingertip that way. */
@@ -741,6 +773,7 @@ G.animate = (c, dt, t) => {
   c.blinkT = (c.blinkT == null ? Math.random() * 3 : c.blinkT) - dt;
   if (c.blinkT < -0.13) c.blinkT = Math.random() < 0.15 ? 0.18 : 2 + Math.random() * 4.5;
   const shut = c.lidsClosed || c.blinkT < 0;
+  if (u.realLids) u.realLids.forEach((ld) => (ld.visible = shut));
   if (u.lids) u.lids.forEach((ld) => { ld.position.y = (shut ? 0.0085 : 0.0135) * k; ld.scale.y = (shut ? 0.0125 : 0.0072) * k; });
   // With nothing to look at, glance around now and then.
   let tgt = c.lie ? null : c.lookAt;

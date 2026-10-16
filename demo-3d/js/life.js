@@ -152,6 +152,7 @@ function fitGear(c) {
     }
     g.snow.forEach((s) => { if (s.parent === u.head) s.position.y += dyHat; else { s.position.x *= sT; s.position.z *= sT; } });
     out.boots = fitBoots(m, g.parts.filter((p) => foot(p.parent)));
+    out.head = toHeadBone(m, g.parts.concat(g.snow));
     // The model's own long coat wears the same wool and colour as the built-on one did.
     // Over the long coat's own collar the scarf sits a little lower and wider, wrapped round it, not the chin.
     if ((u.realCoat || []).length) g.parts.forEach((p) => { if (p.parent === u.chest && p.material !== g.coatM && !p.userData.coatPiece) { p.position.y -= 0.035 * k; p.scale.x *= 1.08; p.scale.z *= 1.1; } });
@@ -195,6 +196,15 @@ function fitBoots(m, boots) {
   }
   return out;
 }
+/* Hand head-worn gear to the model's own head bone, so it stays on the head when the neck turns and nods
+ * (the rig's head joint pivots at a different height from the model's neck). Call at rest, after fitting. */
+function toHeadBone(m, parts) {
+  const u = m.userData, R = u.retarget; if (!R) return 0;
+  const e = R.map.find((q) => q.group === u.head); if (!e) return 0;
+  G.retarget(m); m.updateMatrixWorld(true);
+  let n = 0; for (const p of parts) if (p.parent === u.head) { e.bone.attach(p); n++; }
+  return n;
+}
 /* The children's bobble hats and scarf (game.js, kidDress), moved onto a realistic child's head and collar. */
 function fitKid(m) {
   const u = m.userData, f = u.fit;
@@ -220,6 +230,7 @@ function fitKid(m) {
     hp.forEach((p) => { p.position.sub(c0).multiplyScalar(sH).add(c0); p.scale.multiplyScalar(sH); });
     const dyScarf = clamp(f.neck - (f.chestY + 0.15 * k), -0.05, 0.05);
     u.bootOff = fitBoots(m, u.kidBoots);
+    toHeadBone(m, hp);
     u.scarfDy = dyScarf;   // kept: the scarf can change hands in the prologue (story.js, moveScarf)
     u.kidScarf.forEach((p) => { p.position.y += dyScarf; });
     return { sH: +sH.toFixed(3), dyHat: +dyHat.toFixed(3), dyScarf: +dyScarf.toFixed(3), centre: cn ? [+(cx / cn).toFixed(3), +(cz / cn).toFixed(3)] : null };
