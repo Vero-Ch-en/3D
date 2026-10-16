@@ -933,6 +933,15 @@ CH.prologue = async () => {
   await N('(Somebody is calling a name, back among the lanterns. Hers. She doesn’t get up straight away.)', { shot: sitShot });
   await P('That’s my mum.', { shot: sitShot });
   PARTNER.stillLook = { x: PLAYER.x, z: PLAYER.z, headY: PLAYER.y + 0.9 };
+  // The whistle: three notes, made up right here, "if one of us gets lost".
+  await P('If I get lost, I’ll whistle. Like this.', { shot: sitShot });
+  await wait(Math.min(1.6, G.Audio.whistle(1.12) + 0.2));
+  await P('That’s mine. You need one too.', { shot: sitShot });
+  const cw = await choose(['Whistle the same three notes back', 'Make one up', 'Try, and get it wrong']);
+  if (cw === 0) { await wait(Math.min(1.6, G.Audio.whistle(1.05) + 0.2)); await P('No, that’s mine. …Fine. We can share it.', { shot: sitShot }); }
+  else if (cw === 1) { G.Audio.whistle(0.98, 0.5); await wait(1.5); await P('That’s the same as mine but worse.', { shot: sitShot }); await P('…It can be both of ours.', { shot: sitShot }); }
+  else { G.Audio.whistle(1.0, 1.4); await wait(1.5); await N('(It comes out as mostly air.)', { shot: sitShot }); await P('You’ll get better.', { shot: sitShot }); }
+  S.flags.fairWhistle = 1;
   await P('Will you be here tomorrow?', { shot: sitShot });
   const c4 = await choose(['“I’ll be here.”', '“Every day.”', 'Hold out your little finger']);
   if (c4 === 2) {

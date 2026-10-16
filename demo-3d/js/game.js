@@ -233,6 +233,23 @@ G.Audio = (() => {
       return at;
     },
     chime() { bell(1046.5, 0, 0.03); bell(1568, 0.09, 0.025); },
+    // The three-note whistle they made up at the fair ("if one of us gets lost"): up, down, up-and-hold.
+    // pitch: a child's is higher; wobble: a first, uncertain try.
+    whistle(pitch = 1, wobble = 0) {
+      if (!ctx) return 0;
+      const notes = [[1318.5, 0.22], [987.8, 0.22], [1568, 0.5]];
+      let at = ctx.currentTime + 0.05;
+      for (const [f0, d] of notes) {
+        const o = ctx.createOscillator(), g = ctx.createGain(), f = f0 * pitch;
+        o.type = 'sine';
+        o.frequency.setValueAtTime(f * 0.94, at); o.frequency.exponentialRampToValueAtTime(f, at + 0.05);
+        if (wobble) { o.frequency.setValueAtTime(f, at + d * 0.5); o.frequency.linearRampToValueAtTime(f * (1 - 0.04 * wobble), at + d); }
+        g.gain.setValueAtTime(0.0001, at); g.gain.linearRampToValueAtTime(0.03, at + 0.03); g.gain.setValueAtTime(0.03, at + d - 0.06); g.gain.exponentialRampToValueAtTime(0.0001, at + d);
+        o.connect(g); g.connect(outF); o.start(at); o.stop(at + d + 0.02);
+        at += d + 0.07;
+      }
+      return at - ctx.currentTime;
+    },
     // A winter bird somewhere outside: two or three quick falling notes, muffled by the walls when you're in.
     chirp() {
       if (!ctx) return; const n = 2 + Math.floor(Math.random() * 2), f0 = 3200 + Math.random() * 1400;
@@ -1053,12 +1070,12 @@ const Story = (G.Story = {
     const tune = G.Audio.musicBox();
     await G.say(null, '(She winds the snow globe on the mantle. It plays its little tune, a touch slow, and she hums along, off-key and completely sure of herself.)', { shot: cakeShot, auto: Math.max(5, tune + 0.4) });
     // The same tune the lantern fair played, the night you met (the prologue).
-    if (G.S.flags.fairTune) await G.say(null, '(It’s the tune from the lantern fair. You realised that years ago. Neither of you has ever said so.)', { shot: cakeShot });
+    if (G.S.flags.fairTune) await G.say(null, '(For a moment it sounds like somewhere else. Lanterns, a long time ago. Then it’s just the snow globe again.)', { shot: cakeShot });
     await G.say('partner', 'Wait. Make a wish first. A proper one. Not a sensible one.');
     await G.say('player', 'What counts as sensible?');
     await G.say('partner', '“More sleep.” “A new kettle.” Anything you’d be willing to say out loud.');
-    if (G.S.flags.fairWish === 'secret') await G.say(null, '(You make the same wish you made under the sky lanterns, a long time ago. You still haven’t said it out loud.)', { shot: cakeShot });
-    else if (G.S.flags.fairWish === 'snow') await G.say('partner', 'And not “snow every day”. We tried that one. Look where it got us.', { shot: cakeShot });
+    if (G.S.flags.fairWish === 'secret') await G.say(null, '(You make one. For a second it feels like a wish you’ve made before, somewhere colder.)', { shot: cakeShot });
+    else if (G.S.flags.fairWish === 'snow') await G.say('partner', 'And not “snow every day”. …Somebody wished that once. I’m sure somebody did.', { shot: cakeShot });
     G.Audio.blow(); G.CAKE.lit = false;
     await G.say(null, '(You blow them out. All five, first try.)', { shot: cakeShot });
     await G.say('partner', 'Happy first snow, {giant}.');

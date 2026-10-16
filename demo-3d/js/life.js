@@ -298,7 +298,7 @@ A.rewire('coats', async () => {
   if (!PLAYER.dressed) {
     setDressed(PLAYER, true);
     await N(A.cyc('coatOn', ['(Coat. Boots. The red scarf, wound twice. You look like a parcel somebody loves.)', '(Coat, boots, scarf. Ready for whatever the weather has in mind.)']));
-    if (!S.flags.scarfTalk && A.canHear() && !PARTNER.lie) { S.flags.scarfTalk = 1; await Pt(S.flags.scarfGiven ? 'You lent me that red scarf once, you know. At the lantern fair. I did give it back. Eventually.' : 'You’ve had that red scarf as long as I’ve known you.'); }
+    if (!S.flags.scarfTalk && A.canHear() && !PARTNER.lie) { S.flags.scarfTalk = 1; await Pt(S.flags.scarfGiven ? 'I have a feeling that scarf was mine once. For about an hour. You’ll say it wasn’t.' : 'You’ve had that red scarf as long as I’ve known you.'); }
     return;
   }
   setDressed(PLAYER, false);
