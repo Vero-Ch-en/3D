@@ -191,3 +191,67 @@ def make_coat(name, color=(0.36, 0.37, 0.39), **kw):
     for p in me.polygons: p.use_smooth = True
     info['shHalf'] = shHalf; info['verts'] = len(me.vertices)
     return ob, info
+
+
+def skin_coat(name, spring=0.35, thigh=0.45):
+    """Weight coat_<name> to its rig. Upper coat and sleeves: the body's own weights (nearest skin).
+    The skirt, from just below the crotch to the hem, blends from those onto its own thigh and a spring
+    bone (coat_L / coat_R, children of the hips) that the game swings, so the tails trail and settle."""
+    ob = bpy.data.objects['coat_' + name]
+    arm = rig(name); W = arm.matrix_world; B = arm.data.bones
+    P = lambda b: W @ B['mixamorig:' + b].head_local
+    hips = P('Hips'); zTop = P('LeftUpLeg').z - 0.02; zKnee = P('LeftLeg').z - 0.06
+    # Spring bones for the two coat tails.
+    for o in bpy.context.selected_objects:
+        o.select_set(False)
+    bpy.context.view_layer.objects.active = arm; arm.select_set(True)
+    bpy.ops.object.mode_set(mode='EDIT')
+    eb = arm.data.edit_bones; Wi = W.inverted()
+    for S, sx in (('L', 1), ('R', -1)):
+        nm = 'coat_' + S
+        if nm in eb:
+            eb.remove(eb[nm])
+        b = eb.new(nm)
+        side = P(('Left' if S == 'L' else 'Right') + 'UpLeg')
+        b.head = Wi @ Vector((side.x, side.y, zTop + 0.04)); b.tail = Wi @ Vector((side.x, side.y, zKnee))
+        b.parent = eb['mixamorig:Hips']; b.use_deform = True; b.roll = 0
+    bpy.ops.object.mode_set(mode='OBJECT')
+    # Body weights first.
+    tmp = full_body(name)
+    copy_weights(tmp, ob)
+    bpy.data.objects.remove(tmp, do_unlink=True)
+    cx = hips.x
+    vg = {g.name: g for g in ob.vertex_groups}
+    for nm in ('coat_L', 'coat_R', 'mixamorig:LeftUpLeg', 'mixamorig:RightUpLeg', 'mixamorig:Hips'):
+        if nm not in vg:
+            vg[nm] = ob.vertex_groups.new(name=nm)
+    mw = ob.matrix_world
+    for v in ob.data.vertices:
+        p = mw @ v.co
+        if p.z >= zTop:
+            continue
+        t = min(1.0, (zTop - p.z) / max(0.05, zTop - zKnee)); t = t * t * (3 - 2 * t)
+        S = 'L' if p.x > cx else 'R'
+        old = [(ob.vertex_groups[g.group].name, g.weight) for g in v.groups]
+        for g in list(v.groups):
+            ob.vertex_groups[g.group].remove([v.index])
+        # the skirt hangs from the hips: whatever leg weight the nearest skin gave becomes this side's thigh
+        acc = {}
+        for gname, w in old:
+            if 'Leg' in gname or 'Foot' in gname or 'Toe' in gname:
+                gname = 'mixamorig:' + ('Left' if S == 'L' else 'Right') + 'UpLeg'
+            acc[gname] = acc.get(gname, 0) + w * (1 - t)
+        mix = {'mixamorig:Hips': 1 - thigh - spring, 'mixamorig:' + ('Left' if S == 'L' else 'Right') + 'UpLeg': thigh, 'coat_' + S: spring}
+        for gname, w in mix.items():
+            acc[gname] = acc.get(gname, 0) + w * t
+        tot = sum(acc.values()) or 1
+        for gname, w in acc.items():
+            if w / tot > 0.002:
+                vg.setdefault(gname, ob.vertex_groups.get(gname) or ob.vertex_groups.new(name=gname)).add([v.index], w / tot, 'REPLACE')
+    # Parent to the rig like the other clothes (under the body, so parts(name) includes it).
+    mwc = ob.matrix_world.copy()
+    ob.parent = bpy.data.objects['human_' + name]; ob.matrix_world = mwc
+    for m in [m for m in ob.modifiers if m.type == 'ARMATURE']:
+        ob.modifiers.remove(m)
+    md = ob.modifiers.new('Armature', 'ARMATURE'); md.object = arm
+    return {'groups': len(ob.vertex_groups), 'zTop': zTop, 'zKnee': zKnee}
