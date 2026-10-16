@@ -116,6 +116,28 @@ def make_socks(name):
 
 
 # ---------------------------------------------------------------- weights
+def full_body(name):
+    """A temporary copy of the whole skin (shape keys applied, NOTHING masked) to borrow weights from:
+    the skin under the clothes is removed for the game, but the clothes need its weights."""
+    bm = body(name)
+    hide = [(m, m.show_viewport) for m in bm.modifiers if m.type in ('MASK', 'ARMATURE')]
+    for m, _ in hide:
+        m.show_viewport = False
+    dg = bpy.context.evaluated_depsgraph_get()
+    dg.update()
+    me = bpy.data.meshes.new_from_object(bm.evaluated_get(dg), preserve_all_data_layers=True, depsgraph=dg)
+    for m, v in hide:
+        m.show_viewport = v
+    ob = bpy.data.objects.new('tmp_fullbody_' + name, me)
+    bm.users_collection[0].objects.link(ob)
+    ob.parent = bm.parent
+    ob.matrix_world = bm.matrix_world.copy()
+    for g in sorted(bm.vertex_groups, key=lambda g: g.index):   # same order, so the indices line up
+        ob.vertex_groups.new(name=g.name)
+    ob['arm'] = bm.parent.name
+    return ob
+
+
 def rig(name):
     HS = svc('humanservice', 'HumanService')
     bm = body(name)
@@ -128,7 +150,7 @@ def rig(name):
 
 def copy_weights(src, dst, k=4):
     """Give a garment/asset the weights of the nearest skin: average of the k nearest body vertices."""
-    arm = src.parent
+    arm = bpy.data.objects[src['arm']] if 'arm' in src else src.parent
     bones = [b.name for b in arm.data.bones if b.use_deform]
     gi = {g.name: g.index for g in src.vertex_groups}
     cols = [gi[b] for b in bones if b in gi]
@@ -342,9 +364,11 @@ def prepare(save_copy=True, names=NAMES):
             slim(o)
             if o is not bm:
                 bake(o)
-        bake(bm)             # shape keys and the hide-under-clothes masks, applied
+        src = full_body(name)
         for o in parts(name)[1:]:
-            copy_weights(bm, o)
+            copy_weights(src, o)
+        bpy.data.objects.remove(src, do_unlink=True)
+        bake(bm)             # shape keys and the hide-under-clothes masks, applied
         arms_down(arm)
         apply_rest(arm, parts(name))
         for o in parts(name):
