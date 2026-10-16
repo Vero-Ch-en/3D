@@ -271,17 +271,22 @@ const loadEmbeddedReal = () => embeddedReal || (embeddedReal = new Promise((res)
   document.head.appendChild(s);
 }));
 G.loadRealModel = async (name, spec, embeddedOnly) => {
+  G.CHAR_SRC = G.CHAR_SRC || {};
+  // Already on the page (the published build includes js/models_real.js): use it, don't fetch.
+  if (window.CBS_REAL && window.CBS_REAL[name]) { G.CHAR_SRC[name] = 'page'; return decodeReal(window.CBS_REAL[name]); }
   if (!embeddedOnly && location.protocol !== 'file:' && spec.url) {
     try {
       const r = await fetch(spec.url);
       // Only a real GLB (some hosts answer a missing file with a web page and a 200).
       // And it must be the realistic rig (Mixamo bones), not some other file served in its place.
-      if (r.ok) { const buf = await r.arrayBuffer(); if (isRealGlb(buf)) return buf; console.warn('[characters]', spec.url, 'served something else; using the embedded copy'); }
+      if (r.ok) { const buf = await r.arrayBuffer(); if (isRealGlb(buf)) { G.CHAR_SRC[name] = 'fetched ' + (buf.byteLength / 1e6).toFixed(1) + 'MB'; return buf; } console.warn('[characters]', spec.url, 'served something else; using the embedded copy'); }
     } catch (e) { /* try the embedded copy */ }
   }
   const all = await loadEmbeddedReal();
-  return all[name] ? Uint8Array.from(atob(all[name]), (c) => c.charCodeAt(0)).buffer : null;
+  if (all[name]) G.CHAR_SRC[name] = 'embedded';
+  return all[name] ? decodeReal(all[name]) : null;
 };
+const decodeReal = (b64) => Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)).buffer;
 /* Build number of the published page (the artifact build puts every script under v<build>/, so phones don't keep stale copies). */
 G.BUILD = G.BUILD || (document.currentScript && (document.currentScript.src.match(/\/v(\d+)\/js\//) || [])[1]) || 'dev';
 /* A few facts for Stats, to see from a screenshot why a device shows the characters differently. */
@@ -296,7 +301,8 @@ G.diag = () => {
   const R = G.renderer, cap = R.capabilities, gl = R.getContext();
   const per = (m) => { let n = 0, vis = 0, tex = 0, bones = 0; m.traverse((o) => { if (o.isSkinnedMesh) { n++; if (o.visible) vis++; if (o.material.map && o.material.map.image) tex++; bones = Math.max(bones, o.skeleton.bones.length); } }); const u = m.userData; return `${vis}/${n} vis ${tex} tex ${bones} bones top ${(u.realTop || []).map((o) => (o.visible ? 1 : 0)).join('')} fit ${u.gearFitted ? 1 : 0}`; };
   const ext = gl.getExtension('WEBGL_debug_renderer_info');
-  diagS = `\nHim ${per(G.PLAYER.m)}\nHer ${per(G.PARTNER.m)}\nGPU ${ext ? String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)).slice(0, 34) : '?'}\nWebGL${cap.isWebGL2 ? 2 : 1} vtex ${cap.floatVertexTextures ? 1 : 0} vuni ${cap.maxVertexUniforms} tex ${cap.maxTextureSize} dressed ${G.PLAYER.dressed ? 1 : 0}${G.PARTNER.dressed ? 1 : 0}` + G.ERRS.slice(-3).map((e) => '\n! ' + e).join('');
+  const kid = G.KIDS && G.PLAYER.m === G.KIDS.player;
+  diagS = `${kid ? '\n(childhood scene: the children, built-in bodies)' : ''}\nHim ${per(G.PLAYER.m)}\nHer ${per(G.PARTNER.m)}\nGPU ${ext ? String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)).slice(0, 34) : '?'}\nWebGL${cap.isWebGL2 ? 2 : 1} vtex ${cap.floatVertexTextures ? 1 : 0} vuni ${cap.maxVertexUniforms} tex ${cap.maxTextureSize} dressed ${G.PLAYER.dressed ? 1 : 0}${G.PARTNER.dressed ? 1 : 0}` + G.ERRS.slice(-3).map((e) => '\n! ' + e).join('');
   return diagS;
 };
 /* Which body each character got, and why (shown in Stats). */
@@ -314,7 +320,7 @@ G.attachBlenderBody = async (root, name, opts = {}) => {
         const bin = await G.loadRealModel(name, spec, only);
         if (!bin) continue;
         root.userData.real = true;
-        if (await attachBody(root, name, spec, bin)) { G.CHAR_STATUS[key] = 'realistic' + (only ? ' (embedded)' : ''); return true; }
+        if (await attachBody(root, name, spec, bin)) { G.CHAR_STATUS[key] = 'realistic ' + ((G.CHAR_SRC || {})[name] || '?') + ' ' + (bin.byteLength / 1e6).toFixed(1) + 'MB'; return true; }
         why = 'could not be read';
         if (!isMeshopt(bin)) break;
       }
