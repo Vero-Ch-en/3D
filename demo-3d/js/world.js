@@ -294,7 +294,26 @@ function pineGeometry(seed, lod = 0) {
       parts.push({ geo: cone, mat: G.mtx(0, y, 0, 1, 1, 1, r() * 6), color: (v) => (v.y > y + h * 0.2 ? tipC : base) });
       continue;
     }
-    parts.push({ geo: cone, mat: G.mtx(0, y, 0, 1, 1, 1, r() * 6), color: (v, n) => { const patch = Math.sin(Math.atan2(v.z, v.x) * 4 + ph) * 0.5 + 0.5; const up = (v.y - (y - h * 0.5)) / h; return snowy && n.y > 0.25 && up > 0.25 + patch * 0.45 ? snow : base.clone().offsetHSL(0, 0, (up - 0.5) * 0.05); } });
+    // Near trees: a dark inner cone for body, then a ring of separate drooping branches round it, each its own
+    // length and angle, so the outline is ragged like a spruce's; snow lies only on their upper faces.
+    const inner = base.clone().multiplyScalar(0.55);
+    parts.push({ geo: new THREE.ConeGeometry(rad * 0.62, h * 1.25, 9, 1, true), mat: G.mtx(0, y, 0, 1, 1, 1, r() * 6), color: inner });
+    const nb = Math.max(6, Math.round(7 + rad * 30)), droop0 = lerp(0.55, 0.25, t);
+    for (let b = 0; b < nb * 2; b++) {
+      const ring = b >= nb, bi = ring ? b - nb : b;   // two rings, the second shorter and a little higher, between the first
+      const phi = ((bi + (ring ? 0.5 : 0)) / nb) * Math.PI * 2 + (r() - 0.5) * 0.4, L = rad * (ring ? 0.7 : 0.95) * (0.85 + r() * 0.3), w = L * (0.42 + r() * 0.1), d = droop0 + (r() - 0.5) * 0.2 - (ring ? 0.08 : 0);
+      const br = new THREE.CylinderGeometry(w * 0.3, w, L, 4, 2, true);   // blunt-ended, not a spike (open: the ends are never seen)
+      // a little sag along its length: the far half bends down further
+      const bp = br.attributes.position; for (let k = 0; k < bp.count; k++) { const yy = bp.getY(k) / L + 0.5; bp.setX(k, bp.getX(k) - yy * yy * L * 0.18); }
+      const M = new THREE.Matrix4().makeTranslation(0, y + (r() - 0.5) * h * 0.4 + (ring ? h * 0.3 : 0), 0)
+        .multiply(new THREE.Matrix4().makeRotationY(phi))
+        .multiply(new THREE.Matrix4().makeRotationZ(-(Math.PI / 2 + d)))
+        .multiply(new THREE.Matrix4().makeTranslation(0, L / 2, 0))
+        .multiply(new THREE.Matrix4().makeScale(0.28, 1, 1));
+      const tone = base.clone().offsetHSL((r() - 0.5) * 0.02, 0, (r() - 0.5) * 0.03);
+      const snowB = snowy && r() < 0.8;
+      parts.push({ geo: br, mat: M, color: (v, n) => { const out = Math.hypot(v.x, v.z) / Math.max(1e-3, rad); return snowB && n.y > 0.45 && out > 0.25 ? snow : tone.clone().multiplyScalar(0.7 + Math.min(1, out) * 0.45); } });
+    }
   }
   return G.merge(parts);
 }

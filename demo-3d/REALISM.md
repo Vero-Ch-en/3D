@@ -145,7 +145,9 @@ blinks, dozing, hugs. Hats and the snow on them are handed to the model's own he
 - Pose weights (arm poses, holding hands, swaying, the hug) use `G.spring` (core.js) instead of plain damping,
   so they start gently. Sitting down and getting up take about a second, eased, with the chest going forward
   over the feet half-way.
-- Turning on the spot takes small steps.
+- Turning on the spot takes small steps; brisk steps in fresh snow kick a little powder off the toes (`G.kickAt`).
+- The real eyes are split into two eyeballs on pivots and turn toward what the character looks at, ahead of
+  the head, with small saccades (`makeRealEyes`, `aimEyes`, people.js).
 - The scarf's hanging end is a chain of five knitted segments with verlet physics (`G.simScarf`, life.js):
   gravity, the body's own motion, a little wind, kept in front of the chest. The player's pace is on a spring.
 - Boot shafts ride the shin bone and flare for the calf; the coat's seams share skin weights so they don't open;
@@ -162,8 +164,8 @@ These are deliberately cheap approximations, each in one place:
 | Snowfall | point sprites | GPU particles with motion blur |
 | Footprints, wet prints | instanced decals | deferred decals or a deformable snow height map |
 | Windows | flat glow at night | interior mapping / real interior lighting seen through glass |
-| Trees | procedural cones, instanced | scanned or SpeedTree-style conifers with LODs |
-| Fire | animated flame planes | flipbook or simulated fire with a light probe |
+| Trees | near: spruces of separate drooping boughs with snow on their tops; far: low-poly cones; instanced | scanned or SpeedTree-style conifers with LODs |
+| Fire | seven flame tongues at different depths and a bright core, a glowing coal bed, logs lit from below, a light that moves | flipbook or simulated fire with a light probe |
 | Faces | procedural eyes, lids, lips | the model's own head with blend shapes |
 | Hair | alpha-tested cards | the model's hair cards or strands |
 | Radio music, humming, sound effects | synthesised in `game.js` (`G.Audio`) | recorded audio through the same placed sources |

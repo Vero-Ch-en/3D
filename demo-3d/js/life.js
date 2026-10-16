@@ -237,7 +237,7 @@ function fitBoots(m, boots) {
     foot.position.set(c.x, lowY + fh * 0.42, c.z); foot.scale.set(w * 1.05, fh * 0.5 + 0.006, sz.z * 0.5 + 0.012);
     const fit = (mesh) => { mesh.scale.set(1, 1, 1); mesh.geometry.computeBoundingBox(); return mesh.geometry.boundingBox.getSize(new THREE.Vector3()); };
     // Sole: under it.
-    const gs = fit(sole); sole.position.set(c.x, lowY + 0.004, c.z); sole.scale.set((w * 2.1) / gs.x, 1, (sz.z + 0.03) / gs.z);
+    const gs = fit(sole); sole.position.set(c.x, lowY + 0.004, c.z); sole.scale.set((w * 1.9) / gs.x, 1, (sz.z + 0.016) / gs.z);
     // Shaft: up the shin from the ankle, wide enough for the sock's top.
     // A real calf widens above the ankle: the shaft flares to fit it (unit cylinder, top half as wide again).
     // Sized to the body: a child's wellies come to below the knee, not up to it.

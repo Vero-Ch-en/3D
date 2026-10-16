@@ -293,13 +293,18 @@ G.snowPuff = (near) => {
   for (const [x0, x1, z, y] of EAVES) { const x = G.clamp(near.x + (Math.random() - 0.5) * 6, x0, x1), dd = Math.hypot(x - near.x, z - near.z); if (dd < bd) { bd = dd; best = { x, y, z }; } }
   if (!best || bd > 9) return false;
   let n = 0;
-  for (const p of PUFF) { if (p.age < p.life) continue; p.age = 0; p.life = 0.9 + Math.random() * 0.7; p.x = best.x + (Math.random() - 0.5) * 0.5; p.z = best.z + (Math.random() - 0.5) * 0.2; p.y = best.y; p.vy = -Math.random() * 0.5; p.vx = (Math.random() - 0.5) * 0.4 + G.WIND.gust * 0.3; p.s.visible = true; if (++n > 14) break; }
+  for (const p of PUFF) { if (p.age < p.life) continue; p.age = 0; p.life = 0.9 + Math.random() * 0.7; p.x = best.x + (Math.random() - 0.5) * 0.5; p.z = best.z + (Math.random() - 0.5) * 0.2; p.y = best.y; p.vy = -Math.random() * 0.5; p.vx = (Math.random() - 0.5) * 0.4 + G.WIND.gust * 0.3; p.vz = 0; p.sz = 1; p.op = 1; p.s.visible = true; if (++n > 14) break; }
   return true;
 };
 // A burst of powder at a point (a snowball landing).
 G.puffAt = (x, y, z, n = 12) => {
   let k = 0;
-  for (const p of PUFF) { if (p.age < p.life) continue; p.age = 0; p.life = 0.5 + Math.random() * 0.5; p.x = x + (Math.random() - 0.5) * 0.15; p.z = z + (Math.random() - 0.5) * 0.15; p.y = y + (Math.random() - 0.5) * 0.15; p.vy = Math.random() * 1.2; p.vx = (Math.random() - 0.5) * 1.6; p.s.visible = true; if (++k >= n) break; }
+  for (const p of PUFF) { if (p.age < p.life) continue; p.age = 0; p.life = 0.5 + Math.random() * 0.5; p.x = x + (Math.random() - 0.5) * 0.15; p.z = z + (Math.random() - 0.5) * 0.15; p.y = y + (Math.random() - 0.5) * 0.15; p.vy = Math.random() * 1.2; p.vx = (Math.random() - 0.5) * 1.6; p.vz = (Math.random() - 0.5) * 1.6; p.sz = 1; p.op = 1; p.s.visible = true; if (++k >= n) break; }
+};
+// Powder kicked up by a boot: a few small puffs off the toe, forward and up, gone in half a second.
+G.kickAt = (x, y, z, yaw, amt = 1) => {
+  let k = 0; const n = Math.round(2 + amt * 2), fx = Math.sin(yaw), fz = Math.cos(yaw);
+  for (const p of PUFF) { if (p.age < p.life) continue; p.age = 0; p.life = 0.35 + Math.random() * 0.3; p.x = x + fx * 0.12 + (Math.random() - 0.5) * 0.08; p.z = z + fz * 0.12 + (Math.random() - 0.5) * 0.08; p.y = y + 0.04; const sp = (0.4 + Math.random() * 0.6) * amt; p.vx = fx * sp + (Math.random() - 0.5) * 0.3; p.vz = fz * sp + (Math.random() - 0.5) * 0.3; p.vy = 0.5 + Math.random() * 0.7 * amt; p.sz = 0.35 + Math.random() * 0.2; p.op = 0.8; p.s.visible = true; if (++k >= n) break; }
 };
 /* Snowballs: a packed ball flying in an arc from one hand to its target. Resolves when it lands. */
 const BALLS = [];
@@ -347,9 +352,10 @@ function updatePuffs(dt) {
   for (const p of PUFF) {
     if (p.age >= p.life) { if (p.s.visible) p.s.visible = false; continue; }
     p.age += dt; const k = p.age / p.life;
-    p.vy -= dt * 6; p.y = Math.max(G.floorAt(p.x, p.z) + 0.05, p.y + p.vy * dt); p.x += p.vx * dt;
-    p.s.position.set(p.x, p.y, p.z); p.s.scale.setScalar(0.12 + k * 0.5);
-    p.s.material.opacity = (1 - k) * 0.55;
+    p.vy -= dt * 6; p.y = Math.max(G.floorAt(p.x, p.z) + 0.02, p.y + p.vy * dt); p.x += p.vx * dt; p.z += (p.vz || 0) * dt;
+    const sz = p.sz || 1;
+    p.s.position.set(p.x, p.y, p.z); p.s.scale.setScalar((0.12 + k * 0.5) * sz);
+    p.s.material.opacity = (1 - k) * 0.55 * (p.op || 1);
   }
 }
 

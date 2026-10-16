@@ -132,16 +132,36 @@ G.buildInterior = () => {
   box(2.25, 0.12, 0.44, MAT.darkWood, fx, 1.42, 0.62, { r: 0.02 });
   box(1.0, 0.78, 0.25, G.std({ color: '#070504', roughness: 1, env: 0 }), fx, 0.42, 0.56, { cast: false });
   box(1.7, 0.06, 0.6, MAT.stone, fx, 0.03, 0.98, { cast: false });
-  const logA = cyl(0.065, 0.065, 0.6, MAT.bark, fx - 0.05, 0.13, 0.74); logA.rotation.z = Math.PI / 2; logA.rotation.y = 0.3;
-  const logB = cyl(0.06, 0.06, 0.55, MAT.bark, fx + 0.05, 0.22, 0.74); logB.rotation.z = Math.PI / 2; logB.rotation.y = -0.4;
+  // Logs that glow from underneath where they're burning (their own material: emissive with the fire).
+  const logM = MAT.bark.clone(); logM.emissive = new THREE.Color('#ff4a10'); logM.emissiveIntensity = 0;
+  const logA = cyl(0.065, 0.065, 0.6, logM, fx - 0.05, 0.13, 0.74); logA.rotation.z = Math.PI / 2; logA.rotation.y = 0.3;
+  const logB = cyl(0.06, 0.06, 0.55, logM, fx + 0.05, 0.22, 0.74); logB.rotation.z = Math.PI / 2; logB.rotation.y = -0.4;
+  const logC = cyl(0.05, 0.055, 0.5, logM, fx + 0.02, 0.17, 0.82); logC.rotation.z = Math.PI / 2 - 0.35; logC.rotation.y = 1.25;
+  // A bed of coals under them: a low mound with a slowly crawling glow.
+  const coalM = new THREE.ShaderMaterial({
+    uniforms: { uTime: { value: 0 }, uPower: { value: 1 } },
+    vertexShader: 'varying vec3 vP; void main(){ vP = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
+    fragmentShader: `uniform float uTime; uniform float uPower; varying vec3 vP;
+      float h(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453); }
+      float n(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix(h(i),h(i+vec2(1,0)),f.x), mix(h(i+vec2(0,1)),h(i+vec2(1,1)),f.x), f.y); }
+      void main(){ vec2 q = vP.xz * 9.0; float g = n(q + uTime * 0.2) * 0.65 + n(q * 2.7 - uTime * 0.35) * 0.35; float crack = smoothstep(0.35, 0.85, g) * (0.55 + 0.45 * smoothstep(0.3, 0.0, length(vP.xz) - 0.05));
+        vec3 ash = vec3(0.06, 0.05, 0.045); vec3 hot = mix(vec3(0.9, 0.18, 0.02), vec3(1.0, 0.6, 0.15), crack);
+        gl_FragColor = vec4(mix(ash, hot * (0.8 + crack * 1.4), crack * uPower), 1.0); }`,
+  });
+  const coals = new THREE.Mesh(new THREE.SphereGeometry(0.3, 20, 6, 0, Math.PI * 2, 0, Math.PI / 2), coalM);
+  coals.scale.set(1.15, 0.14, 0.42); coals.position.set(fx, 0.05, 0.7); W.add(coals);
   const fireG = new THREE.Group(); fireG.position.set(fx, 0.15, 0.74); W.add(fireG);
   const firePlanes = [];
-  for (let i = 0; i < 3; i++) {
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.72), flameMaterial('#ff7a2a'));
-    m.position.set((i - 1) * 0.14, 0.33, 0); fireG.add(m); firePlanes.push(m); FLAMES.push(m);
-  }
+  // Tongues of flame at different depths and sizes (each its own flicker), a small bright core in the middle.
+  const TONGUES = [[-0.16, 0.05, 0.34, 0.52], [0.0, -0.05, 0.42, 0.72], [0.15, 0.04, 0.32, 0.5], [-0.07, 0.1, 0.26, 0.42], [0.09, -0.1, 0.28, 0.46], [-0.24, -0.04, 0.2, 0.3], [0.24, 0.0, 0.2, 0.32]];
+  TONGUES.forEach(([x, z, w, hh], i) => {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, hh), flameMaterial(i % 3 === 1 ? '#ff6a1a' : '#ff8a32'));
+    m.position.set(x, hh * 0.46, z); m.renderOrder = 7; fireG.add(m); firePlanes.push(m); FLAMES.push(m);
+  });
+  const core = new THREE.Mesh(new THREE.PlaneGeometry(0.2, 0.26), flameMaterial('#ffd27a'));
+  core.position.set(0, 0.11, 0.02); core.renderOrder = 8; fireG.add(core); firePlanes.push(core); FLAMES.push(core);
   const fireLight = new THREE.PointLight('#ff8a3a', 0, 10, 2); fireLight.position.set(fx, 0.5, 1.35); W.add(fireLight);
-  G.FIRE = { planes: firePlanes, light: fireLight, on: true, power: 9, level: 1 };
+  G.FIRE = { planes: firePlanes, light: fireLight, on: true, power: 9, level: 1, coals: coalM, logM, lightAt: fireLight.position.clone() };
   G.INTER.push({ id: 'fire', pos: [fx, 0.6, 1.25], r: 1.3, label: () => (G.FIRE.on ? 'Fireplace' : 'Light the fire'), act: () => { G.FIRE.on = !G.FIRE.on; if (G.FIRE.on) G.say('partner', 'The fire person, at work. My hero, {giant}.'); } });
   // Mantle: candles, frames, a snow globe, a sprig of pine.
   // Mantle things sit on the shelf in front of the stone (its face is at z = 0.66), not inside it.

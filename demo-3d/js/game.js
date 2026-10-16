@@ -325,6 +325,10 @@ function updateLighting(t, dt, focus) {
   const fireShadow = G.Q.ssao && camIn && fp > 0.02;
   if (F.light.castShadow !== fireShadow) F.light.castShadow = fireShadow;
   F.light.intensity = damp(F.light.intensity, F.power * fp * fl, 12, dt);
+  // The light moves a little as the flames do, so shadows in the room breathe and dance.
+  if (F.lightAt) F.light.position.set(F.lightAt.x + Math.sin(t * 5.3) * 0.04 + Math.sin(t * 11.7) * 0.02, F.lightAt.y + Math.sin(t * 7.1) * 0.03, F.lightAt.z + Math.sin(t * 4.1) * 0.02);
+  if (F.coals) { F.coals.uniforms.uTime.value = t; F.coals.uniforms.uPower.value = Math.max(0.15 * (F.level || 0), fp) * (0.85 + (fl - 0.82) * 1.5); }
+  if (F.logM) F.logM.emissiveIntensity = 0.12 * fp * fl;
   F.planes.forEach((p, i) => { p.visible = fp > 0.02; p.material.uniforms.uPower.value = fp; p.lookAt(G.camera.position.x, p.getWorldPosition(tmpV).y, G.camera.position.z); });
   G.CAKE.light.intensity = damp(G.CAKE.light.intensity, G.CAKE.lit ? 1.4 * fl : 0, 10, dt);
   G.CAKE.flames.forEach((f) => { f.visible = G.CAKE.lit; });
@@ -1463,6 +1467,8 @@ function step(dt, t) {
       const vol = c === PLAYER ? 1 : clamp(1.3 - Math.hypot(PARTNER.x - PLAYER.x, PARTNER.z - PLAYER.z) * 0.25, 0, 0.7);
       if (vol > 0.02) G.Audio.step(surf, vol * clamp(c.speed / 1.5, 0.5, 1.4));
       if (!deck && surf !== 'ice' && G.addFootprint) G.addFootprint(e.x, e.z, e.yaw, e.leg, c === PLAYER ? 1.05 : 0.9);
+      // Walking briskly through fresh snow kicks a little powder off the toes.
+      if (!deck && surf !== 'ice' && surf !== 'rug' && !G.inside(e.x, e.z) && c.speed > 0.7 && G.kickAt && Math.random() < 0.75) G.kickAt(e.x, G.floorAt(e.x, e.z), e.z, e.yaw, clamp((c.speed - 0.5) / 2, 0.3, 1.2));
       // Boots that were in the snow leave wet prints on the boards for a while after you come in.
       if (!deck) c.snowyT = surf === 'ice' ? Math.max(c.snowyT || 0, 10) : 30; else if (c.snowyT > 0 && surf !== 'rug' && G.addWetPrint) G.addWetPrint(e.x, e.z, e.yaw, e.leg, c === PLAYER ? 1.05 : 0.9, c.snowyT / 30);
     }
