@@ -17,11 +17,12 @@ const K = (o) => ({ shot: 'keep', ...o });
 const dist = () => Math.hypot(PARTNER.x - PLAYER.x, PARTNER.z - PLAYER.z);
 const here = () => S.chapter === 'lastbirthday';
 const W = G.world, fy = (x, z) => G.floorAt(x, z);
-const CIRCLE = { x: -3.6, z: 45.0 };
+const CIRCLE = { x: -3.6, z: 45.0 };   // where the real one waits (out on the frozen lake instead, if it kept her)
+const kept = () => !!S.flags.keptHer;
 const GATE = { x: 6.5, z: 9.6 };          // the bottom of the porch path: it asks you not to go
 const EXIT = { x: 1.6, z: 27.5 };         // the door in the snow, in the meadow, on the way home
 const trust = (n) => { S.vars.trust = (S.vars.trust || 0) + n; };
-const accepted = () => (S.vars.corruption || 0) + (S.flags.wentBack ? 0.5 : 0) + (S.flags.ateBreakfast ? 0.5 : 0);
+const accepted = () => (S.vars.taken || 0) * 0.35 + (S.vars.corruption || 0) + (S.flags.wentBack ? 0.5 : 0) + (S.flags.ateBreakfast ? 0.5 : 0);
 const E = (t, o) => N('“' + t + '”', o);   // the Entity speaks without a body, mostly
 const fade = async (on, sec = 1.6, col = '#000') => { const f = G.$('fade'); f.style.background = col; f.style.transition = 'opacity ' + sec + 's'; if (on) f.classList.add('on'); else f.classList.remove('on'); await wait(sec + 0.1); if (!on) { f.style.transition = ''; f.style.background = ''; } };
 
@@ -67,11 +68,50 @@ const ENT = (() => {
 
 const MUG3 = (() => { const m = G.cyl(0.04, 0.035, 0.09, G.shared({ color: '#e8e2d6', roughness: 0.4 }), 13.42, 0.97, -1.98, { seg: 14 }); m.rotation.x = Math.PI; m.visible = false; return m; })();
 (G.onJump = G.onJump || []).push(() => { SIGN.g.visible = false; TRAIL.g.visible = false; EXD.g.visible = false; ENT.g.visible = false; MUG3.visible = false; G.WALK && G.WALK.showCircle(false); });
+/* ---------- what it takes: a memory at a time. A scrapbook page goes blank; the photograph loses one of them. ---------- */
+G.take = () => {
+  S.vars.taken = (S.vars.taken || 0) + 1;
+  const pages = S.scrap.filter((p) => !p.taken && !/^end_/.test(p.art));
+  const p = pages.length ? pages[Math.floor(Math.random() * pages.length)] : null;
+  if (p) p.taken = true;
+  if (S.vars.taken === 1 && G.EVE && G.EVE.photo) {
+    const m = G.EVE.photo.material.map; if (m && m.image && m.image.getContext) { const x = m.image.getContext('2d'), c = x.getImageData(150, 110, 1, 1).data, g = x.getImageData(150, 200, 1, 1).data; x.fillStyle = `rgb(${c[0]},${c[1]},${c[2]})`; x.fillRect(132, 112, 27, 56); x.fillStyle = `rgb(${g[0]},${g[1]},${g[2]})`; x.fillRect(132, 168, 27, 18); m.needsUpdate = true; }
+  }
+  G.observe('take', p ? 'I took “' + (p.caption || p.art).slice(0, 40) + '”. It was mine anyway.' : 'I took something small.');
+  return p;
+};
+
+/* ---------- Replaced: it takes your place. You watch from outside. ---------- */
+CH.ending_replaced = async () => {
+  checkpoint('ending_replaced'); home(false); STATE.watchDoor = false;
+  for (const L of G.LAMPS) L.on = true;
+  G.setTime({ day: 0, tod: 1, snow: 0.6 }, true); G.WEATHER.hold = 'snow';
+  setBreakfast({ plates: true, mugs: true });
+  const ch = G.KITCHEN.chairs;
+  G.sitAt(PLAYER, ch.B.x, ch.B.z, ch.B.yaw, ch.B.seatY || 0.49); G.sitAt(PARTNER, ch.A.x, ch.A.z, ch.A.yaw, ch.A.seatY || 0.49); PARTNER.mode = 'seated';
+  // From outside, through the window by the table, in the snow.
+  const shot = fixed(V(13.2, 1.55, 6.3), V(13.0, 1.0, 3.2), 34, 0.012);
+  G.setShot(shot);
+  await wait(0.3); fade(false, 2.2);
+  await N('(Breakfast. Two plates. Two mugs, the handles turned the same way.)', { shot });
+  await P('You’re quiet this morning.', { shot });
+  await N('(“I’m happy,” it says, in your voice.)', { shot });
+  await P('You’re never happy before coffee.', { shot });
+  await N('(“I am now.”)', { shot });
+  await N('(She laughs. It laughs at exactly the same moment.)', { shot });
+  await N('(Outside, in the snow, you watch through the glass. Your hands are very cold. Nobody looks up.)', { shot });
+  const c = await choose(['Knock on the glass', 'Whistle', 'Say nothing']);
+  if (c === 0) { await N('(You knock. The sound doesn’t carry. It glances at the window anyway, and then back at her, and smiles.)', { shot }); }
+  else if (c === 1) { G.Audio.whistle(1.0, 0.5); await wait(1.6); await N('(Three notes. Inside, she stops, her cup halfway to her mouth.)', { shot }); await N('(It puts its hand over hers. After a moment she drinks her tea.)', { shot }); }
+  else await N('(You stay where you are until the window fogs over.)', { shot });
+  await N('(It will remember everything for both of you. It said it would.)', { shot });
+  showEnd('replaced', 'Replaced');
+};
 /* ---------- the endcard learns the ending's name ---------- */
 G.endingName = null;
 const showEnd = (id, title) => {
   try { const k = 'snowed.endings', a = JSON.parse(localStorage.getItem(k) || '[]'); if (!a.includes(id)) a.push(id); localStorage.setItem(k, JSON.stringify(a)); } catch (e) { /* */ }
-  G.observe('ending_' + id, { foundme: 'It found the real one. I will remember how.', uncertain: 'It went home. It is not sure who with. Neither am I.', iknow: 'It does not know. It chose anyway. I did not plan for that.', perfect: 'It stayed with me. Every day is lovely.', stay: 'It stayed. I will remember it for both of us.' }[id]);
+  G.observe('ending_' + id, { foundme: 'It found the real one. I will remember how.', uncertain: 'It went home. It is not sure who with. Neither am I.', iknow: 'It does not know. It chose anyway. I did not plan for that.', perfect: 'It stayed with me. Every day is lovely.', replaced: 'I am him now. She hasn’t noticed. She will not.', stay: 'It stayed. I will remember it for both of us.' }[id]);
   G.$('endEyebrow').textContent = title;
   STATE.nightDone = true; STATE.busy = false; STATE.ending = id;
   addScrap('end_' + id, title + '.');
@@ -94,7 +134,8 @@ CH.lastbirthday = async () => {
   houseFor('evening'); G.FIRE.level = 0.8;
   for (const L of G.LAMPS) { if (L.power0 != null) L.power = L.power0; L.on = true; }
   setBreakfast({ plates: true, mugs: true });     // perfectly round, nobody's bitten anything
-  G.WALK && G.WALK.showCircle(true);
+  if (kept()) { CIRCLE.x = 7.5; CIRCLE.z = 52.0; } else { CIRCLE.x = -3.6; CIRCLE.z = 45.0; }
+  G.WALK && G.WALK.showCircle(!kept());
   TRAIL.g.visible = true; SIGN.g.visible = true; for (const k of ['cones', 'plate', 'note']) SIGN[k].visible = false;
   SIGN[{ pinecones: 'cones', pancake: 'plate', note: 'note' }[S.flags.sign || 'pinecones']].visible = true;
   EXD.g.visible = true; EXD.hinge.rotation.y = 0; EXD.glow.material.opacity = 0.0; EXD.light.intensity = 0; ENT.g.visible = false;
@@ -163,16 +204,25 @@ const NIGHTT = {}, A4 = {};
 async function gate() {
   STATE.busy = true; PARTNER.mode = 'still';
   G.gaze(PARTNER, [PLAYER.x, PLAYER.y + 1.6, PLAYER.z], 6);
-  if (S.flags.gateN) await P('…Again?');
+  const ob = (S.vars.corruption || 0) + (S.vars.taken || 0) * 0.5;
+  if (S.flags.gateN) await P(ob >= 2 ? 'Again. You keep doing this.' : '…Again?');
   else { await P('…You’re still looking for them.'); await P('I’m right here.'); }
   S.flags.gateN = (S.flags.gateN || 0) + 1;
-  const c = await choose(['Keep walking', 'Go back with it']);
+  let c = await choose(['Keep walking', 'Go back with it']);
+  if (c === 0 && ob >= 2) {
+    // It doesn't let go the first time.
+    await N('(Its hand is on your arm. You didn’t see it move.)');
+    await P(kept() ? 'She isn’t out there. I made sure. There’s only me now.' : 'No. You don’t get to leave me in the snow. Not after everything I remember for you.');
+    c = await choose(['Pull your arm away', 'Go back with it']);
+  }
   if (c === 0) {
     await P('I’ll wait. I’m good at waiting. I learned it from you.');
     S.flags.fakeLeftBehind = true; PARTNER.mode = 'still';
     G.observe('gate_left', 'It left me at the bottom of the path. I waited.');
   } else {
     if (!S.flags.wentBack) S.flags.wentBack = true;
+    S.flags.wentBackN = (S.flags.wentBackN || 0) + 1;
+    if (S.flags.wentBackN >= 2 && ob >= 1.5) { await P('Good. Now stay.'); STATE.busy = false; await fade(true, 1.8); return A.go('ending_replaced'); }
     await P('Good. Home.');
     await G.cutTo(() => { G.standAt(PLAYER, 6.5, 5.2, Math.PI); G.standAt(PARTNER, 7.1, 5.4, Math.PI); G.CAM.cut = true; }, 0.4);
     PARTNER.mode = 'follow';
@@ -251,6 +301,7 @@ inter('aBreakfast', [13.0, 0.9, 3.1], 1.1, 'Breakfast', async () => {
   S.flags.ateBreakfast = true;
   const ch = G.KITCHEN.chairs;
   await G.cutTo(() => { G.sitAt(PLAYER, ch.B.x, ch.B.z, ch.B.yaw, ch.B.seatY || 0.49); if (fake) { G.sitAt(PARTNER, ch.A.x, ch.A.z, ch.A.yaw, ch.A.seatY || 0.49); PARTNER.mode = 'seated'; } G.setShot(fixed(V(13.0, 1.4, 1.55), V(13.0, 0.98, 3.4), 42, 0.01)); STATE.sceneShot = true; }, 0.4);
+  if (kept()) { await N('(Nobody comes through the door. Nobody is coming.)', K()); await fade(true, 1.8); return A.go('ending_replaced'); }
   if ((S.vars.bond || 0) >= 6 && accepted() < 2 && !S.flags.rescued) return rescue();
   await N('(It tastes exactly right. It tastes exactly the way you remember it tasting.)', K());
   S.flags.ending = 'perfect';
@@ -294,7 +345,8 @@ async function reunion() {
     G.standAt(PLAYER, px, pz, a + Math.PI);
     G.setShot(fixed(V(px + Math.sin(a) * 2.2 + 1.2, fy(px, pz) + 1.7, pz + Math.cos(a) * 2.2), V(CIRCLE.x, fy(CIRCLE.x, CIRCLE.z) + 0.7, CIRCLE.z), 44, 0.01)); STATE.sceneShot = true;
   }, 0.5);
-  await N('(In the ring of summer in the snow, cross-legged in the grass, exactly where someone small once sat.)', K());
+  await N(kept() ? '(Out on the frozen lake, sitting on the ice with her knees up, a long way from anywhere. Her lips are blue.)' : '(In the ring of summer in the snow, cross-legged in the grass, exactly where someone small once sat.)', K());
+  if (kept()) { await P('It put me back in bed. Three times. The third time I stayed.', K()); await P('Then I woke up out here. I’ve been whistling for hours.', K()); }
   await N('(Neither of you moves first.)', K());
   const c = await choose(['“What did I say? The first time?”', '“Found you.”', 'Walk over']);
   if (c === 0) {
@@ -315,7 +367,7 @@ async function reunion() {
     else await N('(She looks at your hand for a long second. Then she takes it and squeezes, exactly the wrong amount, exactly the way she always does.)', K());
   }
   await G.cutTo(() => { PARTNER.sitTarget = PARTNER.sit = 0; const a = Math.atan2(PLAYER.x - CIRCLE.x, PLAYER.z - CIRCLE.z); G.sitAt(PARTNER, CIRCLE.x - 0.3, CIRCLE.z, Math.PI / 2 + 0.3, fy(CIRCLE.x, CIRCLE.z) + 0.05); G.sitAt(PLAYER, CIRCLE.x + 0.35, CIRCLE.z + 0.1, -Math.PI / 2 - 0.2, fy(CIRCLE.x, CIRCLE.z) + 0.05); PARTNER.mode = 'seated'; G.setShot(fixed(V(CIRCLE.x + 0.2, fy(CIRCLE.x, CIRCLE.z) + 1.3, CIRCLE.z + 2.6), V(CIRCLE.x, fy(CIRCLE.x, CIRCLE.z) + 0.6, CIRCLE.z), 40, 0.01)); }, 0.5);
-  await N('(You sit down next to her. The grass is warm. It smells like July.)', K());
+  await N(kept() ? '(You sit down next to her on the ice. She is shaking. You put your coat round both of you.)' : '(You sit down next to her. The grass is warm. It smells like July.)', K());
   const n = S.flags.trailN || 0;
   if (n >= 2) { await P('You followed them. My things.', K()); await Y('You dropped a mitten.', K()); await P('I PLACED a mitten. There’s a difference. I was very cold about it.', K()); trust(0.4); }
   else if (n === 1) { await P('Did you see anything I left? I left you things. I was very clever about it.', K()); await Y('One thing.', K()); await P('One. I left a whole trail, Partner.', K()); }
@@ -331,7 +383,7 @@ async function reunion() {
   await Y('The floor is cold.', K());
   await P('The floor is cold. That’s when I knew.', K());
   await N('(Out past the edge of the grass, the snow goes on falling, very slowly.)', K());
-  await N('(In the grass between you, two sets of small footprints, stopping toe to toe.)', K());
+  await N(kept() ? '(In the frost on the ice between you, two sets of small footprints, stopping toe to toe.)' : '(In the grass between you, two sets of small footprints, stopping toe to toe.)', K());
   const q = await choose(['“Do you think that’s us?”', 'Say nothing', 'Put your hand in the footprint']);
   if (q === 0) { await P('I think we’ve been here before. A long time ago. I think one of us waited.', K()); await Y('Which one?', K()); await P('I don’t remember. I hope it was you. I hope you were very patient and very cold.', K()); }
   else if (q === 1) { await N('(She leans against you. Neither of you says anything for a while. It is the best part of the day.)', K()); addBond(0.4); }

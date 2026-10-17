@@ -178,12 +178,66 @@ function nightLoops(run) {
     if ((PLAYER.speed || 0) < 0.2 && d < 2.4 && facing && !PLAYER.lie && !(PLAYER.sit > 0.1)) { stare += dt; if (stare > 5) { stare = -6; suspect(1, 'stare'); G.bark('…What?', 1.6); } }
     else stare = Math.max(0, stare - dt);
     if ((PLAYER.speed || 0) > 2.4 && d < 3.2) { NIGHT.runT = (NIGHT.runT || 0) + dt; if (NIGHT.runT > 1.2) { NIGHT.runT = -8; suspect(0.5, 'run'); } }
-    if ((S.vars.suspicion || 0) >= 3 && !S.flags.fakeWithdrawn) withdraw();
+    if ((S.vars.suspicion || 0) >= 3 && !S.flags.fakeWithdrawn && !NIGHT.slipping) A.run(slip);
   });
+  // The more you've let it convince you, the closer it keeps you, and the more it says so.
+  (async () => {
+    const lines = [
+      ['Don’t go far.', 'Where are you going?', 'Stay where I can see you.'],
+      ['I like it when you’re close. Closer.', 'You don’t need to go in there. Everything you need is here.', 'You keep looking at the door.'],
+      ['I’ll remember all of it for you. You don’t have to.', 'You’re mine to keep warm. Mine.', 'Nobody else gets to have this. Not even her.'],
+    ];
+    while (live()) {
+      await wait(26 - Math.min(14, (S.vars.corruption || 0) * 4) + Math.random() * 8);
+      if (!live() || PARTNER.hidden || PARTNER.lie || G.busy() || S.flags.fakeWithdrawn) continue;
+      const lv = Math.min(2, Math.floor(S.vars.corruption || 0));
+      if (lv < 1 && dist() < 5) continue;
+      G.bark(lines[lv][Math.floor(Math.random() * 3)], 2.8);
+      if (lv >= 2 && dist() > 2) { PARTNER.mode = 'script'; await G.walkTo(PARTNER, PLAYER.x + 0.5, PLAYER.z + 0.3, 1.5); if (live() && !S.flags.fakeWithdrawn) PARTNER.mode = 'follow'; }
+    }
+  })();
   // A hint, if you've heard the whistle and stood about a while.
   (async () => { await wait(70); if (live() && NIGHT.whistles > 0 && !G.busy()) G.hint('(The whistling seems to come from the kitchen.)', 6); })();
 }
-// Too watched: she goes back to bed, and lies there with her eyes open.
+// Too watched: it stops pretending, for a moment. Then you wake up in bed an hour later, and something is gone.
+// The third time, it doesn't let you wake up as yourself.
+async function slip() {
+  NIGHT.slipping = true; STATE.busy = true;
+  S.vars.slips = (S.vars.slips || 0) + 1;
+  const n = S.vars.slips, o = S.obs || {};
+  for (const L of G.LAMPS) if (L.on) L.power *= 0.25;
+  G.Audio.thud && G.Audio.thud();
+  await wait(0.5);
+  // It's right behind you.
+  const bx = PLAYER.x - Math.sin(PLAYER.yaw) * 0.7, bz = PLAYER.z - Math.cos(PLAYER.yaw) * 0.7;
+  G.standAt(PARTNER, bx, bz, PLAYER.yaw); PARTNER.mode = 'still'; PARTNER.lidsClosed = false; PARTNER.noBlink = true;
+  G.gaze(PARTNER, [PLAYER.x, PLAYER.y + 1.6, PLAYER.z], 8);
+  const knows = o.corrupt_fire ? 'You put a log on the fire for me. Two, actually. I counted.' : o.gift ? 'You always shake things. Snow globes. Presents. Me.' : 'You checked the sink. Then the window. Then me.';
+  const said = [
+    ['Stop looking at me like that.', knows],
+    ['You’re doing it again.', 'I was being so good. I was being exactly right.'],
+    ['No.', 'I’m keeping you.'],
+  ][Math.min(2, n - 1)];
+  await N('(Her voice is very flat. Her eyes don’t move from you.)');
+  for (const t of said) await P(t);
+  PARTNER.noBlink = false;
+  const f = G.$('fade'); f.style.background = '#000'; f.style.transition = 'opacity 0.5s'; f.classList.add('on'); await wait(1.4);
+  for (const L of G.LAMPS) if (L.power0 != null) L.power = L.on && L.power < 0.5 ? L.power * 4 : L.power;
+  if (n >= 3) { f.style.transition = ''; NIGHT.slipping = false; return A.go('ending_replaced'); }
+  // An hour later. Back in bed. It's beside you, awake.
+  G.lieDown(PLAYER, B().L, -0.14, 0.15, 0.35); G.lieDown(PARTNER, B().R, -0.40, 0, 0); PARTNER.mode = 'lying'; PARTNER.lidsClosed = false;
+  S.vars.suspicion = 1; S.flags.upT = 0;
+  STATE.sceneShot = true; G.setShot(bedClose());
+  const lost = G.take ? G.take() : null;
+  f.style.transition = 'opacity 1.6s'; f.classList.remove('on'); await wait(1.8); f.style.transition = ''; f.style.background = '';
+  await N('(You’re in bed. The clock says it’s an hour later. You don’t remember lying down.)', K());
+  if (lost) await N('(Something is missing. You can’t think what.)', K());
+  await P(n === 1 ? 'Bad dream?' : 'You keep getting up. I keep bringing you back.', K());
+  STATE.sceneShot = false; G.releaseCamera(); G.CAM.cut = true;
+  STATE.busy = false; NIGHT.slipping = false;
+  // It gets up when you do, sooner this time.
+  A.run(async () => { await until(() => !night() || !PLAYER.lie); if (!night()) return; await wait(3); if (!night()) return; G.standAt(PARTNER, B().R + 0.6, 0.2, Math.PI / 2); PARTNER.mode = 'follow'; });
+}
 async function withdraw() {
   S.flags.fakeWithdrawn = true;
   G.bark('I’m going back to bed, Partner. You should too.', 3);
@@ -320,7 +374,7 @@ G.swapBodies = () => {
 };
 async function elsewhere() {
   const f = G.$('fade'); f.style.background = S.flags.sleptBeside ? '#000' : '#dfe9f5'; f.style.transition = 'opacity 1.6s'; f.classList.add('on'); await wait(1.8);
-  STATE.busy = true; STATE.sceneShot = false; NIGHT.left = false; NIGHT.outside = false;
+  STATE.busy = true; STATE.sceneShot = false; NIGHT.left = false; NIGHT.outside = false; NIGHT.kept = false; NIGHT.hiding = null; S.vars.caught = 0;
   NIGHT.door.visible = false; STATE.bounds = { zMin: -5, zMax: 4.3 };
   G.swapBodies();
   // Earlier, the same night. She's up for water. He's asleep.
@@ -353,9 +407,11 @@ async function elsewhere() {
   await N('(He doesn’t wait for you.)');
   STATE.busy = false;
   NIGHT.canWhistle = true;
+  hunt(S.run);
   const wh = () => G.hint(G.MOBILE ? 'Any window in the kitchen: tap Use to whistle.' : 'Any window in the kitchen: ' + G.keyFor('interact') + ' to whistle.', 7);
   wh(); (async () => { for (let i = 0; i < 20 && !S.flags.povWhistled; i++) { await wait(25); if (!S.flags.povWhistled && NIGHT.canWhistle && !G.busy()) wh(); } })();
-  await until(() => S.flags.povWhistled && !G.busy());
+  await until(() => (S.flags.povWhistled && !G.busy()) || NIGHT.kept);
+  if (NIGHT.kept) return;
   STATE.busy = true;
   await N('(You leave him something. Just in case.)');
   const s = await choose(['Line the pinecones up along the windowsill', 'Leave half a pancake, one enormous bite out of it', 'Write on a page of the scrapbook']);
@@ -367,7 +423,8 @@ async function elsewhere() {
   STATE.busy = false; STATE.bounds = null; NIGHT.outside = true;
   G.hint('Out through the front door.', 6);
   (async () => { for (let i = 0; i < 20 && NIGHT.outside && !NIGHT.left; i++) { await wait(25); if (NIGHT.outside && !NIGHT.left && !G.busy()) G.hint('Out through the front door, into the snow.', 6); } })();
-  await until(() => PLAYER.z > 4.75 || (Math.hypot(PLAYER.x - G.FRONT_DOOR.x, PLAYER.z - G.FRONT_DOOR.z) < 0.7));
+  await until(() => NIGHT.kept || PLAYER.z > 4.75 || (Math.hypot(PLAYER.x - G.FRONT_DOOR.x, PLAYER.z - G.FRONT_DOOR.z) < 0.7));
+  if (NIGHT.kept) return;
   NIGHT.left = true;
   STATE.busy = true;
   f.style.background = '#ffffff'; f.style.transition = 'opacity 2.2s'; f.classList.add('on'); await wait(2.4);
@@ -376,6 +433,77 @@ async function elsewhere() {
   STATE.busy = false;
   return A.go('lastbirthday');
 }
+// It comes back for her. Sooner, and faster, the more it got its way with him earlier.
+function hunt(run) {
+  const live = () => S.run === run && !NIGHT.left && !NIGHT.kept;
+  const ob = () => Math.min(3, S.vars.corruption || 0);
+  (async () => {
+    while (live()) {
+      await wait(Math.max(8, 26 - ob() * 5));
+      if (!live()) return;
+      await until(() => !live() || !G.busy());
+      if (!live()) return;
+      // Footsteps from the bedroom. The lights in the kitchen dip.
+      for (let i = 0; i < 4; i++) { G.Audio.step('wood', 0.6); await wait(0.45); }
+      if (!live()) return;
+      PARTNER.hidden = false; PARTNER.m.visible = true; PARTNER.mode = 'script'; G.placeChar(PARTNER, 5.8, 1.2, Math.PI / 2);
+      G.bark(['Partner?', 'Where did you go?', 'I know you’re in here.'][Math.min(2, S.vars.caught || 0)], 2.2);
+      const t0 = G.simT, spd = 0.85 + ob() * 0.2;
+      let lostT = 0;
+      while (live() && G.simT - t0 < 40) {
+        const hid = !!NIGHT.hiding, d = Math.hypot(PLAYER.x - PARTNER.x, PLAYER.z - PARTNER.z);
+        if (!hid && d < 0.95 && !G.busy()) { await caught(); break; }
+        if (hid) lostT += 0.5; else lostT = 0;
+        if (lostT > 6) break;   // it can't find her: it goes back to wait for her
+        if (hid) G.walkTo(PARTNER, 12.2 + Math.random() * 1.4, 1.0 + Math.random() * 2, spd * 0.7);
+        else G.walkTo(PARTNER, PLAYER.x, PLAYER.z, spd);
+        await wait(0.5);
+      }
+      if (!live()) return;
+      if (!PARTNER.hidden && !NIGHT.kept) { G.bark('Come back to bed when you’re ready.', 2.4); await G.walkTo(PARTNER, 5.6, 1.2, spd); PARTNER.hidden = true; PARTNER.m.visible = false; }
+    }
+  })();
+}
+async function caught() {
+  STATE.busy = true; NIGHT.hiding = null;
+  S.vars.caught = (S.vars.caught || 0) + 1;
+  const n = S.vars.caught;
+  PARTNER.script = null; PARTNER.mode = 'still';
+  G.gaze(PARTNER, [PLAYER.x, PLAYER.y + 1.5, PLAYER.z], 6); G.gaze(PLAYER, [PARTNER.x, PARTNER.y + 1.7, PARTNER.z], 6);
+  await N('(His hand closes round your wrist. A little too hard.)');
+  await Y(['There you are. Come back to bed.', 'You keep wandering off. I don’t like it when you wander off.', 'Stay.'][Math.min(2, n - 1)]);
+  G.observe('caught', ['I found her in the kitchen. I brought her back.', 'She wandered again. I brought her back again.', 'She stays now.'][Math.min(2, n - 1)]);
+  const f = G.$('fade'); f.style.background = '#000'; f.style.transition = 'opacity 0.8s'; f.classList.add('on'); await wait(1.6);
+  if (n >= 3) {
+    NIGHT.kept = true; S.flags.keptHer = true; NIGHT.canWhistle = false;
+    G.lieDown(PLAYER, B().R, -0.40, 0, 0); G.lieDown(PARTNER, B().L, -0.14, 0, 0); PARTNER.mode = 'lying';
+    STATE.sceneShot = true; G.setShot(bedClose());
+    f.classList.remove('on'); await wait(1.0);
+    await N('(You lie down on your side. Exactly on your side.)', K());
+    await N('(Beside you, he says goodnight three times, the same way each time.)', K());
+    await N('(Somewhere, very far off, the snow keeps falling. You stop listening for him.)', K());
+    f.classList.add('on'); await wait(2.2); f.style.transition = '';
+    G.swapBodies(); G.post.grade.uniforms.uMem.value = 0;
+    addScrap('kept', 'A page that should be about the kitchen at night. It’s been left blank.');
+    STATE.busy = false;
+    return A.go('lastbirthday');
+  }
+  // Back to the kitchen: she slips out again. Something is gone.
+  G.standAt(PLAYER, 13.05, -1.25, Math.PI); PARTNER.hidden = true; PARTNER.m.visible = false;
+  const lost = G.take ? G.take() : null;
+  f.classList.remove('on'); await wait(1.0); f.style.transition = ''; f.style.background = '';
+  await N(lost ? '(Later. The kitchen again. You slipped away when he fell asleep. Something is missing; you can’t think what.)' : '(Later. The kitchen again. You slipped away when he fell asleep.)');
+  STATE.busy = false;
+}
+// Somewhere to hide from it in the dark house: the curtains of the window seat, and the study.
+const hideAct = (where) => async () => {
+  if (NIGHT.hiding) { NIGHT.hiding = null; STATE.noControl = false; await N('(You come out.)'); return; }
+  NIGHT.hiding = where; STATE.noControl = true;
+  await N(where === 'nook' ? '(You fold yourself into the window seat behind the curtain, knees up, and keep very still.)' : '(You slip into the study and stand behind the door, in the dark.)');
+};
+inter('eHideNook', [10.05, 0.8, -1.3], 1.1, () => (NIGHT.hiding === 'nook' ? 'Come out' : 'Hide behind the curtain'), hideAct('nook'), () => S.chapter !== 'lastbirthday' && NIGHT.swapped && !NIGHT.left && !NIGHT.kept && (!NIGHT.hiding || NIGHT.hiding === 'nook'));
+inter('eHideStudy', [14.35, 0.8, 3.85], 1.0, () => (NIGHT.hiding === 'study' ? 'Come out' : 'Hide in the study'), hideAct('study'), () => S.chapter !== 'lastbirthday' && NIGHT.swapped && !NIGHT.left && !NIGHT.kept && (!NIGHT.hiding || NIGHT.hiding === 'study'));
+
 // Elsewhere on its own (for the chapter list): the night house, then straight through the door.
 CH.elsewhere = async () => {
   checkpoint('elsewhere');

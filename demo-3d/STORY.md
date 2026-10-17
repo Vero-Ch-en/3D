@@ -176,3 +176,12 @@ The closing card is set in the config (`closing`): by default,
 - *The Last Birthday* becomes *The Same Day*; *The First Snow* ending becomes
   *The Thaw*.
 - The 2D game itself is unchanged and still tells the birthday version.
+
+## The Entity, darker (build 46): harsher consequences
+It grows more **obsessive the more you've been convinced** (corruption, plus memories it has taken).
+- **The night:** possessive lines come more often and get worse ("Don't go far." → "You keep looking at the door." → "You're mine to keep warm. Mine."). At high corruption it walks right up to you.
+- **The mask slips:** when suspicion reaches 3, the lights dip and it's right behind you, flat-voiced and unblinking, saying something it shouldn't know. You wake in bed an hour later and **a memory is taken**. **The third slip leads to *Replaced*.**
+- **Memories taken** (`G.take`): a scrapbook page goes blank, and the first time, one of the two children disappears from the photograph. Each one counts towards the darker endings.
+- **Elsewhere:** after he leaves, it **comes back hunting for her**, sooner and faster the more it convinced him earlier. She can hide behind the window-seat curtain or in the study. If caught, it takes her wrist ("There you are. Come back to bed."), takes a memory and she slips out again. **Caught three times, it keeps her:** she lies back down beside it, and in Act IV the real one is out on the frozen lake, blue-lipped, instead of in the summer circle.
+- **Act IV gate:** when it's obsessive, it grabs your arm the first time ("You don't get to leave me in the snow"). Going back with it twice while convinced leads to *Replaced*. If it kept her, sitting down to its breakfast leads to *Replaced* (nobody comes through the door).
+- **New ending, *Replaced*:** breakfast seen from outside through the kitchen window. It sits in your place, speaking in your voice. You can knock, whistle (she pauses, and it puts its hand over hers) or say nothing.

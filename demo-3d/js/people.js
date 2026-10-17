@@ -1061,6 +1061,7 @@ G.animate = (c, dt, t) => {
   else if ((c.holdW || 0) > 0.01 && c.holdWith && c.holdWith.m && c.holdArm != null && c.holdWith.holdArm != null) holdIK(c, u, c.holdW);
   // Blinks on a natural, irregular rhythm (sometimes a double blink).
   c.blinkT = (c.blinkT == null ? Math.random() * 3 : c.blinkT) - dt;
+  if (c.noBlink) c.blinkT = Math.max(c.blinkT, 1);   // the imitation, when it stops pretending
   if (c.blinkT < -0.13) c.blinkT = Math.random() < 0.15 ? 0.18 : 2 + Math.random() * 4.5;
   const shut = c.lidsClosed || c.blinkT < 0;
   if (u.realLids) u.realLids.forEach((ld) => (ld.visible = shut));

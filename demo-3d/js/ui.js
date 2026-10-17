@@ -174,7 +174,7 @@ UI.scrapbook = (pages) => new Promise((res) => {
   at -= at % 2;
   const render = () => {
     const pic = (p) => (p.src ? `<img class="photo" alt="" src="${esc(p.src)}">` : `<canvas width="220" height="190" data-art="${esc(p.art)}"></canvas>`);   // photographs you took, or a little painting
-    const page = (p) => (p ? `<div class="scrap-page">${pic(p)}<div class="scrap-cap">${esc(G.fmt(p.caption))}</div></div>` : '<div class="scrap-page"><div class="scrap-empty">(Room for more.)</div></div>');
+    const page = (p) => (p && p.taken ? '<div class="scrap-page taken"><div class="scrap-empty">&nbsp;</div></div>' : p ? `<div class="scrap-page">${pic(p)}<div class="scrap-cap">${esc(G.fmt(p.caption))}</div></div>` : '<div class="scrap-page"><div class="scrap-empty">(Room for more.)</div></div>');
     box.innerHTML = `<div class="scrap-book">${page(pages[at])}${page(pages[at + 1])}<div class="scrap-nav"><button class="btn" data-k="prev" ${at <= 0 ? 'disabled' : ''}>←</button><button class="btn" data-k="close">Close</button><button class="btn" data-k="next" ${at + 2 >= pages.length ? 'disabled' : ''}>→</button></div></div>`;
     box.querySelectorAll('canvas').forEach((cv) => paintSnap(cv, cv.dataset.art));
     box.querySelector('[data-k=prev]').onclick = () => { if (at > 0) { at -= 2; render(); } };
