@@ -124,7 +124,7 @@ CH.walk = async () => {
   await G.UI.card(['The walk.'], { hold: 2.4 });
   await N('(Boots, coats, scarves wound twice. The snow has stopped, and the whole clearing is new.)', K());
   await P('Fresh snow. Nobody’s walked here but us.', K());
-  await P('The meadow first. Then the hill. Then the lake. I have a plan, Partner, and I intend to follow it.', K());
+  await P('The meadow first. Then the hill. Then the lake. I have a plan, {toHim}, and I intend to follow it.', K());
   STATE.sceneShot = false; G.releaseCamera(); G.CAM.cut = true;
   STATE.busy = false; STATE.bounds = { zMin: 8.2 };   // the cabin can wait: no going back in until the walk is done
   PARTNER.mode = 'follow';
@@ -141,7 +141,7 @@ CH.walk = async () => {
     }
   })();
   // She leads to the end of the path; the walk's beats follow on as you reach them.
-  await lead(6.3, 31.5, ['The meadow, Partner! It’s just past the end of the path.', 'Keep up. Snow waits for no one.']);
+  await lead(6.3, 31.5, ['The meadow, {toHim}! It’s just past the end of the path.', 'Keep up. Snow waits for no one.']);
   if (!live()) return;
   await meadow(); if (!live()) return;
   await hill(); if (!live()) return;
@@ -191,7 +191,7 @@ async function meadow() {
     const hoff = 0.2 + Math.random() * 1.1, b = Math.random() * Math.PI * 2, hx = STUMP.x + Math.cos(b) * hoff, hz = STUMP.z + Math.sin(b) * hoff;
     await arc(CONES[i * 2 + 1], handOf(p), V(hx, fy(hx, hz) + 0.03, hz), 0.7, 1.1); G.puffAt(hx, fy(hx, hz) + 0.05, hz, 6);
     hers.push(hoff);
-    G.bark(hoff < off ? pick(['Ha!', 'Closer. Obviously.', 'Watch and learn, Partner.']) : pick(['Bother.', 'The wind took it.', 'That one was a practice throw.']), 1.8);
+    G.bark(hoff < off ? pick(['Ha!', 'Closer. Obviously.', 'Watch and learn, {dear}.']) : pick(['Bother.', 'The wind took it.', 'That one was a practice throw.']), 1.8);
     await wait(0.8);
   }
   const best = Math.min(...mine), hb = Math.min(...hers), won = best < hb;
@@ -203,7 +203,7 @@ async function meadow() {
   } else {
     addBond(0.3);
     await N('(Her best pinecone is nearest the stump. She does a small, dignified victory dance.)', K());
-    await P('My gloves, please, Partner. Carry them carefully. They’ve seen victory.', K());
+    await P('My gloves, please, {toHim}. Carry them carefully. They’ve seen victory.', K());
   }
   p.mode = 'follow'; p.stillLook = null;
   addScrap('pinecones', won ? 'The pinecone contest. You won, by about a pinecone. (She asked for a recount.)' : 'The pinecone contest. She won, and did a small, dignified dance.');
@@ -238,7 +238,7 @@ async function hill() {
   });
   await N('(From up here you can see all of it: the cabin, small and smoking, the meadow, the lake gone white, the mountains.)', K());
   p.tiltTarget = -0.2;
-  await P('Can I ask you something, Partner?', K());
+  await P('Can I ask you something, {toHim}?', K());
   await P('Do you think we’re the same people we were, when we were kids?', K());
   const c = await choose(['“No. Better.”', '“Mostly. You still cheat.”', '“I hope we keep changing.”']);
   if (c === 0) { addBond(0.6); await P('Better. I’ll take better.', K()); }
@@ -258,7 +258,7 @@ async function hill() {
   });
   STATE.busy = false;
   G.bark('The lake next. Down we go. Carefully. Mostly carefully.', 3);
-  await lead(SHORE.x - 0.3, SHORE.z - 0.6, ['The lake, Partner! Before the light goes.', 'Down here!']);
+  await lead(SHORE.x - 0.3, SHORE.z - 0.6, ['The lake, {dear}! Before the light goes.', 'Down here!']);
 }
 
 async function lake() {
@@ -312,7 +312,7 @@ async function circle() {
   p.mode = 'still'; p.stillLook = { x: CIRCLE.x, z: CIRCLE.z, headY: fy(CIRCLE.x, CIRCLE.z) + 0.3 };
   p.yaw = Math.atan2(CIRCLE.x - p.x, CIRCLE.z - p.z);
   await wait(0.6);
-  G.bark('Partner. …What is that?', 3);
+  G.bark('{toHim}. …What is that?', 3);
   await wait(1.6);
   STATE.sceneShot = true;
   const y = fy(CIRCLE.x, CIRCLE.z);
@@ -332,7 +332,7 @@ async function circle() {
   G.setShot(fixed(V(CIRCLE.x - 0.6, y + 2.6, CIRCLE.z + 3.0), V(CIRCLE.x + 0.3, y + 0.3, CIRCLE.z - 0.2), 42, 0.006));
   await N('(Warm air. It smells of cut grass and July. Your breath doesn’t show.)', K());
   await N('(Two sets of footprints in the grass. Small ones: children’s. One set from each side. They stop in the middle, toe to toe, as if two children had stood right here, facing each other.)', K());
-  await P('Partner. Come out of there. Please.', K());
+  await P('{toHim}. Come out of there. Please.', K());
   const c = await choose(['“Look at the footprints.”', '“It’s warm in here. Come and feel it.”', 'Come out']);
   S.vars.fear = (S.vars.fear || 0) + 1;
   if (c === 0) await P('I don’t want to look at them. I don’t want to know whose they are.', K());

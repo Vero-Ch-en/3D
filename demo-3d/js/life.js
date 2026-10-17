@@ -442,7 +442,7 @@ function updateCold(dt) {
   if (frostEl) { const f = smooth(0.38, 1, PLAYER.cold) * 0.92; if (Math.abs((frostEl._o || 0) - f) > 0.004) { frostEl._o = f; frostEl.style.opacity = f.toFixed(3); } }
   // Her side of it.
   const out = outside(PLAYER), inNow = G.inside(PLAYER.x, PLAYER.z);
-  if (out && !COLD.outing) { COLD.outing = true; COLD.warned = {}; if (!PLAYER.dressed && S.chapter !== 'prologue') wait2(1.5, () => { if (outside(PLAYER) && !PLAYER.dressed && !freeBark(pick(['Coat, Partner! And boots. You’ll catch your death.', 'Where is your coat? It’s snowing, Partner.']), 3)) return; if (!L.coatHint) { L.coatHint = 1; G.hint('Your coat and boots are on the hook by the front door.', 5); } }); }
+  if (out && !COLD.outing) { COLD.outing = true; COLD.warned = {}; if (!PLAYER.dressed && S.chapter !== 'prologue') wait2(1.5, () => { if (outside(PLAYER) && !PLAYER.dressed && !freeBark(pick(['Coat, {toHim}! And boots. You’ll catch your death.', 'Where is your coat? It’s snowing, {toHim}.']), 3)) return; if (!L.coatHint) { L.coatHint = 1; G.hint('Your coat and boots are on the hook by the front door.', 5); } }); }
   if (inNow && COLD.outing) {
     COLD.outing = false;
     if (PLAYER.cold > 0.45 && S.chapter !== 'prologue') wait2(1.2, () => freeBark(pick(['You’re frozen! Come and stand by the fire.', 'Look at you. Fire. Now. I insist.']), 3));
@@ -503,7 +503,7 @@ function updatePartnerGear(dt) {
   }
   if (!G.inside(PLAYER.x, PLAYER.z)) { L.cameIn = PLAYER.dressed; L.pInT = 0; }
   // Still in your coat by the fire after a while: she notices.
-  if (PLAYER.dressed && G.inside(PLAYER.x, PLAYER.z)) { L.coatInT = (L.coatInT || 0) + dt; if (L.coatInT > 50 && !L.coatTease) { L.coatTease = 1; freeBark('Are you planning to wear that coat all evening, Partner?', 3); } } else L.coatInT = 0;
+  if (PLAYER.dressed && G.inside(PLAYER.x, PLAYER.z)) { L.coatInT = (L.coatInT || 0) + dt; if (L.coatInT > 50 && !L.coatTease) { L.coatTease = 1; freeBark('Are you planning to wear that coat all evening, {dear}?', 3); } } else L.coatInT = 0;
   // The puddle on the mat dries; drips while it's fresh.
   PUDDLE.wet = Math.max(0, PUDDLE.wet - dt / 240);
   const k = 1 - PUDDLE.wet * 0.42; PUDDLE.mat.color.setRGB(k, k, k * 1.01);
@@ -553,7 +553,7 @@ A.rewire('fire', async () => {
     if (L.basket <= 0) { await N('(No logs. The basket by the hearth is empty, and the woodpile is out on the porch.)'); return; }
     L.basket--; F.fuel = 0.6; F.on = true; G.Audio.blow();
     await N('(It takes three matches and a certain amount of quiet swearing.)');
-    if (A.canHear()) await Pt('The fire person, at work. My hero, Partner.');
+    if (A.canHear()) await Pt('The fire person, at work. My hero, {toHim}.');
     return;
   }
   if (F.fuel < 0.62 && L.basket > 0) {
@@ -580,7 +580,7 @@ A.inter('woodpile', [4.3, 0.6, 5.4], 0.85, () => (PLAYER.carry ? 'Woodpile' : 'T
   await N(A.cyc('logs', ['(An armful of logs, cold and sweet-smelling, with snow in the bark.)', '(Another armful. Your arms remember the shape.)']));
   if (A.canHear() && PARTNER.mode === 'follow' && !PARTNER.task && !PARTNER.lie && !PARTNER.carry && !PARTNER.hold && dist() < 4) { setCarry(PARTNER, true); G.bark(pick(['I’ll take the small ones.', 'Give me two. I’m stronger than I look.']), 2.4); }
 });
-A.REACT.basket = { lines: ['Thank you, Partner. You do keep us warm.'] };
+A.REACT.basket = { lines: ['Thank you, {toHim}. You do keep us warm.'] };
 A.REACT.woodpile = { lines: ['Mind your back. It’s the only one you have.', 'The one at the bottom is the load-bearing log. Don’t touch it.'] };
 function updateFire(dt) {
   if (F.on && !F._was && F.fuel < 0.05) F.fuel = 0.6;   // lit by a scene
@@ -589,7 +589,7 @@ function updateFire(dt) {
   if (F.on) {
     F.fuel = Math.max(0, F.fuel - dt / 480);
     if (F.fuel <= 0) { F.outT = (F.outT || 0) + dt; if (F.outT > 50) { F.on = false; F.outT = 0; freeBark('Oh. The fire’s gone out.', 2.6); } } else F.outT = 0;
-    if (F.fuel < 0.2 && !L.lowWarned) { L.lowWarned = 1; freeBark(pick(['The fire’s getting sleepy, Partner.', 'Is it me, or is it getting colder in here?']), 3); }
+    if (F.fuel < 0.2 && !L.lowWarned) { L.lowWarned = 1; freeBark(pick(['The fire’s getting sleepy, {dear}.', 'Is it me, or is it getting colder in here?']), 3); }
     if (F.fuel > 0.4) L.lowWarned = 0;
   }
   F.level = !F.on ? 0 : F.fuel > 0.02 ? 0.3 + 0.7 * smooth(0, 0.55, F.fuel) : 0.14;   // embers when it's nearly out
@@ -721,7 +721,7 @@ function updateSolo(dt) {
     if (L.leftT > 2.5) {
       L.leftT = 0;
       const opts = SOLO.filter((o) => (!o.cond || o.cond()) && Math.hypot(o.spot.x - p.x, o.spot.z - p.z) < 6);
-      if (opts.length) { const o = opts[0]; p.task = { o, phase: 'go', t: 0 }; G.bark(pick(['I’ll be in here, Partner.', 'Go on, then. I’ll find something to do.', 'Fine. Leave me. I have a book.']), 2.4); }
+      if (opts.length) { const o = opts[0]; p.task = { o, phase: 'go', t: 0 }; G.bark(pick(['I’ll be in here, {toHim}.', 'Go on, then. I’ll find something to do.', 'Fine. Leave me. I have a book.']), 2.4); }
     }
   } else L.leftT = 0;
 }

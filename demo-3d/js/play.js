@@ -316,7 +316,7 @@ async function snowAngels() {
   const side = okAt(x0 + rx, z0) ? 1 : okAt(x0 - rx, z0) ? -1 : 0;
   if (!okAt(x0, z0) || !side) { G.bark('Not here. Somewhere with lots of fresh snow.', 2.6); return; }
   clearHands(); STATE.busy = true;
-  G.bark(pick(['Snow angels! Lie down. Go on. It’s tradition.', 'On your back, Partner. Arms out.']), 2.6);
+  G.bark(pick(['Snow angels! Lie down. Go on. It’s tradition.', 'On your back, {toHim}. Arms out.']), 2.6);
   await wait(1);
   const px = x0 + side * rx, y = G.floorAt(x0, z0);
   STATE.sceneShot = true;
@@ -327,7 +327,7 @@ async function snowAngels() {
   });
   await wait(1.6);
   await N('(Flat on your backs in the snow, sweeping your arms and legs like a pair of very determined beetles.)', K());
-  await Pt('Flap properly, Partner. You’re doing a starfish.', K());
+  await Pt('Flap properly, {toHim}. You’re doing a starfish.', K());
   await Y('This is how angels flap.', K());
   await Pt('Have you ever seen an angel?', K());
   await Y('I’m looking at one.', K());
@@ -402,7 +402,7 @@ A.rewire('kettle', async () => {
     await G.walkTo(p, PLAYER.x + Math.cos(PLAYER.yaw) * 0.6 + Math.sin(PLAYER.yaw) * 0.5, PLAYER.z - Math.sin(PLAYER.yaw) * 0.6 + Math.cos(PLAYER.yaw) * 0.5, 1.5);
     p.yaw = Math.atan2(PLAYER.x - p.x, PLAYER.z - p.z);
     setMug(p, true);
-    await Pt(q > 0.7 ? 'Oh. Oh, that’s perfect. Marry me again.' : q > 0.38 ? 'The lumps are my favourite part. Thank you, Partner.' : 'It’s warm, and you made it. That’s the whole recipe.');
+    await Pt(q > 0.7 ? 'Oh. Oh, that’s perfect. Marry me again.' : q > 0.38 ? 'The lumps are my favourite part. Thank you, {dear}.' : 'It’s warm, and you made it. That’s the whole recipe.');
     S.mem.affection++; addBond(0.4);
     if (!S.flags.cocoaScrap) { S.flags.cocoaScrap = 1; addScrap('cocoa', q > 0.38 ? 'Cocoa, with a pinch of salt (she swears by it).' : 'Cocoa-adjacent. Drunk anyway, every drop.'); }
   }
@@ -440,7 +440,7 @@ const BOOKS = [
     await Y('“Pancakes. Serves four.”', K());
     await Pt('Serves two. Generously.', K());
     await Y('“Step one: heat a heavy pan.”', K());
-    await Pt('Step two: the first pancake goes to Partner, as a tax.', K());
+    await Pt('Step two: the first pancake goes to {toHim}, as a tax.', K());
     await Y('That isn’t in the book.', K());
     await Pt('It’s in the margin. In pencil. I wrote it years ago. Check the other five copies.', K());
   } },
@@ -553,7 +553,7 @@ async function cards() {
   hers++;
   await Pt('Lower. And— oh, look. A queen. Lovely. Correct.', K());
   await N('(As she reaches for the deck, a second queen slides out of her sleeve and lands face up on the table.)', K());
-  const call = await choose(['“Partner.”', 'Say nothing']);
+  const call = await choose(['“{toHim}.”', 'Say nothing']);
   S.mem.cards = (S.mem.cards || 0) + 1;
   if (call === 0) {
     addRivalry(0.6);

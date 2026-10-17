@@ -84,6 +84,8 @@
   .pause-panel h2 { font: 500 34px/1 var(--display); margin: 0 0 4px; }
   #chapterSel, #pChapter { flex: 1; min-width: 0; font: inherit; font-size: 14px; padding: 6px 8px; border-radius: 8px; background: rgba(255,255,255,0.08); color: inherit; border: 1px solid rgba(255,255,255,0.18); }
   #chapterSel option, #pChapter option { color: #222; }
+  .row.playas { align-items: center; gap: 8px; margin-top: 12px; font-size: 14px; }
+  .row.playas .btn[aria-pressed=true] { background: var(--amber); color: #2a1d10; }
   .row.chapters { align-items: center; gap: 10px; margin-top: 10px; font-size: 14px; opacity: 0.85; }
   .ptest summary { cursor: pointer; font-size: 14px; color: var(--ink-dim); }
   #pTest { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 14px; margin-top: 8px; }
@@ -182,14 +184,14 @@
     <h1>Snowed In</h1>
     <p class="lede">The first real snow of the winter, a cabin in the pines, and a whole day with nowhere to be. Wake up tangled in the blanket, burn the pancakes, take the long way round, and find your way home by the light in the windows.</p>
     <div class="row"><button class="btn primary" id="begin">Begin</button><button class="btn" id="continue" hidden>Continue</button></div>
+    <div class="row playas" role="group" aria-label="Play as"><span>Play as</span><button class="btn small" data-as="player" type="button">Player</button><button class="btn small" data-as="partner" type="button">Partner</button></div>
     <div class="row chapters"><label for="chapterSel">Chapters</label><select id="chapterSel" aria-label="Jump to a chapter"></select></div>
-    <div class="keys" id="titleKeys">WASD walk · Shift run · drag to look · scroll to zoom · E interact · Q together · T take a photo · V first person · Tab play as her · N time of day · ` stats</div>
+    <div class="keys" id="titleKeys">WASD walk · Shift run · drag to look · scroll to zoom · E interact · Q together · T take a photo · V first person · N time of day · ` stats</div>
   </div>
 </div>
 
 <div id="hud">
   <div class="pill" role="group" aria-label="Graphics quality" id="quality"><span>QUALITY</span><button data-q="Low">Low</button><button data-q="High">High</button><button data-q="Epic">Epic</button></div>
-  <div class="pill"><button id="switchBtn" type="button" title="Play as the other one (Tab)">Switch</button></div>
   <div class="pill"><button id="timeBtn" type="button">Time of day</button></div>
   <div class="pill"><button id="statsBtn" type="button">Stats</button></div>
   <div class="pill" id="pausePill"><button id="pauseBtn" type="button" aria-label="Pause">II</button></div>

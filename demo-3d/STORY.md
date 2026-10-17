@@ -186,8 +186,8 @@ It grows more **obsessive the more you've been convinced** (corruption, plus mem
 - **Act IV gate:** when it's obsessive, it grabs your arm the first time ("You don't get to leave me in the snow"). Going back with it twice while convinced leads to *Replaced*. If it kept her, sitting down to its breakfast leads to *Replaced* (nobody comes through the door).
 - **New ending, *Replaced*:** breakfast seen from outside through the kitchen window. It sits in your place, speaking in your voice. You can knock, whistle (she pauses, and it puts its hand over hers) or say nothing.
 
-## Two perspectives (build 47)
-- **Tab / the Switch button:** play as her in free time (morning, the walk, the evening, the endings). The two swap bodies where they stand and he follows you. Any scene, or the night chapters, puts you back as him, because the story is told from his side.
-- **Dawn, as her:** Act I opens "Earlier. Before it was light." You get up for a glass of water, and the real him calls from the bedroom doorway. He won't step onto the cold kitchen floor, says "Hello, you" back and waits in the doorway until you're past him. This sets up Elsewhere's tells (barefoot all the way into the kitchen, a flat "Hello.", not waiting).
-- **Their greeting:** "Hello, you." / "Hello, you." is now their morning ritual.
+## Two perspectives and their pet names (build 48)
+- **Play as Player or Partner**, chosen on the title screen (and remembered). As Partner, you control her in free time and he follows you. Scenes are still told from his side, so the game switches to him for a scene and back to her afterwards. Chapters that need a particular person decide: dawn and Elsewhere are played as her; the night and Act IV as him.
+- **Dawn, as her:** Act I opens "Earlier. Before it was light." The real him calls from the bedroom doorway, won't step onto the cold kitchen floor, says "Hello, Dearest Partner" back, and waits in the doorway until you're past him. This sets up Elsewhere's tells.
+- **Pet names:** both say **"Dearest Partner"**; he calls her **"Lovely Partner"**; she calls him **"Charming Partner"** (config: `callBoth`, `callPartner`, `callPlayer`). The imitation never uses them; it just says "Partner" or "Hello." That is another tell.
 - **Testing:** the pause menu has a "Story state" panel (bond, trust, corruption, suspicion, memories taken, keptHer, sleptBeside, fakeWithdrawn).

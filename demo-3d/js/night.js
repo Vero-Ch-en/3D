@@ -87,12 +87,12 @@ CH.bedtime = async () => {
   else { addBond(0.6); await P('…Stop it. You can’t say things like that at night. I’ll cry on your good jumper.', K()); }
   const b = await choose(['Hold her', 'Look at her', 'Kiss her goodnight']);
   addBond(0.6);
-  if (b === 0) { PARTNER.lidsClosed = true; await N('(She fits into your side as though she were measured for it.)', K()); await P('Mm. Don’t let it go to your head.', K()); PARTNER.lidsClosed = false; }
+  if (b === 0) { PARTNER.lidsClosed = true; await N('(She fits into your side as though she were measured for it.)', K()); await P('Mm. Don’t let it go to your head, {toHim}.', K()); PARTNER.lidsClosed = false; }
   else if (b === 1) { await P('You’re staring.', K()); await Y('I’m looking.', K()); await P('At me.', K()); await Y('Unfortunately.', K()); await P('You could simply admit I’m lovely.', K()); await Y('I could.', K()); await P('…Coward.', K()); }
   else { await P('Mm. A goodnight kiss. Very proper. Very old married couple.', K()); await Y('We’re not married.', K()); await P('Very old unmarried couple, then.', K()); }
   await P('If I get up for water, don’t steal my side.', K());
   await Y('You don’t recognise sides.', K());
-  await P('…Touché. Goodnight.', K());
+  await P('…Touché. Goodnight, {dear}.', K());
   for (const L of G.LAMPS) L.on = false;
   G.Audio.click && G.Audio.click();
   PARTNER.lidsClosed = true;
@@ -394,7 +394,7 @@ async function elsewhere() {
   G.gaze(PARTNER, [PLAYER.x, PLAYER.y + 1.5, PLAYER.z], 9); G.gaze(PLAYER, [PARTNER.x, PARTNER.y + 1.7, PARTNER.z], 9);
   await Y('Come back to bed, Partner.');
   await N('(He’s come all the way into the kitchen, in his bare feet.)');
-  const c = await choose(['“Did you call from the door?”', '“Two minutes.”', '“…Hello, you.”']);
+  const c = await choose(['“Did you call from the door?”', '“Two minutes.”', '“…Hello, {dear}.”']);
   if (c === 0) { await Y('No. I came for you.'); }
   else if (c === 1) { await Y('I’ll wait.'); }
   else { await Y('Hello.'); }
@@ -418,7 +418,7 @@ async function elsewhere() {
   S.flags.sign = ['pinecones', 'pancake', 'note'][s];
   if (s === 0) await N('(Seven pinecones, in a row along the sill, biggest to smallest. The contest. He won it, and you said you let him.)');
   else if (s === 1) await N('(Half a pancake on a plate, with one enormous bite out of it. He’ll know that bite anywhere.)');
-  else await N('(You write: “If it’s sure about the night we met, it isn’t me. — me”)');
+  else await N('(You write: “If it’s sure about the night we met, it isn’t me. — your {dear}”)');
   await N('(Then you walk out into the snow, towards wherever he is.)');
   STATE.busy = false; STATE.bounds = null; NIGHT.outside = true;
   G.hint('Out through the front door.', 6);
@@ -505,7 +505,7 @@ inter('eHideNook', [10.05, 0.8, -1.3], 1.1, () => (NIGHT.hiding === 'nook' ? 'Co
 inter('eHideStudy', [14.35, 0.8, 3.85], 1.0, () => (NIGHT.hiding === 'study' ? 'Come out' : 'Hide in the study'), hideAct('study'), () => S.chapter !== 'lastbirthday' && NIGHT.swapped && !NIGHT.left && !NIGHT.kept && (!NIGHT.hiding || NIGHT.hiding === 'study'));
 
 /* ---------- Dawn, as her (start of Act I): the real him, so you know what he's like ----------
- * He calls from the bedroom door, won't set foot on the cold kitchen floor, says "Hello, you" back, and waits for you. */
+ * He calls from the bedroom door, won't set foot on the cold kitchen floor, says "Hello, Dearest Partner" back, and waits for you. */
 G.herDawn = async () => {
   const f = G.$('fade');
   f.style.background = '#000'; f.style.transition = 'opacity 0.8s'; f.classList.add('on'); await wait(1.0);
@@ -524,11 +524,11 @@ G.herDawn = async () => {
   PARTNER.lie = false; PARTNER.lidsClosed = false; G.placeChar(PARTNER, 5.15, 1.2, Math.PI / 2); PARTNER.mode = 'still';
   G.gaze(PARTNER, [PLAYER.x, PLAYER.y + 1.5, PLAYER.z], 10);
   await N('(From the bedroom doorway, sleepy: “Are you in the kitchen?”)');
-  await N('(“The floor’s freezing. I’m not coming in. I’ll stand here and complain.”)');
-  const c = await choose(['“Come and get me.”', '“Two minutes.”', '“Hello, you.”']);
+  await N('(“The floor’s freezing, {toHer}. I’m not coming in. I’ll stand here and complain.”)');
+  const c = await choose(['“Come and get me.”', '“Two minutes.”', '“Hello, {dear}.”']);
   if (c === 0) await N('(“Absolutely not. There’s a line. This is the line.” He points at the doorframe, toes curled on the rug.)');
   else if (c === 1) await N('(“One. The floor is a crime.”)');
-  else await N('(“Hello, you,” he says back, through an enormous yawn.)');
+  else await N('(“Hello, {dear},” he says back, through an enormous yawn.)');
   STATE.busy = false;
   G.hint('Back to bed.', 4);
   await until(() => Math.hypot(PLAYER.x - PARTNER.x, PLAYER.z - PARTNER.z) < 1.4 && !G.busy());

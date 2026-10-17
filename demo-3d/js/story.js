@@ -230,13 +230,13 @@ const Pt = (t, o) => { S.pSpoke = true; return P(t, o); };   // Partner speaking
  * lines: when she's up and about; drowsy: from bed (bedroom only); each object reacts on first use,
  * then now and then. Barks don't stop you moving. */
 const REACT = {
-  bed: { lines: ['If you make that bed, I shall only unmake it tonight.', 'Leave the dent on my side. I’m attached to it.'], drowsy: ['Mm. Come back.', 'You’re letting the cold in, Partner.'] },
+  bed: { lines: ['If you make that bed, I shall only unmake it tonight.', 'Leave the dent on my side. I’m attached to it.'], drowsy: ['Mm. Come back.', 'You’re letting the cold in, {toHim}.'] },
   wardrobe: { lines: ['If you’re looking for your grey jumper, I’m very probably wearing it.', 'The one shoe is important. I won’t explain.'], drowsy: ['Wear the grey one. No. Wait. I have the grey one.', 'Not the wedding jumper. Please.'] },
-  chest: { lines: ['Be gentle with Kevin. He’s had a hard winter.', 'Kevin is lukewarm by design, Partner.'], drowsy: ['Is that Kevin? Bring him here.'] },
+  chest: { lines: ['Be gentle with Kevin. He’s had a hard winter.', 'Kevin is lukewarm by design, {dear}.'], drowsy: ['Is that Kevin? Bring him here.'] },
   bwin: { lines: ['Is Gerald there? Do say good morning from me.', 'He’s been on that sill since autumn. I think he pays rent in feathers.'], drowsy: ['Tell Gerald I’m asleep.', 'Is it still snowing? Don’t tell me. Yes, tell me.'] },
   wwin: { lines: ['The trees look very pleased with themselves this morning.', 'It snowed all night. I heard it. Well. I imagined I heard it.'], drowsy: ['Close the curtain. Or don’t. I can’t decide.'] },
   photos: { lines: ['I still say the lake one is cursed.', 'We should take a new one today. A good one. On purpose.'], drowsy: ['The lake one is cursed. Mm.'] },
-  lampL: { lines: [], drowsy: ['Too bright, Partner. Far too bright.', 'Mood lighting. Very bold for this hour.'] },
+  lampL: { lines: [], drowsy: ['Too bright, {toHim}. Far too bright.', 'Mood lighting. Very bold for this hour.'] },
   lampR: { lines: [], drowsy: ['That is my lamp. I can feel it from here.'] },
   fire: { lines: ['There. Now it feels like a proper morning.', 'I do love watching you be competent at things.'] },
   clock: { lines: ['Leave it fast, please. It’s the only reason we’re ever on time.', 'Four minutes fast. Like you, at breakfast.'], drowsy: ['What time is it? No. Don’t tell me.'] },
@@ -244,21 +244,21 @@ const REACT = {
   armchair: { lines: ['That chair suits you. Very distinguished.', 'You look like someone about to read a will.'] },
   chairB: { lines: ['That’s the creaky one. It likes you.'] },
   basil: { lines: ['Thank you for looking after my son.', 'Basil says thank you. Basil is very shy about it.'] },
-  scrap: { lines: ['We need more pages, I think.', 'Please skip the lake page. I’m begging you, Partner.', 'Is that my handwriting? It’s dreadful.'] },
+  scrap: { lines: ['We need more pages, I think.', 'Please skip the lake page. I’m begging you, {toHim}.', 'Is that my handwriting? It’s dreadful.'] },
   shelf2: { lines: ['Six copies. And neither of us has made a single recipe.', 'The pine candle is for emergencies. Don’t light it on a whim.'] },
   lwin: { lines: ['Any good clouds?', 'If it’s a pancake-shaped cloud, I saw it first.'] },
-  coats: { lines: ['That scarf is yours. It has always been yours.', 'The scarf is not mine, Partner, and I won’t hear otherwise.'] },
+  coats: { lines: ['That scarf is yours. It has always been yours.', 'The scarf is not mine, {dear}, and I won’t hear otherwise.'] },
   cushion: { lines: ['That is a private collection.', 'Please put my stash back exactly as you found it.'] },
   armchair: { lines: ['That blanket and I have an understanding.', 'Your chair. My blanket. A fair arrangement.'] },
   ctable: { lines: ['I’ll clear those. Eventually. In a broad sense.', 'The spoon mug is mine. I was making a point.'] },
   kettle: { lines: ['Is one of those for me? Say it is.', 'Two sugars, please. And not a word to anyone.'] },
   ksink: { lines: ['The spoon is innocent. I was testing the honey.', 'Leave the washing up. It’s a snow day. I’ll do it. Later.'] },
   toaster: { lines: ['Not the toaster. We agreed. After last time.', 'The toaster and I are no longer speaking.'] },
-  fridge: { lines: ['Anything new in there?', 'The lemon is mine. I have plans for it.', 'Please close the door, Partner. You’re heating the snow.'] },
+  fridge: { lines: ['Anything new in there?', 'The lemon is mine. I have plans for it.', 'Please close the door, {toHim}. You’re heating the snow.'] },
   ktable: { lines: ['Don’t open the card. It says “not yet”. That means you.', 'I tidied that table. Briefly.'] },
   kwin: { lines: ['Did you see the heart on the rail? I didn’t draw it. I drew it.', 'It looks like the whole world has been tidied away.'] },
   ewin: { lines: ['Nothing to see over there. Look somewhere else. Lovely snow, isn’t it?', 'Why are you looking at the study? Look at the sky.'] },
-  study: { lines: ['No. Absolutely not. Kindly step away from the door.', 'It says “private”, Partner. In my best handwriting.'] },
+  study: { lines: ['No. Absolutely not. Kindly step away from the door.', 'It says “private”, {toHim}. In my best handwriting.'] },
   cupboard: { lines: ['Hands where I can see them, please.', 'Every biscuit in there is accounted for.'] },
   bench: { lines: ['It’s far too cold to sit out here before dark.', 'Later. When the stars are out. I promise.'] },
 };
@@ -304,7 +304,7 @@ const fire = rewire('fire', async () => {
   }
   G.FIRE.on = true; G.Audio.blow();
   await N('(It takes three matches and a certain amount of quiet swearing.)');
-  if (canHear()) await Pt('The fire person, at work. My hero, Partner.');
+  if (canHear()) await Pt('The fire person, at work. My hero, {dear}.');
 });
 fire.label = () => (G.FIRE.on ? 'Poke the fire' : 'Light the fire');
 // The window seat in the reading nook.
@@ -334,7 +334,7 @@ inter('cushion', [9.2, 0.6, 1.5], 0.6, 'Under the cushions', async () => {
 inter('armchair', [6.62, 0.6, 0.68], 0.8, 'Sit in the armchair', () => sitFree(SEATS.armchair));
 inter('frontdoor', [6.5, 1, 4.15], 0.8, 'Front door', async () => {
   if (morning()) {
-    if (!S.flags.breakfastDone) { await N('(Breakfast first. Snow-day law, apparently.)'); if (canHear() && !PARTNER.lie) await Pt('Not without breakfast, Partner. I won’t allow it.'); return; }
+    if (!S.flags.breakfastDone) { await N('(Breakfast first. Snow-day law, apparently.)'); if (canHear() && !PARTNER.lie) await Pt('Not without breakfast, {toHim}. I won’t allow it.'); return; }
     S.flags.leaveHouse = true; return;
   }
   return N('(The front door. Somebody has hung a sprig of pine on it.)');
@@ -361,7 +361,7 @@ inter('fridge', [14.45, 1, -1.35], 0.75, 'Fridge', async () => {
   const n = ++S.mem.fridge;
   if (n === 1) { S.flags.knowsPancakes = true; return N('(Eggs. Milk. Butter. A sad lemon. Pancakes are possible.)'); }
   if (n === 2) return N('(Still eggs. Still milk. The lemon is still sad.)');
-  if (n === 3) { if (canHear()) return Pt('It won’t grow new food if you keep checking, Partner.'); return N('(Cold air. Comforting, somehow.)'); }
+  if (n === 3) { if (canHear()) return Pt('It won’t grow new food if you keep checking, {toHim}.'); return N('(Cold air. Comforting, somehow.)'); }
   if (n === 5 && canHear()) return Pt('Are you waiting for it to say good morning? I could write it on something.');
   return N('(The fridge hums. It has nothing new to say.)');
 });
@@ -370,11 +370,11 @@ inter('ktable', [13.0, 0.8, 2.95], 1.3, () => (morning() && S.flags.pancakesMade
   await N(cyc('ktable', ['(The table. Mostly used for piling things on.)', '(A pile of post, a bowl of keys, and an envelope, face down, addressed to you. On the back, in her handwriting: “not yet”.)']));
 });
 inter('cupboard', [11.45, 1, 3.75], 0.7, 'Snack cupboard', async () => {
-  await N('({P}’s snack cupboard. A note on the door: “Property of me. Not Partner’s.”)');
+  await N('({P}’s snack cupboard. A note on the door: “Property of me. Not {dear}’s.”)');
   if (S.flags.snackDone) return;
   const c = await choose(['Leave her a snack on the counter', 'Steal a biscuit', 'Close it']);
   if (c === 0) { S.flags.snackDone = 1; S.mem.snacks++; addBond(0.6); await N('(You leave a biscuit on the counter, on a folded napkin, like a small gift.)'); }
-  if (c === 1) { S.flags.snackDone = 1; S.flags.stoleSnack = 1; addRivalry(0.5); await N('(Delicious. Illegal. Delicious.)'); if (canHear()) await Pt('I saw that, Partner. I see everything.'); }
+  if (c === 1) { S.flags.snackDone = 1; S.flags.stoleSnack = 1; addRivalry(0.5); await N('(Delicious. Illegal. Delicious.)'); if (canHear()) await Pt('I saw that, {toHim}. I see everything.'); }
 });
 inter('kwin', [13.0, 1.3, 4.05], 0.75, 'Window', () => N(morning() ? cyc('kwin', ['(The clearing, white and blue and perfectly still. Somebody has drawn a heart in the snow on the porch rail.)', '(The heart is still there. So is a smaller, crosser one beside it.)']) : '(Your reflection, and the snow behind it.)'));
 inter('radio', [13.58, 1.0, 4.1], 0.7, () => (G.Audio.radioOn() ? 'Turn the radio off' : 'Turn the radio on'), async () => {
@@ -382,11 +382,11 @@ inter('radio', [13.58, 1.0, 4.1], 0.7, () => (G.Audio.radioOn() ? 'Turn the radi
   G.Audio.radio(on); K().radioDial.material.opacity = on ? 0.9 : 0;
   S.pSpoke = true;
   if (on && !S.flags.radioN) { S.flags.radioN = 1; await N('(The radio warms up with a hum, wanders through some static, and settles on something slow.)'); }
-  if (canHear() && !PARTNER.lie) G.bark(on ? pick(['Oh, I love this one.', 'Leave it on. Please.', 'Is this an invitation, Partner?']) : pick(['Oh. I was enjoying that.', 'Spoilsport.']), 2.6);
+  if (canHear() && !PARTNER.lie) G.bark(on ? pick(['Oh, I love this one.', 'Leave it on. Please.', 'Is this an invitation, {toHim}?']) : pick(['Oh. I was enjoying that.', 'Spoilsport.']), 2.6);
 });
 inter('ewin', [14.6, 1.3, 2.1], 0.6, 'Window', () => N(cyc('ewin', ['(The study’s roof, sloping away under a fat roll of snow.)', '(The study’s little window has a curtain drawn across it. It didn’t yesterday.)'])));
 inter('study', [14.6, 1, 3.85], 0.7, 'Study door', async () => {
-  if (PARTNER.hidden) { G.bark(['Not now, Partner!', 'Private business. Please go away. Lovingly.', 'I can hear you breathing on the door.', 'The sign says “private”. I wrote it myself.'], 2.6); S.pSpoke = true; return; }
+  if (PARTNER.hidden) { G.bark(['Not now, {dear}!', 'Private business. Please go away. Lovingly.', 'I can hear you breathing on the door.', 'The sign says “private”. I wrote it myself.'], 2.6); S.pSpoke = true; return; }
   await N(cyc('study', ['(Locked. A sign on it, in marker: “PRIVATE”.)', '(Still locked. Beneath the sign, smaller: “this means you, Partner”.)']));
 });
 
@@ -394,7 +394,7 @@ inter('study', [14.6, 1, 3.85], 0.7, 'Study door', async () => {
 G.SMART = [
   { id: 'sofa', spot: { x: 6.55, z: 2.95 }, seatAt: { x: 7.5, z: 2.95, yaw: Math.PI, y: 0.6 }, dur: [10, 18], lines: ['I’m claiming the sofa.', 'This sofa is mine now. Rent is one cushion a week.', '*settles in with great ceremony*'] },
   { id: 'lwin', spot: { x: 9.4, z: 4.08 }, yaw: 0, dur: [5, 8], look: { x: 9.4, y: 1.6, z: 8 }, lines: ['That cloud looks like you. Tall. Soft.', 'There’s a squirrel out there behaving very oddly about the snow.'] },
-  { id: 'basil', spot: { x: 9.85, z: 3.72 }, yaw: 0.8, dur: [4, 7], look: { x: 10.4, y: 0.7, z: 4.2 }, lines: ['You’re doing wonderfully, Basil.', 'Don’t tell Partner, Basil, but you’re my favourite.'] },
+  { id: 'basil', spot: { x: 9.85, z: 3.72 }, yaw: 0.8, dur: [4, 7], look: { x: 10.4, y: 0.7, z: 4.2 }, lines: ['You’re doing wonderfully, Basil.', 'Don’t tell {toHim}, Basil, but you’re my favourite.'] },
   { id: 'books', spot: { x: 6.2, z: -1.45 }, yaw: Math.PI, dur: [5, 9], look: { x: 6.15, y: 1.2, z: -2.2 }, lines: ['I am reading this one. I have been reading it for a year.', 'Who owns six copies of the same cookbook? We do, apparently.'] },
   { id: 'fridge', spot: { x: 14.35, z: -1.18 }, yaw: Math.PI, dur: [3, 5], look: { x: 14.5, y: 1.1, z: -2 }, lines: ['*rustling* …nothing. I was looking at nothing.', '*takes a single grape*', 'We need cheese. Spiritually.'] },
   { id: 'study', spot: { x: 14.5, z: 3.85 }, yaw: Math.PI / 2, dur: [12, 22], hide: true, exit: { x: 14.45, z: 3.85, yaw: -Math.PI / 2 }, line: 'Private business. Please don’t follow me.', cond: () => morning() && !S.flags.pancakesMade },
@@ -453,7 +453,7 @@ async function sitSofa() {
     if (PARTNER.task) G.endPartnerTask();
     const o = G.SMART.find((x) => x.id === 'sofa');
     PARTNER.task = { o, phase: 'go', t: 0 };
-    G.bark(['Budge up, Partner.', 'Is there room for one more?', 'Don’t move. I’m coming.'], 2);
+    G.bark(['Budge up, {toHim}.', 'Is there room for one more?', 'Don’t move. I’m coming.'], 2);
     S.mem.affection++; addBond(0.4);
   }
 }
@@ -465,12 +465,12 @@ async function sitSofa() {
  * the day's own topics, then small talk that fits the room. Each topic runs once. */
 const recent = (id) => S.lastUse && S.lastUse.id === id && G.simT - S.lastUse.t < 60;
 const ABOUT = {
-  kettle: async () => { await Pt('Thank you for the tea, Partner.'); await Y('Two sugars.'); await Pt('One. And a second one that doesn’t count.'); },
+  kettle: async () => { await Pt('Thank you for the tea, {dear}.'); await Y('Two sugars.'); await Pt('One. And a second one that doesn’t count.'); },
   stove: async () => { await Pt('You were very serious at that stove. Like a surgeon. A pancake surgeon.'); await Y('Pancakes deserve respect.'); await Pt('So do I, and I’ve never seen that face for me.'); },
-  fridge: async () => { await Pt('You keep visiting the fridge as if it were a friend.'); await Y('It’s a good listener.'); await Pt('It hums when you talk. That isn’t listening, Partner. That’s politeness.'); },
+  fridge: async () => { await Pt('You keep visiting the fridge as if it were a friend.'); await Y('It’s a good listener.'); await Pt('It hums when you talk. That isn’t listening, {toHim}. That’s politeness.'); },
   cupboard: async () => {
     if (S.flags.stoleSnack) { await Pt('About the biscuit.'); await Y('What biscuit?'); await Pt('Precisely the answer a thief would give.'); addRivalry(0.2); }
-    else if (S.mem.snacks) { await Pt('Did you leave a biscuit on a napkin for me?'); await Y('It might have been Gerald.'); await Pt('Gerald has no thumbs. Thank you, Partner.'); addBond(0.3); }
+    else if (S.mem.snacks) { await Pt('Did you leave a biscuit on a napkin for me?'); await Y('It might have been Gerald.'); await Pt('Gerald has no thumbs. Thank you, {toHim}.'); addBond(0.3); }
     else { await Pt('Were you about to open my cupboard?'); await Y('Admiring it. From a respectful distance.'); await Pt('Keep it respectful.'); }
   },
   basil: async () => { await Pt('Basil likes you, you know. He just can’t show it.'); await Y('He’s a plant.'); await Pt('He is a very reserved plant.'); },
@@ -488,7 +488,7 @@ const ABOUT = {
   'shelf6.15': async () => ABOUT.scrap(),
   fire: async () => { await Pt('I’m going to learn to light it myself one day.'); await Y('You say that every winter.'); await Pt('And every winter you light it first. That’s hardly my fault.'); },
   bwin: async () => { await Pt('I think Gerald comes back because of you.'); await Y('Because I feed him?'); await Pt('Because you say good morning to him. It matters to a bird.'); },
-  wardrobe: async () => { await Pt('I will give the grey jumper back. In principle.'); await Y('When?'); await Pt('When it stops smelling of you, Partner. So never.'); },
+  wardrobe: async () => { await Pt('I will give the grey jumper back. In principle.'); await Y('When?'); await Pt('When it stops smelling of you, {dear}. So never.'); },
   photos: async () => { await Pt('We should take a photograph today. A proper one.'); await Y('With both of us looking?'); await Pt('Let’s not be unrealistic.'); },
   coats: async () => { await Pt('The scarf. Be honest. Is it yours?'); await Y('It’s yours.'); await Pt('Then we’re agreed. It belongs to no one. A free scarf.'); },
   cushion: async () => { await Pt('You found my collection.'); await Y('Three of my socks are in there.'); await Pt('They were lonely. I gave them a home.'); },
@@ -505,7 +505,7 @@ const ROOM = {
     { id: 'r_bed2', when: () => !morning(), run: async () => { await Pt('The fairy lights were your idea. I want that on record.'); await Y('They were yours.'); await Pt('Then I have excellent ideas.'); } },
   ],
   living: [
-    { id: 'r_liv1', when: () => morning() && !G.FIRE.on, run: async () => { await Pt('It’s a little cold in here, isn’t it?'); await Y('Is that a hint?'); await Pt('It is a heavy hint, Partner. The fire is right there.'); } },
+    { id: 'r_liv1', when: () => morning() && !G.FIRE.on, run: async () => { await Pt('It’s a little cold in here, isn’t it?'); await Y('Is that a hint?'); await Pt('It is a heavy hint, {toHim}. The fire is right there.'); } },
     { id: 'r_liv2', when: () => G.FIRE.on, run: async () => { await Pt('Listen to the fire. It sounds like someone whispering.'); await Y('What’s it saying?'); await Pt('That we should stay in all day. I agree with it entirely.'); } },
     { id: 'r_liv3', run: async () => { await Pt('Do you remember carrying that sofa in?'); await Y('I remember you directing.'); await Pt('Someone had to have a vision.'); } },
   ],
@@ -519,7 +519,7 @@ const ROOM = {
     { id: 'r_por2', when: () => !morning(), run: async () => { await Pt('The string lights were crooked all year. I like them crooked.'); await Y('I could straighten them.'); await Pt('Don’t you dare.'); } },
   ],
   outside: [
-    { id: 'r_out1', when: () => morning(), run: async () => { await Pt('Look at our footprints. Yours are enormous.'); await Y('Yours are tiny.'); await Pt('Efficient, Partner. Mine are efficient.'); } },
+    { id: 'r_out1', when: () => morning(), run: async () => { await Pt('Look at our footprints. Yours are enormous.'); await Y('Yours are tiny.'); await Pt('Efficient, {toHim}. Mine are efficient.'); } },
     { id: 'r_out2', when: () => !morning(), run: async () => { await Pt('The cabin looks so small from out here.'); await Y('It is small.'); await Pt('It’s exactly big enough. That’s different.'); } },
   ],
 };
@@ -528,7 +528,7 @@ const DAY = {
     { id: 'gift', run: async () => {
       await Pt('If you could have anything at all today, what would it be?');
       const c = await choose(['“Pancakes.”', '“You.”', '“To know what’s in the study.”']);
-      if (c === 0) await Pt('Pancakes aren’t a wish, Partner. They’re a way of life.');
+      if (c === 0) await Pt('Pancakes aren’t a wish, {dear}. They’re a way of life.');
       if (c === 1) { addBond(0.5); await Pt('Oh, honestly. …You already have me. That isn’t a wish. That’s a standing arrangement.'); }
       if (c === 2) await Pt('A good try. The answer is still “private”.');
     } },
@@ -539,24 +539,24 @@ const DAY = {
     { id: 'fair', run: async () => { await Pt('Do you remember the winter fair? It was the first snow then, too.'); await Y('Vaguely.'); await Pt('Same. Vaguely is my favourite way to remember things.'); } },
   ],
   any: [
-    { id: 'size', run: async () => { await Pt('Why are you so tall, Partner?'); await Y('Why are you so small?'); await Pt('Concentrated.'); } },
+    { id: 'size', run: async () => { await Pt('Why are you so tall, {toHim}?'); await Y('Why are you so small?'); await Pt('Concentrated.'); } },
   ],
 };
 const SMALL = {
-  bedroom: ['Mm?', 'Yes, Partner?', 'If you’re about to suggest a nap, the answer is yes.'],
+  bedroom: ['Mm?', 'Yes, {toHim}?', 'If you’re about to suggest a nap, the answer is yes.'],
   living: ['Hello again.', 'You only wanted to hear my voice. I can tell.', 'I’m listening. Attentively.'],
-  kitchen: ['Is this about food? It’s usually about food.', 'Yes, Partner?', 'If you’re asking whether I want more tea, I do.'],
+  kitchen: ['Is this about food? It’s usually about food.', 'Yes, {dear}?', 'If you’re asking whether I want more tea, I do.'],
   porch: ['It’s lovely out, isn’t it?', 'Mm. Yes?'],
-  outside: ['My nose is cold. That’s all I have to report.', 'Yes, Partner?'],
+  outside: ['My nose is cold. That’s all I have to report.', 'Yes, {toHim}?'],
 };
 async function talk() {
   const here = hereRoom(), seen = S.lastUse && S.lastUse.room === room(PARTNER.x, PARTNER.z);
   // In bed she's barely awake.
-  if (PARTNER.lie) { await Pt(pick(['…Mm. Five more minutes. Then you may talk to me.', 'I’m asleep, Partner. This is a dream. Go and make pancakes in it.', '…Shh. I’m conserving warmth.'])); return; }
+  if (PARTNER.lie) { await Pt(pick(['…Mm. Five more minutes. Then you may talk to me.', 'I’m asleep, {toHim}. This is a dream. Go and make pancakes in it.', '…Shh. I’m conserving warmth.'])); return; }
   if (S.lastUse && G.simT - S.lastUse.t < 60 && ABOUT[S.lastUse.id] && !S.talked['a_' + S.lastUse.id] && (seen || dist() < 4)) {
     S.talked['a_' + S.lastUse.id] = true; await ABOUT[S.lastUse.id](); return;
   }
-  if (PARTNER.hold && !S.talked.s_hold) { S.talked.s_hold = true; await Pt('You know, you could just hold my hand all day. I wouldn’t object.'); await Y('People might talk.'); await Pt('There are no people, Partner. There is Gerald.'); return; }
+  if (PARTNER.hold && !S.talked.s_hold) { S.talked.s_hold = true; await Pt('You know, you could just hold my hand all day. I wouldn’t object.'); await Y('People might talk.'); await Pt('There are no people, {dear}. There is Gerald.'); return; }
   if ((PLAYER.sit || 0) > 0.5 && (PARTNER.sit || 0) > 0.5 && !S.talked.s_sofa) { S.talked.s_sofa = true; await ABOUT.sofa(); return; }
   const roomT = (ROOM[here] || []).find((x) => !S.talked[x.id] && (!x.when || x.when()));
   if (roomT) { S.talked[roomT.id] = true; await roomT.run(); return; }
@@ -566,7 +566,7 @@ async function talk() {
 }
 const TEASES = [
   ['You have a pillow crease on your face.', 'It’s a dimple. A very long dimple.'],
-  ['Your hair is doing something remarkable this morning.', 'It’s called “style”, Partner. Look it up.'],
+  ['Your hair is doing something remarkable this morning.', 'It’s called “style”, {toHim}. Look it up.'],
   ['I’m a year older, and therefore wiser.', 'Older, certainly.'],
   ['You’re very small.', 'I’m concentrated.'],
   ['You snore, you know.', 'I purr. There’s a difference, and it’s considerable.'],
@@ -579,7 +579,7 @@ async function snowball() {
   STATE.busy = true;
   // She steps back a few paces first; it's only fair.
   const ax = Math.atan2(p.x - PLAYER.x, p.z - PLAYER.z), d = Math.hypot(p.x - PLAYER.x, p.z - PLAYER.z);
-  if (d < 2.5) { G.bark('Oh, no. Not the snow. Partner, don’t you dare.', 2); await G.walkTo(p, PLAYER.x + Math.sin(ax) * 3.2, PLAYER.z + Math.cos(ax) * 3.2, 1.9); }
+  if (d < 2.5) { G.bark('Oh, no. Not the snow. {toHim}, don’t you dare.', 2); await G.walkTo(p, PLAYER.x + Math.sin(ax) * 3.2, PLAYER.z + Math.cos(ax) * 3.2, 1.9); }
   PLAYER.yaw = Math.atan2(p.x - PLAYER.x, p.z - PLAYER.z); p.yaw = PLAYER.yaw + Math.PI;
   // Side-on, wide enough to see the ball fly both ways.
   { const mx = (PLAYER.x + p.x) / 2, mz = (PLAYER.z + p.z) / 2, sx = Math.cos(PLAYER.yaw), sz = -Math.sin(PLAYER.yaw), D = Math.hypot(p.x - PLAYER.x, p.z - PLAYER.z) * 0.9 + 1.8;
@@ -592,7 +592,7 @@ async function snowball() {
   await G.throwSnow(hand(PLAYER), chest(p), 0.55);
   G.Audio.thwump(); p.lidsClosed = true; wait(0.4).then(() => { p.lidsClosed = false; });
   S.mem.snowballs = (S.mem.snowballs || 0) + 1; addRivalry(0.3); addBond(0.2);
-  G.bark(S.mem.snowballs === 1 ? 'Oh. Oh, you did not, Partner.' : ['That’s it. That is war.', 'You’ll regret that. Lovingly.', 'Right in the scarf!'], 2);
+  G.bark(S.mem.snowballs === 1 ? 'Oh. Oh, you did not, {dear}.' : ['That’s it. That is war.', 'You’ll regret that. Lovingly.', 'Right in the scarf!'], 2);
   await wait(1.1);
   p.forcePose = 'throw'; await wait(0.5); p.forcePose = null;
   await G.throwSnow(hand(p), chest(PLAYER), 0.6);
@@ -646,7 +646,7 @@ async function together() {
     }
     case 'kiss': {
       S.mem.kisses++; S.mem.affection++; addBond(S.mem.kisses < 5 ? 0.35 : 0.05);
-      const line = p.lie ? ['Mm. Good morning to you too.', '…Again. For warmth.'] : ['Well. Good morning to you too.', 'A good-morning kiss. Noted.', 'Again? Greedy, Partner.', '*a small, flustered noise*', 'You can’t simply do that. …Do it again.'];
+      const line = p.lie ? ['Mm. Good morning to you too.', '…Again. For warmth.'] : ['Well. Good morning to you too.', 'A good-morning kiss. Noted.', 'Again? Greedy, {toHim}.', '*a small, flustered noise*', 'You can’t simply do that. …Do it again.'];
       if (seated || !(await G.hug('kiss', line))) G.bark(line, 2.4);
       return;
     }
@@ -685,7 +685,7 @@ Object.assign(Story, {
     G.standAt(p, 3.72, -0.85, -Math.PI / 2); p.mode = 'follow';
     G.shapeBed({});
     STATE.autonomy = true;
-    if (!silent) G.bark(['*an enormous yawn* Good morning, Partner.', '*stretches* I’m up. Spiritually and now physically.'], 2.6);
+    if (!silent) G.bark(['*an enormous yawn* Good morning, {toHim}.', '*stretches* I’m up. Spiritually and now physically.'], 2.6);
   },
   async morningCuddle() {
     S.flags.inBedScene = true; S.flags.cuddled = true;
@@ -695,7 +695,7 @@ Object.assign(Story, {
     PARTNER.lidsClosed = true;
     await P('I knew you’d come back.', { shot: 'keep' });
     await Y('It’s a snow day. Nobody is going anywhere.', { shot: 'keep' });
-    await P('Mm. Ten more minutes, Partner. Snow-day rules.', { shot: 'keep' });
+    await P('Mm. Ten more minutes, {dear}. Snow-day rules.', { shot: 'keep' });
     addBond(1); S.mem.affection++;
     await G.fade(true); await wait(0.8); await G.fade(false);
     await N('(It is not ten minutes.)', { shot: 'keep' });
@@ -730,7 +730,7 @@ Object.assign(Story, {
     if (p.task) G.endPartnerTask();
     if (p.hold) G.setHold(false);
     p.mode = 'script';
-    G.bark('Do I smell pancakes, Partner?', 2.6);
+    G.bark('Do I smell pancakes, {toHim}?', 2.6);
     const A = k.chairs.A;
     G.walkTo(p, A.x, A.z + 0.52, 1.6).then(async () => { if (S.flags.breakfastDone) return; await G.sitDown(p, A.x, A.z, A.yaw, A.seatY); p.mode = 'seated'; });
   },
@@ -746,7 +746,7 @@ Object.assign(Story, {
     const q = S.flags.pancakeQuality;
     if (q === 'golden') await P('These are… irritatingly good. I’m quite put out.', { shot: 'keep' });
     else if (q === 'fine') await P('Mm. Pancakes. Full marks for effort with the shapes.', { shot: 'keep' });
-    else await P('Crunchy. A bold choice, Partner. I respect it.', { shot: 'keep' });
+    else await P('Crunchy. A bold choice, {toHim}. I respect it.', { shot: 'keep' });
     if (S.flags.teaMade) await P('And tea. Two sugars? …Please don’t tell anyone.', { shot: 'keep' });
     if (S.flags.snackDone && S.mem.snacks) await P('Also, someone left a biscuit on a napkin for me. I intend to keep it forever. I have already eaten it.', { shot: 'keep' });
     await N('(Her fork drifts, casually, toward your plate.)', { shot: 'keep' });
@@ -755,12 +755,12 @@ Object.assign(Story, {
     if (s === 0) { bite(); await P('*chewing* …What? It looked lonely.', { shot: 'keep' }); S.mem.foodStolen++; addBond(0.3); }
     else if (s === 1) {
       addRivalry(1);
-      await P('Fork violence! At the breakfast table, Partner!', { shot: 'keep' });
+      await P('Fork violence! At the breakfast table, {dear}!', { shot: 'keep' });
       await N('(You look away for one second. One.)', { shot: 'keep' });
       bite();
       await P('Mine now. Thank you.', { shot: 'keep' });
       S.mem.foodStolen++;
-    } else { bite(); await P('…You are unbearably kind. Thank you, Partner.', { shot: 'keep' }); S.mem.foodShared++; addBond(1); }
+    } else { bite(); await P('…You are unbearably kind. Thank you, {toHim}.', { shot: 'keep' }); S.mem.foodShared++; addBond(1); }
     addScrap('pancakes', q === 'burnt' ? 'Snow-day pancakes. Structurally ambitious. Somebody stole a bite anyway.' : 'Snow-day pancakes. Somebody stole a bite. (It was {P}.)');
     await P('Now. A walk. The meadow, the hill, the lake, all under fresh snow. I have planned this extensively.', { shot: 'keep' });
     await Y('Since when?', { shot: 'keep' });
@@ -1002,7 +1002,7 @@ CH.morning = async () => {
   if (G.herDawn && !S.flags.dawnDone && !window.SKIP_DAWN) { await G.herDawn(); G.lieDown(PLAYER, B.L, -0.14, 0.15, 0.35); G.lieDown(PARTNER, B.R, -0.40, -0.3, -0.4); PARTNER.mode = 'lying'; PARTNER.lidsClosed = true; STATE.sceneShot = true; G.setShot(bedShot()); STATE.busy = true; }
   G.setShot(bedCloseShot(), false);
   await N('(The first real snow of the winter came in the night. Morning. Warm. Someone is breathing, very softly, against your neck.)', { shot: 'keep' });
-  await P('…Mm. Don’t move, Partner. You’re warm.', { shot: 'keep' });
+  await P('…Mm. Don’t move, {toHim}. You’re warm.', { shot: 'keep' });
   await Y('You have taken the entire blanket.', { shot: 'keep' });
   PARTNER.lidsClosed = false;
   await P('Our blanket.', { shot: 'keep' });
@@ -1022,7 +1022,7 @@ CH.morning = async () => {
     addRivalry(1);
     await slideBlanket(-1);
     await N('(One heroic tug. The blanket is yours. Briefly.)', { shot: 'keep' });
-    await P('Theft. First thing in the morning. I’m shocked, Partner.', { shot: 'keep' });
+    await P('Theft. First thing in the morning. I’m shocked, {dear}.', { shot: 'keep' });
     await slideBlanket(0.35);
     await N('(It is back on her side within four seconds. You did not see how.)', { shot: 'keep' });
     await P('Good morning, all the same. Thief.', { shot: 'keep' });
@@ -1032,9 +1032,10 @@ CH.morning = async () => {
     await P('Traitor.', { shot: 'keep' });
     await P('…Good morning, traitor.', { shot: 'keep' });
   }
-  await P('Hello, you.', { shot: 'keep' });
-  await Y('Hello, you.', { shot: 'keep' });
-  await P('Good. Now it’s officially morning.', { shot: 'keep' });
+  await P('Hello, {dear}.', { shot: 'keep' });
+  await Y('Hello, {dear}.', { shot: 'keep' });
+  await P('Good. Now it’s officially morning, {toHim}.', { shot: 'keep' });
+  await Y('Officially, {toHer}.', { shot: 'keep' });
   await P('On snow days, whoever wakes first makes breakfast. I believe that’s the law.', { shot: 'keep' });
   await Y('You woke up first.', { shot: 'keep' });
   await P('I have no recollection of that. …Pancakes, please. I’ll be up in a minute.', { shot: 'keep' });
@@ -1063,7 +1064,7 @@ CH.morning = async () => {
   })();
   await until(() => S.flags.breakfastDone);
   G.setHold(false);
-  PARTNER.lead = { x: 6.45, z: 7.95, waitLines: ['Boots, Partner. The walk awaits.', 'Do come along, Partner.', 'The day isn’t getting any younger. Nor are you.'] };
+  PARTNER.lead = { x: 6.45, z: 7.95, waitLines: ['Boots, {toHim}. The walk awaits.', 'Do come along, {toHim}.', 'The day isn’t getting any younger. Nor are you.'] };
   G.bark('Boots, please! The snow won’t wait.', 2.8);
   await until(() => S.flags.leaveHouse || (PLAYER.z > 6.9 && Math.abs(PLAYER.x - 6.5) < 2.2));
   STATE.noControl = true;
@@ -1180,7 +1181,7 @@ G.TICKERS.add((dt) => { const want = S.flags.lanternsLit ? 0.85 * (0.94 + Math.s
 
 // The frame: empty all day; after the cake, a photograph nobody put there.
 inter('frame', [7.75, 1.4, 4.15], 0.8, () => (EVE.photo.visible ? 'Photograph' : 'Empty frame'), async () => {
-  if (!EVE.photo.visible) { await N(cyc('frame', ['(The frame in the hall. It has been empty for as long as you’ve lived here. Partner says it’s “waiting for the right one”.)', '(Still empty. Still waiting, apparently.)'])); return; }
+  if (!EVE.photo.visible) { await N(cyc('frame', ['(The frame in the hall. It has been empty for as long as you’ve lived here. {dear} says it’s “waiting for the right one”.)', '(Still empty. Still waiting, apparently.)'])); return; }
   if (S.flags.photoSeen) { await N(cyc('photo', ['(Two children in the snow. You look for a long time and it still doesn’t become a memory.)', '(The lanterns in it look brighter than they did. Probably the fire.)'])); return; }
   // Step to one side of it, so you can both look (and the camera can see it, over your shoulder).
   await G.slideTo(PLAYER, 7.3, 3.86, Math.atan2(7.75 - 7.3, 4.43 - 3.86), 0.45);
@@ -1188,7 +1189,7 @@ inter('frame', [7.75, 1.4, 4.15], 0.8, () => (EVE.photo.visible ? 'Photograph' :
   await N('(The frame isn’t empty any more.)', { shot });
   await N('(A photograph. Two children in the snow, side by side on a log, lanterns blurred behind them. ' + (S.flags.scarfGiven ? 'The girl is wearing a red scarf that is far too big for her.' : 'The boy has a red scarf on. The girl hasn’t got one at all.') + ')', { shot });
   // Fetch her: she ought to see this.
-  if (!canHear() || dist() > 2.2) await Y('Partner? Come and look at this.', { shot });
+  if (!canHear() || dist() > 2.2) await Y('{toHer}? Come and look at this.', { shot });
   PARTNER.mode = 'script'; await G.walkTo(PARTNER, 8.05, 3.72, 1.3, Math.atan2(7.75 - 8.05, 4.43 - 3.72)); PARTNER.mode = 'still'; PARTNER.stillLook = { x: 7.75, z: 4.43, headY: 1.5 };
   G.gaze(PARTNER, [7.75, 1.5, 4.43], 6);
   await P('Did you put that there?', { shot });
@@ -1201,11 +1202,11 @@ inter('frame', [7.75, 1.4, 4.15], 0.8, () => (EVE.photo.visible ? 'Photograph' :
   await P('All right. What do you remember. The scarf: it was blue.', { shot });
   const c1 = await choose(['“It was red.”', '“It was blue.”', '“There wasn’t a scarf.”']);
   if (c1 === 0) await P(S.flags.scarfGiven ? 'It was blue. Red is the one you have now. You’re mixing them up.' : 'Blue. I would stake the cake on it. What’s left of the cake.', { shot });
-  else if (c1 === 1) await P('…Now you agree with me I’m not sure. That’s very unsettling, Partner.', { shot });
+  else if (c1 === 1) await P('…Now you agree with me I’m not sure. That’s very unsettling, {toHim}.', { shot });
   else await P('There is a scarf right there in the photograph. …Although I don’t remember it.', { shot });
   await P('There were three trees. By the log.', { shot });
   const c2 = await choose(['“Two.”', '“A whole forest.”', '“I don’t remember any trees.”']);
-  await P(['Three. One of them was leaning.', 'It was a fair, Partner, not a forest. There were three.', 'You were looking at something else, then.'][c2], { shot });
+  await P(['Three. One of them was leaning.', 'It was a fair, {dear}, not a forest. There were three.', 'You were looking at something else, then.'][c2], { shot });
   if (c2 === 2) await N('(You were. You don’t say what.)', { shot });
   await P('And the first thing you said to me. What was it?', { shot });
   const open = S.flags.fairOpen;
@@ -1253,7 +1254,7 @@ inter('lanterns', [7.9, 1.0, 5.9], 1.1, () => (S.flags.lanternsLit ? 'Lanterns' 
     await P('Careful. That’s the only weather we’ve got.', { shot: close });
   }
   if (S.flags.fairWish === 'snow') await P('I wanted it to be snowing in there forever. Somebody wished for that once.', { shot: close });
-  await P('Happy first snow, Partner. Again.', { shot: close });
+  await P('Happy first snow, {toHim}. Again.', { shot: close });
   S.flags.presentGiven = 1; addBond(0.4);
   addScrap('globe', 'A snow globe of the night we met. Seven trees, a cinnamon-stick log, and a month of glue.');
   G.hint('The bench on the porch has the best view of the sky.', 5);

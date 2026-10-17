@@ -254,7 +254,7 @@ function buildRooms() {
   core.position.set(0, 0.11, 0.02); core.renderOrder = 8; fireG.add(core); firePlanes.push(core); FLAMES.push(core);
   const fireLight = new THREE.PointLight('#ff8a3a', 0, 10, 2); fireLight.position.set(fx, 0.5, 1.35); W.add(fireLight);
   G.FIRE = { planes: firePlanes, light: fireLight, on: true, power: 9, level: 1, coals: coalM, logM, lightAt: fireLight.position.clone() };
-  G.INTER.push({ id: 'fire', pos: [fx, 0.6, 1.25], r: 1.3, label: () => (G.FIRE.on ? 'Fireplace' : 'Light the fire'), act: () => { G.FIRE.on = !G.FIRE.on; if (G.FIRE.on) G.say('partner', 'The fire person, at work. My hero.'); } });
+  G.INTER.push({ id: 'fire', pos: [fx, 0.6, 1.25], r: 1.3, label: () => (G.FIRE.on ? 'Fireplace' : 'Light the fire'), act: () => { G.FIRE.on = !G.FIRE.on; if (G.FIRE.on) G.say('partner', 'The fire person, at work. My hero, {toHim}.'); } });
   // Mantle: candles, frames, a snow globe, a sprig of pine.
   // Mantle things sit on the shelf in front of the stone (its face is at z = 0.66), not inside it.
   candle(fx - 0.85, 1.48, 0.74, 0.16, 0.03); candle(fx - 0.72, 1.48, 0.77, 0.11, 0.03); candle(fx + 0.82, 1.48, 0.76, 0.13, 0.03);
@@ -477,7 +477,7 @@ function buildKitchen() {
   K.cupboard = { x: 11.42, z: 4.12 };
   box(0.6, 1.9, 0.42, paint, 11.42, 0.95, 4.26, { coll: true, cam: true, r: 0.01 });
   box(0.012, 1.7, 0.01, G.shared({ color: '#55604f', roughness: 0.8 }), 11.42, 0.95, 4.045, { cast: false });
-  const note = new THREE.Mesh(new THREE.PlaneGeometry(0.17, 0.17), G.std({ map: noteTex([{ t: 'Property', size: 30 }, { t: 'of me.', size: 30, gap: 44 }, { t: 'Not', size: 34, color: '#b8322a', gap: 56 }, { t: 'Partner’s.', size: 36, color: '#b8322a', gap: 46 }]), roughness: 0.9 }));
+  const note = new THREE.Mesh(new THREE.PlaneGeometry(0.17, 0.17), G.std({ map: noteTex([{ t: 'Property', size: 30 }, { t: 'of me.', size: 30, gap: 44 }, { t: 'Not', size: 34, color: '#b8322a', gap: 56 }, { t: '{toHim}’s.', size: 36, color: '#b8322a', gap: 46 }]), roughness: 0.9 }));
   note.position.set(11.52, 1.3, 4.044); note.rotation.set(0, Math.PI, -0.05); W.add(note);
   // A little radio on the window sill (story.js switches it on and off).
   K.radio = G.propSlot('radio', 13.58, 0.88, 4.42, Math.PI, (g) => {

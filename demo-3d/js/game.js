@@ -821,7 +821,6 @@ const keys = (G.keys = new Set()), pressed = new Set();
 addEventListener('keydown', (e) => {
   if (e.code === 'Escape' || e.code === 'KeyP') { setPaused(!STATE.paused); e.preventDefault(); return; }
   if (e.code === 'KeyM') { setMuted(!SETTINGS.muted); return; }
-  if (e.code === 'Tab' && !STATE.paused && STATE.started) { e.preventDefault(); if (G.switchPerspective) G.switchPerspective(); return; }
   if (e.code === 'KeyV' && !STATE.paused) { setView(SETTINGS.view === 'first' ? 'third' : 'first'); return; }
   if (STATE.paused) return;
   if (e.code === 'KeyT' && !e.repeat && STATE.started && G.takePhoto) { G.takePhoto(); return; }
@@ -1004,7 +1003,7 @@ function partnerLead(p, dt, t) {
   if (L.arrived || d > 6.5) {
     p.speed = damp(p.speed, 0, 6, dt); p.nav = null;
     p.yaw = angDamp(p.yaw, Math.atan2(PLAYER.x - p.x, PLAYER.z - p.z), 3, dt); p.lookAt = head(PLAYER);
-    if (L.waitT <= 0 && d > 3.5) { L.waitT = 8 + Math.random() * 5; bark(L.waitLines || ['Do keep up, Partner.', 'I’m waiting. Patiently. Mostly.', 'Your legs are longer than mine, you know.', 'Come along, slowcoach.'], 2.6); }
+    if (L.waitT <= 0 && d > 3.5) { L.waitT = 8 + Math.random() * 5; bark(L.waitLines || ['Do keep up, {toHim}.', 'I’m waiting. Patiently. Mostly.', 'Your legs are longer than mine, you know.', 'Come along, {toHim}.'], 2.6); }
     if (!L.arrived && d > 6.5) return;
     if (L.arrived) return;
   }
@@ -1082,7 +1081,7 @@ const Story = (G.Story = {
     await G.say(null, '(A cake. Five candles: one for every first snow in this cabin. Somebody counted very carefully.)', { shot: cakeShot });
     await G.say('partner', 'You thought I’d forgotten what day it is. Admit it.');
     await G.say('player', 'You didn’t say a word all day.');
-    await G.say('partner', 'That was the hardest thing I have ever done, Partner.');
+    await G.say('partner', 'That was the hardest thing I have ever done, {toHim}.');
     // The snow globe on the mantle doubles as a music box.
     const tune = G.Audio.musicBox();
     await G.say(null, '(She winds the snow globe on the mantle. It plays its little tune, a touch slow, and she hums along, off-key and completely sure of herself.)', { shot: cakeShot, auto: Math.max(5, tune + 0.4) });
@@ -1095,7 +1094,7 @@ const Story = (G.Story = {
     else if (G.S.flags.fairWish === 'snow') await G.say('partner', 'And not “snow every day”. …Somebody wished that once. I’m sure somebody did.', { shot: cakeShot });
     G.Audio.blow(); G.CAKE.lit = false;
     await G.say(null, '(You blow them out. All five, first try.)', { shot: cakeShot });
-    await G.say('partner', 'Happy first snow.');
+    await G.say('partner', 'Happy first snow, {dear}.');
     await G.say('player', 'Happy first snow.');
     STATE.cakeDone = true;
     if (G.EVE && G.EVE.showPhoto) { G.EVE.showPhoto(); wait(4).then(() => hint('Something’s different about the frame in the hall.', 6)); }
@@ -1148,7 +1147,7 @@ const Story = (G.Story = {
     await G.say(null, '(The sun goes, and then all at once there are more stars than sky.)', { shot: 'keep' });
     PARTNER.tiltTarget = -0.25;
     await G.say('partner', 'Pick a star. That one is yours. For this year.', { shot: 'keep' });
-    await G.say('player', 'Which one?', { shot: 'keep' });
+    await G.say('player', 'Which one, {toHer}?', { shot: 'keep' });
     await G.say('partner', 'The bright one, naturally. I wouldn’t give you a dim one tonight.', { shot: 'keep' });
     await wait(1.5);
     // Something that should not be here in winter.
@@ -1163,7 +1162,7 @@ const Story = (G.Story = {
       await G.say('player', 'Is that a—', { shot: 'keep' });
       await G.say('partner', 'It’s a firefly.', { shot: 'keep' });
       await wait(1.2);
-      await G.say('partner', 'It’s the first snow, Partner. There aren’t any fireflies.', { shot: 'keep' });
+      await G.say('partner', 'It’s the first snow, {dear}. There aren’t any fireflies.', { shot: 'keep' });
       await G.say(null, '(Her hand finds yours on the bench, and holds on.)', { shot: 'keep' });
       setShot(rear);
       await G.say('partner', 'Inside. Please.', { shot: 'keep' });
@@ -1226,7 +1225,7 @@ async function hug(kind = 'hug', line) {
   // Mostly side-on, a little to your side of the hug, so her face (turned against you) is the one in frame.
   const pick = [[1, -0.25, 1.25], [-1, -0.25, 1.25], [1, -0.1, 0.9], [-1, -0.1, 0.9]].find((o) => { const c = camAt(o); return !blocked(c.look, c.pos); });
   if (pick) setShot(() => camAt(pick));
-  bark(line || ['Mm. Hello, you.', 'You’re so warm. It hardly seems fair.', 'A very good hug. Ten out of ten.', 'All right. One more second. Two.']);
+  bark(line || ['Mm. Hello, {toHim}.', 'You’re so warm. It hardly seems fair.', 'A very good hug. Ten out of ten.', 'All right. One more second. Two.']);
   await wait(kiss ? 1.7 : 2.6);
   STATE.hugging = false; STATE.hugIn = null; PARTNER.lidsClosed = false; PARTNER.tiltTarget = 0; STATE.busy = false;
   PLAYER.leanTarget = 0; PLAYER.tiltTarget = 0; PLAYER.lidsClosed = false; PARTNER.headDown = 0;
@@ -1310,8 +1309,8 @@ function renderControls() {
 }
 function updateKeyHints() {
   const k = (a) => G.keyFor(a), mv = [k('forward'), k('left'), k('back'), k('right')].join('');
-  const t = $('titleKeys'); if (t) t.textContent = `${mv} walk · ${k('run')} run · drag to look · scroll to zoom · ${k('interact')} interact · ${k('together')} together · ${k('photo')} take a photo · ${k('view')} first person · Tab play as her · N time of day · \` stats`;
-  const pk = $('pKeys'); if (pk) pk.textContent = `Esc pause · M mute · ${k('view')} first/third person · Tab play as her/him · ${mv} walk · ${k('run')} run · ${k('interact')} interact · ${k('together')} together · ${k('photo')} photo`;
+  const t = $('titleKeys'); if (t) t.textContent = `${mv} walk · ${k('run')} run · drag to look · scroll to zoom · ${k('interact')} interact · ${k('together')} together · ${k('photo')} take a photo · ${k('view')} first person · N time of day · \` stats`;
+  const pk = $('pKeys'); if (pk) pk.textContent = `Esc pause · M mute · ${k('view')} first/third person · ${mv} walk · ${k('run')} run · ${k('interact')} interact · ${k('together')} together · ${k('photo')} photo`;
 }
 G.updateKeyHints = updateKeyHints;
 G.setPaused = setPaused;
@@ -1384,7 +1383,7 @@ const BARKS = [
   { id: 'nose', when: (o) => o.out && STATE.tod > 0.6 && o.idle > 5, text: 'Your nose has gone pink. It suits you. Please don’t fix it.' },
   { id: 'listen', when: (o) => o.out && o.idle > 9, text: 'Listen. You can hear the snow landing.' },
   { id: 'stars', when: (o) => o.out && STATE.tod > 0.8 && o.idle > 6, text: 'There are so many. Someone has rather overdone it.' },
-  { id: 'run', when: (o) => o.out && AMBIENT.runT > 2.2, text: 'No running in the snow, Partner! …Very well. Wait for me.' },
+  { id: 'run', when: (o) => o.out && AMBIENT.runT > 2.2, text: 'No running in the snow, {toHim}! …Very well. Wait for me.' },
   { id: 'fire', when: (o) => o.nearFire && o.idle > 6, text: 'I could stay here until spring, I think.' },
   { id: 'cake', when: (o) => STATE.cakeDone && o.inside && o.idle > 10, text: 'Would a second slice be too early? I say nothing is too early on a first snow.' },
   { id: 'cold', when: (o) => o.out && STATE.tod > 0.4 && o.idle > 14, text: 'My toes have formally resigned. Shall we go in soon?' },
@@ -1399,8 +1398,9 @@ function ambientBarks(dt) {
   const b = BARKS.find((x) => !AMBIENT.used.has(x.id) && x.when(o));
   if (b) { AMBIENT.used.add(b.id); bark(b.text, 4); AMBIENT.cd = 28 + Math.random() * 20; }
 }
-/* Playing as either of them in free time (Tab): the two swap bodies where they stand, so nothing moves on screen;
- * you steer her and he follows. Any scene puts you back in his shoes first (the story is told from his side). */
+/* Playing as Partner (chosen on the title screen): in free time the two swap bodies where they stand, so nothing moves
+ * on screen, and you steer her while he follows. Scenes are told from his side, so a scene puts you back in his shoes
+ * for its length, and the chapters that need a particular one (the night, Act IV as him; dawn and Elsewhere as her) decide. */
 const FREE_CH = /^(morning|walk|evening|ending_)/;
 G.canSwitch = () => STATE.started && !busy() && G.S && FREE_CH.test(G.S.chapter || '') && !PARTNER.hidden && !PARTNER.lie && !PLAYER.lie && (PARTNER.sit || 0) < 0.05 && (PLAYER.sit || 0) < 0.05 && !PARTNER.task && !PLAYER.carry && !STATE.dancing && !PLAYER.hugWith;
 function swapPlaces() {
@@ -1420,8 +1420,9 @@ G.switchPerspective = () => {
 };
 G.unswitch = () => { if (STATE.asHer) swapPlaces(); };
 function step(dt, t) {
-  // A scene starting (or a chapter that isn't free time) puts you back as him.
+  // A scene starting (or a chapter that isn't free time) puts you back as him; free time again, back to her.
   if (STATE.asHer && (busy() || !G.S || !FREE_CH.test(G.S.chapter || '') || PLAYER.lie || PARTNER.lie)) swapPlaces();
+  else if (!STATE.asHer && SETTINGS.playAs === 'partner' && !(G.NIGHT && G.NIGHT.swapped) && G.canSwitch() && (PARTNER.mode === 'follow' || PARTNER.mode === 'still') && Math.hypot(PARTNER.x - PLAYER.x, PARTNER.z - PLAYER.z) < 6) swapPlaces();
   updateDialogue(dt);
   let ix = (keys.has('KeyD') || keys.has('ArrowRight') ? 1 : 0) - (keys.has('KeyA') || keys.has('ArrowLeft') ? 1 : 0);
   let iy = (keys.has('KeyS') || keys.has('ArrowDown') ? 1 : 0) - (keys.has('KeyW') || keys.has('ArrowUp') ? 1 : 0);
@@ -1487,7 +1488,7 @@ function step(dt, t) {
       PARTNER.initT = 55 + Math.random() * 55;
       if (G.S.vars.bond >= 2 || G.S.mem.affection >= 3) {
         const r = Math.random();
-        if (r < 0.4) { G.Audio.tap(); bark('*tap tap*', 1.2); wait(1.1).then(() => { if (!busy()) bark(['Hello. I only wanted to say hello.', 'Still here? Good.', 'You look thoughtful, Partner.', 'Just checking you’re real.']); }); }
+        if (r < 0.4) { G.Audio.tap(); bark('*tap tap*', 1.2); wait(1.1).then(() => { if (!busy()) bark(['Hello. I only wanted to say hello.', 'Still here? Good.', 'You look thoughtful, {toHim}.', 'Just checking you’re real.']); }); }
         else if (r < 0.75 && !PARTNER.hold) { G.setHold(true); PARTNER.holdTimer = 18 + Math.random() * 14; bark(['*takes your hand*', 'Hand, please.', 'I’ll have this, thank you.']); G.S.mem.partnerInit = (G.S.mem.partnerInit || 0) + 1; }
         else bark(['*rests her head on your shoulder for a moment*', '*bumps your arm with hers*'], 2.4);
       }
@@ -1756,7 +1757,7 @@ function boot() {
   };
   // Jumping to a chapter (testing, or replaying a part): from the title or the pause menu. Whatever scene was running
   // is left hanging where it was (its next line never comes), the screen is cleared, and the chapter starts fresh.
-  G.CHAPTERS = [['prologue', 'Prologue · The winter fair'], ['morning', 'Act I · Morning'], ['walk', 'Act I · The walk'], ['evening', 'Act II · Evening'], ['bedtime', 'Act III · Bedtime'], ['night', 'Act III · The night'], ['elsewhere', 'Act III · Elsewhere (as her)'], ['lastbirthday', 'Act IV · The last birthday'], ['ending_foundme', 'Ending · You Found Me'], ['ending_uncertain', 'Ending · Uncertain Morning'], ['ending_iknow', 'Ending · I Know It’s You'], ['ending_perfect', 'Ending · The Perfect Partner'], ['ending_stay', 'Ending · Stay Here'], ['ending_replaced', 'Ending · Replaced']];
+  G.CHAPTERS = [['prologue', 'Prologue · The winter fair'], ['morning', 'Act I · Morning'], ['walk', 'Act I · The walk'], ['evening', 'Act II · Evening'], ['bedtime', 'Act III · Bedtime'], ['night', 'Act III · The night'], ['elsewhere', 'Act III · Elsewhere (as her)'], ['lastbirthday', 'Act IV · The last birthday'], ['ending_foundme', 'Ending · You Found Me'], ['ending_uncertain', 'Ending · Uncertain Morning'], ['ending_iknow', 'Ending · I Know It’s You'], ['ending_perfect', 'Ending · The Perfect {dear}'], ['ending_stay', 'Ending · Stay Here'], ['ending_replaced', 'Ending · Replaced']];
   G.jumpTo = async (id) => {
     if (!G.CH || !G.CH[id]) return;
     setPaused(false);
@@ -1790,7 +1791,10 @@ function boot() {
     $('pTestWrap').addEventListener('toggle', syncTest);
     G.syncTest = syncTest;
   }
-  if ($('switchBtn')) $('switchBtn').addEventListener('click', () => G.switchPerspective());
+  // Who you play as, chosen on the title screen (kept between sessions).
+  const syncAs = () => document.querySelectorAll('[data-as]').forEach((b) => b.setAttribute('aria-pressed', String((SETTINGS.playAs || 'player') === b.dataset.as)));
+  document.querySelectorAll('[data-as]').forEach((b) => b.addEventListener('click', () => { SETTINGS.playAs = b.dataset.as; saveSettings(); syncAs(); }));
+  syncAs();
   for (const sel of [$('chapterSel'), $('pChapter')]) {
     if (!sel) continue;
     sel.innerHTML = '<option value="">Jump to…</option>' + G.CHAPTERS.map(([id, t]) => `<option value="${id}">${t}</option>`).join('');

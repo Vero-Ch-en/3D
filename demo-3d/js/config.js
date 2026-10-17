@@ -12,8 +12,10 @@
     playerLabel: 'You',
     partnerLabel: 'Partner',
     // What they call each other in the 3D game.
-    callPlayer: 'Partner',
-    callPartner: 'Partner',
+    // She calls him “Charming Partner”; he calls her “Lovely Partner”; both say “Dearest Partner”.
+    callPlayer: 'Charming Partner',
+    callPartner: 'Lovely Partner',
+    callBoth: 'Dearest Partner',
     // The card at the end of the 3D game.
     closing: {
       heading: 'Here’s to another winter.',
