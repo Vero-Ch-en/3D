@@ -23,7 +23,8 @@ addEventListener('keydown', (e) => {
 /* A vertical list of options. opts: strings or { t, v }. Resolves to the index (or v). */
 UI.choose = (opts) => new Promise((res) => {
   const box = $('choices');
-  const list = opts.map((o) => (typeof o === 'string' ? { t: o } : o));
+  const herC = G.herSide && G.herSide() && window.CBS_CHOICE_HER;
+  const list = opts.map((o) => (typeof o === 'string' ? { t: (herC && herC[o]) || o } : o));
   box.innerHTML = list.map((o, i) => `<button type="button" style="animation-delay:${i * 0.06}s"><span class="n">${i + 1}</span><span>${esc(G.fmt(o.t))}</span></button>`).join('');
   box.hidden = false;
   const btns = [...box.querySelectorAll('button')];

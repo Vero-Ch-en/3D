@@ -553,7 +553,7 @@ async function cards() {
   hers++;
   await Pt('Lower. And— oh, look. A queen. Lovely. Correct.', K());
   await N('(As she reaches for the deck, a second queen slides out of her sleeve and lands face up on the table.)', K());
-  const call = await choose(['“{toHim}.”', 'Say nothing']);
+  const call = await choose(['“{toHer}.”', 'Say nothing']);
   S.mem.cards = (S.mem.cards || 0) + 1;
   if (call === 0) {
     addRivalry(0.6);
