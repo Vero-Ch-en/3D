@@ -82,6 +82,9 @@
   .pause-panel { width: min(440px, 100%); max-height: calc(100vh - 32px); overflow-y: auto; background: rgba(18,14,14,0.92); border: 1px solid var(--line); border-radius: 18px; padding: 22px 22px 18px; display: grid; gap: 14px; }   /* scrolls on short (landscape phone) screens */
   .prow .seg { flex-wrap: wrap; }
   .pause-panel h2 { font: 500 34px/1 var(--display); margin: 0 0 4px; }
+  #chapterSel, #pChapter { flex: 1; min-width: 0; font: inherit; font-size: 14px; padding: 6px 8px; border-radius: 8px; background: rgba(255,255,255,0.08); color: inherit; border: 1px solid rgba(255,255,255,0.18); }
+  #chapterSel option, #pChapter option { color: #222; }
+  .row.chapters { align-items: center; gap: 10px; margin-top: 10px; font-size: 14px; opacity: 0.85; }
   .prow { display: flex; align-items: center; gap: 12px; font-size: 14px; color: var(--ink-dim); }
   .prow > label, .prow > span { min-width: 7.5em; }
   .prow input[type=range] { flex: 1; min-width: 0; accent-color: var(--amber); }
@@ -175,6 +178,7 @@
     <h1>Snowed In</h1>
     <p class="lede">The first real snow of the winter, a cabin in the pines, and a whole day with nowhere to be. Wake up tangled in the blanket, burn the pancakes, take the long way round, and find your way home by the light in the windows.</p>
     <div class="row"><button class="btn primary" id="begin">Begin</button><button class="btn" id="continue" hidden>Continue</button></div>
+    <div class="row chapters"><label for="chapterSel">Chapters</label><select id="chapterSel" aria-label="Jump to a chapter"></select></div>
     <div class="keys" id="titleKeys">WASD walk · Shift run · drag to look · scroll to zoom · E interact · Q together · T take a photo · V first person · N time of day · ` stats</div>
   </div>
 </div>
@@ -209,6 +213,10 @@
   <div class="pause-panel">
     <h2 id="pauseTitle">Paused</h2>
     <button class="btn primary" id="pResume">Resume</button>
+    <div class="prow">
+      <label for="pChapter">Chapter</label>
+      <select id="pChapter" aria-label="Jump to a chapter"></select>
+    </div>
     <div class="prow">
       <label for="pVolume">Volume</label>
       <input type="range" id="pVolume" min="0" max="100" step="1" value="80">

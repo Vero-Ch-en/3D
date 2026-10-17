@@ -1731,6 +1731,36 @@ function boot() {
     document.body.classList.add('playing');
     if (G.Story.begin) G.Story.begin(fromSave); else { Story.intro(); await wait(0.9); $('fade').classList.remove('on'); }
   };
+  // Jumping to a chapter (testing, or replaying a part): from the title or the pause menu. Whatever scene was running
+  // is left hanging where it was (its next line never comes), the screen is cleared, and the chapter starts fresh.
+  G.CHAPTERS = [['prologue', 'Prologue · The winter fair'], ['morning', 'Act I · Morning'], ['walk', 'Act I · The walk'], ['evening', 'Act II · Evening'], ['bedtime', 'Act III · Bedtime'], ['night', 'Act III · The night'], ['elsewhere', 'Act III · Elsewhere (as her)'], ['lastbirthday', 'Act IV · The last birthday'], ['ending_foundme', 'Ending · You Found Me'], ['ending_uncertain', 'Ending · Uncertain Morning'], ['ending_iknow', 'Ending · I Know It’s You'], ['ending_perfect', 'Ending · The Perfect Partner'], ['ending_stay', 'Ending · Stay Here']];
+  G.jumpTo = async (id) => {
+    if (!G.CH || !G.CH[id]) return;
+    setPaused(false);
+    $('fade').classList.add('on'); $('fade').style.background = '#000';
+    await wait(0.6);
+    if (!STATE.started) { $('title').classList.add('hide'); STATE.started = true; document.body.classList.add('playing'); $('begin').disabled = true; G.Audio.start(); }
+    DLG.q.length = 0; DLG.cur = null; $('subs').className = '';
+    G.UI.reset && G.UI.reset();
+    $('endcard').classList.remove('show'); document.body.classList.remove('ending');
+    STATE.nightDone = false; STATE.ending = null; STATE.paused = false; STATE.watchDoor = false;
+    PLAYER.script = PARTNER.script = null;
+    if (G.NIGHT && G.NIGHT.swapped && G.swapBodies) G.swapBodies();
+    G.setHold && G.setHold(false);
+    releaseCamera(); CAM.cut = true;
+    G.post.grade.uniforms.uMem.value = 0; STATE.fog = null; if (G.WEATHER) G.WEATHER.hold = null; STATE.snowStill = false;
+    (G.onJump || []).forEach((f) => { try { f(); } catch (e) { console.error('[jump]', e); } });
+    const S = G.S; if (S && !S.flags.sign) S.flags.sign = 'pinecones';
+    G.go(id);
+    await wait(0.4);
+    // The chapter fades itself in; if it doesn't within a few seconds, lift the fade anyway.
+    wait(4).then(() => { if (!document.getElementById('card').classList.contains('show')) { $('fade').classList.remove('on'); $('fade').style.background = ''; } });
+  };
+  for (const sel of [$('chapterSel'), $('pChapter')]) {
+    if (!sel) continue;
+    sel.innerHTML = '<option value="">Jump to…</option>' + G.CHAPTERS.map(([id, t]) => `<option value="${id}">${t}</option>`).join('');
+    sel.addEventListener('change', () => { const v = sel.value; sel.value = ''; if (v) G.jumpTo(v); });
+  }
   $('begin').addEventListener('click', () => start(false));
   if ($('continue')) $('continue').addEventListener('click', () => start(true));
   requestAnimationFrame(frame);

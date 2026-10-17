@@ -373,6 +373,18 @@ async function elsewhere() {
   STATE.busy = false;
   return A.go('lastbirthday');
 }
+// Elsewhere on its own (for the chapter list): the night house, then straight through the door.
+CH.elsewhere = async () => {
+  checkpoint('elsewhere');
+  quiet(); STATE.busy = true;
+  G.useKids(false); G.setDressed(PLAYER, false); G.setDressed(PARTNER, false);
+  G.setTime({ day: 0, tod: 1, snow: 0.25 }, true); houseFor('morning'); G.FIRE.on = true; G.FIRE.level = 0.35;
+  for (const L of G.LAMPS) { if (L.power0 == null) L.power0 = L.power; const p = L.g.getWorldPosition(new THREE.Vector3()); if (p.x > 12.5 && p.x < 13.5 && p.y > 1.5) { L.on = true; L.power = 0.9; } }
+  NIGHT.door.visible = false; NIGHT.outside = false; NIGHT.canWhistle = false;
+  Object.assign(S.flags, { doorOpen: true, povWhistled: false });
+  if (!S.flags.sign) S.flags.sign = 'pinecones';
+  await elsewhere();
+};
 // Her whistle, at the kitchen window (only in Elsewhere).
 inter('eWhistle', [13.05, 1.3, -1.45], 0.8, 'Whistle', async () => {
   await wait(Math.min(1.8, G.Audio.whistle(1.12, 0.6) + 0.3));

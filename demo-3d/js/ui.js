@@ -56,6 +56,8 @@ UI.card = (lines, o = {}) => new Promise((res) => {
   requestAnimationFrame(() => box.classList.add('show'));
   G.wait(o.hold || 3).then(() => { box.classList.remove('show'); G.wait(1.2).then(() => { box.innerHTML = ''; res(); }); });
 });
+// Drop whatever is on screen (a choice, a card, the scrapbook): used when jumping to another chapter.
+UI.reset = () => { modal = null; for (const id of ['choices', 'card']) { const b = $(id); if (b) { b.hidden = id === 'choices'; b.innerHTML = ''; b.classList.remove('show'); } } const sb = $('scrap'); if (sb) sb.hidden = true; };
 UI.act = (num, title, o = {}) => UI.card(['Act ' + num, title], { cls: ['act-n', 'act-t'], stagger: 0.45, hold: o.hold || 3.4, white: o.white });
 
 /* Timing minigame: stop the marker in the warm zone. Resolves to an array of scores in 0..1. */

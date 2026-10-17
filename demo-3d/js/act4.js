@@ -66,6 +66,7 @@ const ENT = (() => {
 })();
 
 const MUG3 = (() => { const m = G.cyl(0.04, 0.035, 0.09, G.shared({ color: '#e8e2d6', roughness: 0.4 }), 13.42, 0.97, -1.98, { seg: 14 }); m.rotation.x = Math.PI; m.visible = false; return m; })();
+(G.onJump = G.onJump || []).push(() => { SIGN.g.visible = false; TRAIL.g.visible = false; EXD.g.visible = false; ENT.g.visible = false; MUG3.visible = false; G.WALK && G.WALK.showCircle(false); });
 /* ---------- the endcard learns the ending's name ---------- */
 G.endingName = null;
 const showEnd = (id, title) => {
