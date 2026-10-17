@@ -87,35 +87,20 @@ a queen up her sleeve), and photographs that end up on the fridge.
   *"It's the first snow, Partner. There aren't any fireflies."* Her hand finds
   yours. *"Inside. Please."* *(done)*
 
-## Act III · Recognition — the night *(done: the first version)*
+## Act III · Recognition — the night *(done: rebuilt to follow the 2D Entity rules)*
 
-- You wake cold. The blanket is all on your side; hers is empty but still
-  warm. She comes back ("Couldn't sleep. Got water.") and lies down exactly on
-  her side. It isn't her.
-- Social stealth around the dark house: the chairs pushed in (they never push
-  the chairs in), the fridge arranged with every label facing out, a fogged
-  mirror, the snow globe swirling as if just shaken, the photograph with a
-  third shape at its edge. Two clues open a door in the kitchen wall that has
-  never been there, onto a summer meadow at night.
-- **Elsewhere.** For a little while you are Partner, downstairs, with an
-  imitation of *you*. It gets the facts right and the rhythm wrong. You leave
-  a sign only the real one would understand (the pinecones in a line, half a
-  pancake with one enormous bite, or a note: *"if it's sure about the night we
-  met, it isn't me"*), then walk out into the snow to find them.
-- Built (reworked): no clue-hunting. You wake cold, her side empty, a light
-  in the kitchen; she couldn't sleep either. You pick two ordinary
-  sleepless-night things to do together (cocoa at the stove, the last of the
-  fire, the window seat in the reading nook, cold cake from the fridge) and
-  tease her the way you always do. She answers almost right, and nothing says
-  so: the morning's line word for word, the toaster mentioned, the pinecone
-  score remembered exactly ("eleven to nine"), the whistle perfectly in tune, a
-  laugh a beat late, her chair pushed in, the icing given up without a fight.
-  Back in bed she lies exactly on her side; then, from the kitchen, three
-  notes whistled slightly flat on the last one, the real one's way, and the
-  door in the wall between the fridge and the study. Elsewhere: breakfast in
-  a too-bright kitchen with an imitation of you that recites the night of the
-  fair exactly; you leave one sign (`S.flags.sign`: pinecones, pancake or
-  note) and go out into the snow. *Act IV · The Same Day — to be continued.*
+**Bedtime (the real her).** In bed after the porch: "A good first snow?" (top three / apart from the firefly / every one with you is), then hold, look at or kiss her. The plant line: *"If I get up for water, don't steal my side." / "You don't recognise sides." / "…Touché. Goodnight, giant."* Lamps out.
+
+**The night (the imitation).** You wake cold; her side is empty. Footsteps. She comes back: "Couldn't sleep. Got water." She lies down exactly on her side. "Come back to sleep." Then you're free.
+- **Go back to sleep beside it**: corruption; you wake to the whistle very close and her eyes open.
+- **Get up**: after ~10 s it gets up too and follows you ("Can't sleep either?"). Talk to it anywhere: cocoa, the last of the fire, the window seat, the last of the cake, **tease**, or "Who are you?". It answers almost right: it repeats this morning's lines word for word, gives up a joke line, doesn't flinch when poked, never checks the cake halves, pushes its chair in square, and is certain about scores and the night you met. Agreeing with its certainties or sitting at its fire adds corruption.
+- **Social stealth**: staring at it for 5 s up close ("…What?"), running near it, or confronting it adds suspicion. At 3 it goes back to bed and lies with its eyes open.
+- **The whistle**: the real one's, from the kitchen, after 14 s and then every 18–26 s. The first time it says "…Pipes. Old house." After two whistles a **door** appears in the kitchen wall. There's a hint after 70 s.
+- **Optional, noticed if you look**: three mugs on the rack, the photo's third shape, snow inside the bedroom sill. The front door won't open.
+
+**Elsewhere (played as her).** Through the door (black if you slept beside it, pale blue if not), the bodies swap: "Earlier." She's up for water. Something in his shape walks all the way into the kitchen: "Come back to bed, Partner." (He never comes all the way into the kitchen.) Three replies, each with a tell. It leaves without waiting. You whistle at the window, leave a sign (pinecones / pancake bite / note), and walk out of the front door into the snow. Then the "Act IV · The Same Day" card and the end card.
+
+**The Entity's notes.** `G.observe` logs what it learns about how you play (its own voice, in the console) and keeps the last 80 in this browser under `snowed.entity.observations`. This is ready for Act IV.
 
 ## Act IV · The Same Day
 
