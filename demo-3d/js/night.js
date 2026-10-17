@@ -1,14 +1,15 @@
 'use strict';
 /* =========================================================================
  * Act III · Recognition: the night.
- * You wake cold; her side is empty but warm. She comes back ("Couldn't sleep.
- * Got water.") and lies down exactly on her side. It isn't her. The dark house:
- * the chairs pushed in, the fridge with every label facing out, the snow globe
- * swirling as if just shaken, a third shape in the photograph, three notes in
- * the fogged window that aren't the right three. Two of them, and a door is in
- * the kitchen wall that has never been there. Elsewhere: for a little while you
- * are Partner, at breakfast with an imitation of you. You leave a sign only the
- * real one would understand, and go out into the snow to find them.
+ * You wake cold; her side is empty and there's a light in the kitchen. She
+ * couldn't sleep either. A sleepless night together, the ordinary way: cocoa,
+ * the last of the fire, the window seat, cold cake from the fridge. You tease
+ * her the way you always do; she answers almost right (a line repeated word
+ * for word, the toaster mentioned, a score remembered, a laugh a beat late).
+ * Nothing says so. Back in bed she lies exactly on her side; then, from the
+ * kitchen, three notes whistled the way only the real one whistles them, and
+ * a door in the wall that has never been there. Elsewhere: for a little while
+ * you are Partner, at breakfast with an imitation of you.
  * ========================================================================= */
 (G.afterBuild = G.afterBuild || []).push(() => {
 const { PLAYER, PARTNER, STATE } = G;
@@ -62,118 +63,153 @@ CH.night = async () => {
   G.setTime({ day: 0, tod: 1, snow: 0.25 }, true);
   houseFor('morning');                        // lamps off, the cake put away, the bed slept in
   G.FIRE.on = true; G.FIRE.level = 0.35;      // the fire down to its last coals
-  // Just enough light to find your way: her bedside lamp left on low, the kitchen pendant turned right down.
+  // the light she left on in the kitchen, turned right down
   for (const L of G.LAMPS) {
     if (L.power0 == null) L.power0 = L.power;
     const p = L.g.getWorldPosition(new THREE.Vector3());
-    if (p.x > 3 && p.x < 4 && p.z < -1) { L.on = true; L.power = 2.4; }
-    else if (p.x > 12.5 && p.x < 13.5 && p.y > 1.5) { L.on = true; L.power = 0.9; }
+    if (p.x > 12.5 && p.x < 13.5 && p.y > 1.5) { L.on = true; L.power = 1.1; }
   }
-  NIGHT.clues.clear(); NIGHT.door.visible = false; Object.assign(S.flags, { doorOpen: false, nightUp: false });
+  NIGHT.door.visible = false; NIGHT.done = new Set(); NIGHT.odd = 0;
+  Object.assign(S.flags, { doorOpen: false, nightUp: false, nightFound: false, nightBed: false });
   STATE.bounds = { zMin: -5, zMax: 4.3 };     // nobody is going out tonight
   G.lieDown(PLAYER, B().L, -0.14, 0.15, 0.35);
-  PARTNER.hidden = true; PARTNER.m.visible = false; PARTNER.mode = 'still';
+  // She's up: in the kitchen, at the window, in the dark.
+  G.standAt(PARTNER, 13.0, 3.7, 0); PARTNER.mode = 'still'; PARTNER.stillLook = { x: 13.0, z: 8, headY: 1.5 };
   STATE.sceneShot = true; G.setShot(bedShot());
   await wait(0.4);
   f.style.transition = 'opacity 2.6s'; f.classList.remove('on'); wait(2.8).then(() => { f.style.transition = ''; f.style.background = ''; });
   await G.UI.act('III', 'Recognition', { white: false });
   G.setShot(bedClose(), false);
-  await N('(You wake cold.)', K());
-  await N('(The blanket is all on your side. Her side is empty, and still warm.)', K());
-  const c0 = await choose(['Wait for her', 'Say her name', 'Listen']);
-  if (c0 === 1) { await Y('Partner?', K()); await N('(Nothing. Then, from the kitchen, a glass set down very carefully.)', K()); }
-  else if (c0 === 2) await N('(The house ticks in the cold. The tap runs, and stops. Footsteps: slow, even, exactly as far apart as each other.)', K());
-  else await N('(You wait. The clock in the hall does its uneven tick. Then footsteps, coming back.)', K());
-  // She comes back.
-  PARTNER.hidden = false; PARTNER.m.visible = true;
-  G.placeChar(PARTNER, 5.6, 1.2, -Math.PI / 2); PARTNER.mode = 'script';
-  G.setShot(bedShot(), false);
-  await G.walkTo(PARTNER, B().R + 0.55, -0.4, 0.9);
-  await P('Couldn’t sleep. Got water.', K());
-  G.lieDown(PARTNER, B().R, -0.40, 0, 0); PARTNER.mode = 'lying'; PARTNER.lidsClosed = false;
-  G.setShot(bedClose(), false);
-  await N('(She lies down exactly on her side of the bed. Not an inch over.)', K());
-  await N('(In all the years you have known her, she has never once stayed on her side.)', K());
-  const c1 = await choose(['“Are you all right?”', '“Come here. You’re cold.”', 'Say nothing']);
-  if (c1 === 0) { await P('Yes. I got water.', K()); await Y('You said.', K()); await P('Yes.', K()); }
-  else if (c1 === 1) { await P('Mm. Don’t move, Partner. You’re warm.', K()); await N('(Word for word what she said this morning. The same small pause before “warm”.)', K()); }
-  else await N('(You say nothing. Neither does she. Her eyes are open. She is looking at the ceiling as if it were a page she is reading.)', K());
-  await P('Goodnight, Partner.', K());
-  await wait(1.2);
-  await N('(Something about her is exactly right. That’s what’s wrong.)', K());
-  await N('(You wait until her breathing is slow and even. It is very slow, and very even. Then you get up.)', K());
-  G.cutTo(() => { G.standAt(PLAYER, B().L - 0.6, 2.6, Math.PI); G.releaseCamera(); G.CAM.cut = true; }, 0.4);
+  await N('(You wake up cold. The blanket is all on your side, which has never once happened.)', K());
+  await N('(Her side is empty. There’s a light on in the kitchen.)', K());
+  G.cutTo(() => { G.standAt(PLAYER, B().L - 0.6, 0.2, Math.PI / 2); G.releaseCamera(); G.CAM.cut = true; }, 0.4);
   await wait(0.6);
   STATE.sceneShot = false; STATE.busy = false; S.flags.nightUp = true;
   S.flags.noTogether = true; S.flags.noBarks = true;
-  G.hint('Look around the house. Quietly.', 6);
-  watch(S.run);
+  G.hint('There’s a light on in the kitchen.', 6);
 };
 
-// Every so often she sits up in the dark and calls you back to bed. She takes any answer.
-async function watch(run) {
-  const lines = ['Partner? Come back to bed.', 'Where are you, Partner?', 'It’s very late, Partner.', 'Partner. Come back to bed now.'];
-  let i = 0;
-  while (S.run === run && night() && !S.flags.doorOpen) {
-    await wait(26 + Math.random() * 14);
-    if (S.run !== run || !night() || S.flags.doorOpen) return;
-    if (STATE.busy || A.hereRoom() === 'bedroom') continue;
-    G.bark(lines[i++ % lines.length], 3);
+/* ---------- finding her, and the night up together ---------- */
+const nightUp = () => night() && S.flags.nightUp && !S.flags.doorOpen && !S.flags.nightBed;
+inter('nHer', [13.0, 1.2, 3.55], 1.3, 'Partner', async () => {
+  if (!S.flags.nightFound) {
+    S.flags.nightFound = true;
+    G.gaze(PARTNER, [PLAYER.x, PLAYER.y + 1.6, PLAYER.z], 4); PARTNER.stillLook = null; PARTNER.lookAt = null;
+    await P('Oh. Hello. Couldn’t sleep either?');
+    const c = await choose(['“You stole the whole blanket. Then left it.”', '“Midnight snack, is it?”', '“Come back to bed.”']);
+    if (c === 0) { await P('I gave it to you. As a present. You looked cold.'); await Y('That’s not how it works. You steal it; I complain.'); await P('Yes. Sorry. Next time I’ll steal it properly.'); await N('(She laughs, a moment after you’d expect.)'); NIGHT.odd++; }
+    else if (c === 1) { await P('I was thinking about it. I was mostly looking at the snow.'); await Y('Mostly.'); await P('Mostly.'); }
+    else { await P('In a little while. Since we’re both up.'); }
   }
-}
+  await nightMenu();
+}, nightUp);
 
-/* ---------- the clues ---------- */
-async function clue(id) {
-  if (NIGHT.clues.has(id)) return;
-  NIGHT.clues.add(id);
-  if (NIGHT.clues.size === 2) {
-    await wait(0.6);
-    NIGHT.door.visible = true; G.Audio.door && G.Audio.door(true);
-    await N('(Somewhere in the kitchen, the house settles, the way houses do in the cold. Except that it sounded like a door.)');
-    G.hint('There’s a door in the kitchen.', 5);
-  }
+async function nightMenu() {
+  const all = [['cocoa', 'Make some cocoa'], ['fire', 'Sit by what’s left of the fire'], ['seat', 'Watch the snow from the window seat'], ['cake', 'Raid the fridge for the last of the cake']];
+  const left = all.filter(([id]) => !NIGHT.done.has(id));
+  const opts = left.map((o) => o[1]).concat(NIGHT.done.size ? ['Go back to bed'] : []);
+  if (NIGHT.done.size === 0) await P('Since we’re up. What shall we do?');
+  else if (NIGHT.done.size >= 2) { await P('It’s very late, Partner.'); return toBed(); }
+  else await P('One more thing? Then bed.');
+  const c = await choose(opts);
+  if (c >= left.length) return toBed();
+  const id = left[c][0]; NIGHT.done.add(id);
+  await ({ cocoa, fire, seat, cake })[id]();
+  return nightMenu();
 }
-const nightOnly = () => night() && S.flags.nightUp && !S.flags.doorOpen;
-inter('nChairs', [13.0, 0.6, 2.95], 0.95, 'Kitchen table', async () => {
-  await N('(The chairs are pushed in. All of them, square to the table, exactly the same distance apart.)');
-  await N('(Neither of you has ever pushed a chair in. It is practically a rule of the house.)');
-  await clue('chairs');
-}, nightOnly);
-inter('nFridge', [14.45, 1, -1.35], 0.85, 'Fridge', async () => {
-  G.Audio.fridgeOpen && G.Audio.fridgeOpen();
-  await N('(Every jar has been turned so that its label faces out. The milk is lined up with the juice. The sad lemon is in a bowl, on its own, like a guest.)');
-  await clue('fridge');
-}, nightOnly);
-inter('nGlobe', [8.5, 1.5, -1.4], 0.85, 'Snow globe', async () => {
-  G.shakeGlobe && G.shakeGlobe();
-  await N('(The snow globe on the mantle is swirling. As if someone had just shaken it and put it down.)');
-  await N('(There is nobody in here.)');
-  await clue('globe');
-}, nightOnly);
-inter('nPhoto', [7.75, 1.4, 4.15], 0.8, 'Photograph', async () => {
-  if (!EVE.photo.visible) EVE.showPhoto();
-  thirdShape();
-  await N('(The photograph. The two children on the log, the lanterns.)');
-  await N('(And at the very edge, between the trees, a third shape you didn’t see before. Standing very still. Watching them.)');
-  await clue('photo');
-}, nightOnly);
-inter('nWindow', [13.0, 1.3, 4.05], 0.75, 'Window', async () => {
-  await N('(The kitchen window has fogged over from the inside, though nobody has been cooking.)');
-  await N('(Somebody has drawn three short lines in it, with a fingertip. Three notes.)');
-  await wait(Math.min(1.6, G.Audio.whistle(1.3, 0.9) + 0.2));
-  await N('(Not the right three.)');
-  await clue('window');
-}, nightOnly);
+const two = (px, pz, qx, qz, pyaw, qyaw) => G.cutTo(() => { G.standAt(PLAYER, px, pz, pyaw); G.standAt(PARTNER, qx, qz, qyaw); PARTNER.mode = 'still'; }, 0.35);
+async function cocoa() {
+  const K2 = G.KITCHEN || {}, kx = (K2.stove && K2.stove.x) || 12.35;
+  await two(kx - 0.35, -1.25, kx + 0.4, -1.2, Math.PI + 0.2, Math.PI - 0.3);
+  const shot = fixed(V(kx + 0.1, 1.55, 0.2), V(kx, 1.0, -1.5), 42, 0.012);
+  await N('(Milk in the little pan, the hob ticking, the window black and full of snow.)', { shot });
+  await P('How many sugars?', { shot });
+  const c = await choose(['“Two.”', '“One, and a second one that doesn’t count.”', '“None. I’m sweet enough.”']);
+  if (c === 0) { await P('One. And a second one that doesn’t count.', { shot }); await N('(Exactly how she said it this morning. Exactly.)', { shot }); NIGHT.odd++; }
+  else if (c === 1) { await P('That’s my line.', { shot }); await Y('I know. I’m stealing it.', { shot }); await P('That’s fair. You can have it.', { shot }); await N('(She never gives anything up without a fight. Not even a line.)', { shot }); NIGHT.odd++; }
+  else { await P('That’s not true, Partner. You’re an ordinary amount of sweet.', { shot }); }
+  const t = await choose(['“Toast with it?”', '“Don’t burn it this time.”', 'Just stir']);
+  if (t === 0) { await P('The toaster? Of course. It works perfectly well.', { shot }); await N('(You have never, in all your years in this house, heard her say a single word about the toaster.)', { shot }); NIGHT.odd++; }
+  else if (t === 1) { await P('I won’t.', { shot }); await N('(She doesn’t. Not even a little at the bottom, the way she always does and always blames on the pan.)', { shot }); }
+  else await N('(You stir. She watches the spoon go round as if she were learning how.)', { shot });
+  await N('(It’s good cocoa. It’s exactly right.)', { shot });
+}
+async function fire() {
+  const S0 = G.SOFA;
+  await G.cutTo(() => {
+    for (const [c, x] of [[PLAYER, S0.x + 0.35], [PARTNER, S0.x - 0.25]]) { c.x = x; c.z = S0.z - 0.08; c.y = c.yFloor = 0; c.yaw = Math.PI; c.seatY = S0.seatY; c.sitTarget = 1; c.sit = 1; c.speed = 0; }
+    PARTNER.mode = 'seated';
+  }, 0.35);
+  const shot = fixed(V(S0.x - 1.1, 1.2, S0.z - 1.6), V(S0.x, 0.95, S0.z), 36, 0.012);
+  G.FIRE.level = 0.5;
+  await N('(The fire is down to a red glow. You put one more log on, mostly for the company.)', { shot });
+  await Y('Today was a good day.', { shot });
+  await P('It was a perfect day.', { shot });
+  const c = await choose(['“You let me win the pinecones, you said.”', '“Who got to the bench first? Honestly.”', '“Same time next year?”']);
+  if (c === 0) { await P('Did I? You won by two. Eleven to nine.', { shot }); await N('(She has never once remembered a score. She once argued for an hour that you’d played to fifty.)', { shot }); NIGHT.odd++; }
+  else if (c === 1) { await P('You did. I was three steps behind you.', { shot }); await Y('You always say you won.', { shot }); await P('Do I? Then I won.', { shot }); await N('(She says it as if she were filling in a form.)', { shot }); NIGHT.odd++; }
+  else { await P('Exactly the same time. Exactly the same day.', { shot }); }
+  await N('(She leans her head on your shoulder. It’s the right weight. You keep very still anyway.)', { shot });
+  await G.cutTo(() => { for (const c of [PLAYER, PARTNER]) { c.sitTarget = c.sit = 0; } G.standAt(PLAYER, S0.x + 1.55, S0.z - 0.1, -Math.PI / 2); G.standAt(PARTNER, S0.x - 1.55, S0.z - 0.1, Math.PI / 2); PARTNER.mode = 'still'; }, 0.3);
+  G.FIRE.level = 0.35;
+}
+async function seat() {
+  const Nk = G.NOOK;
+  await G.cutTo(() => { G.sitAt(PLAYER, Nk.x + 0.35, Nk.z, 0, Nk.seatY); G.sitAt(PARTNER, Nk.x - 0.35, Nk.z, 0, Nk.seatY); PARTNER.mode = 'seated'; }, 0.35);
+  const shot = fixed(V(Nk.x + 0.2, 1.35, Nk.z + 2.0), V(Nk.x, 0.95, Nk.z), 38, 0.012);
+  await N('(Snow going past the window behind you, slow and fat and silent. The house ticks.)', { shot });
+  await P('Do you think we’re the same people we were when we were children?', { shot });
+  const c = await choose(['“You asked me that on the hill today.”', '“I hope not. I was terrible at whistling.”', '“Mostly. Taller.”']);
+  if (c === 0) { await P('Did I? And what did you say?', { shot }); await Y('You don’t remember?', { shot }); await P('I remember everything, Partner.', { shot }); await N('(She says it fondly. It isn’t a joke.)', { shot }); NIGHT.odd++; }
+  else if (c === 1) { await P('You were perfect at whistling. Three notes. Like this.', { shot }); await wait(Math.min(1.6, G.Audio.whistle(1.12) + 0.2)); await N('(Perfectly in tune. She has never once whistled it in tune.)', { shot }); NIGHT.odd++; }
+  else { await P('Yes. Exactly the same, only taller. Nothing has changed at all.', { shot }); }
+  await N('(Outside, the snow keeps coming down, all of it at exactly the same speed.)', { shot });
+  await G.cutTo(() => { for (const c of [PLAYER, PARTNER]) { c.sitTarget = c.sit = 0; } G.standAt(PLAYER, Nk.x + 0.4, Nk.z + 0.9, Math.PI); G.standAt(PARTNER, Nk.x - 0.4, Nk.z + 0.9, Math.PI); PARTNER.mode = 'still'; }, 0.3);
+}
+async function cake() {
+  const K2 = G.KITCHEN || {}, tb = K2.table || { x: 13.0, z: 2.95 };
+  await G.cutTo(() => { G.sitAt(PLAYER, 13.3, 3.58, Math.PI, 0.49); G.sitAt(PARTNER, 13.0, 2.3, 0, 0.49); PARTNER.mode = 'seated'; }, 0.35);
+  const shot = fixed(V(tb.x + 1.6, 1.35, tb.z + 0.4), V(tb.x, 0.9, tb.z), 40, 0.012);
+  await N('(The last of the cake, two forks, the fridge door left open for the light.)', { shot });
+  const c = await choose(['Steal the bit with the most icing', '“Half each. You check.”', '“You have it. It was your cake.”']);
+  if (c === 0) { await P('Have it. You like that bit.', { shot }); await N('(She lets you. She has never once let you.)', { shot }); NIGHT.odd++; }
+  else if (c === 1) { await N('(At the fair she checked the chestnuts were split exactly in half. You wait for her to check.)', { shot }); await P('It’s exactly half. I can tell.', { shot }); await N('(She doesn’t look.)', { shot }); NIGHT.odd++; }
+  else { await P('Thank you, Partner.', { shot }); await N('(She eats it neatly, in exactly the same size bites.)', { shot }); }
+  await N('(When you stand up, she pushes her chair in. Square to the table.)', { shot });
+  await G.cutTo(() => { for (const c of [PLAYER, PARTNER]) { c.sitTarget = c.sit = 0; } G.standAt(PLAYER, 12.6, 3.9, Math.PI); G.standAt(PARTNER, 13.4, 3.9, Math.PI); PARTNER.mode = 'still'; }, 0.3);
+}
+// Back to bed. She lies down exactly on her side. Then, from the kitchen: three notes.
+async function toBed() {
+  S.flags.nightBed = true;
+  await G.cutTo(() => {
+    G.lieDown(PLAYER, B().L, -0.14, 0.15, 0.35);
+    G.lieDown(PARTNER, B().R, -0.40, 0, 0); PARTNER.mode = 'lying'; PARTNER.lidsClosed = false;
+    for (const L of G.LAMPS) if (L.power0 != null && L.on) L.on = false;
+    G.setShot(bedClose());
+  }, 0.6);
+  STATE.sceneShot = true;
+  await N('(She lies down exactly on her side of the bed. Not an inch over.)', K());
+  await P('Goodnight, Partner. Sleep well. Goodnight.', K());
+  PARTNER.lidsClosed = true;
+  await wait(1.6);
+  await N(NIGHT.odd >= 3 ? '(You lie awake a long time, adding things up.)' : '(You lie awake a little while. It was a lovely night. Wasn’t it?)', K());
+  await wait(1.2);
+  await N('(Then, very faint, from the kitchen: three notes. Whistled the way only one person in the world whistles them, slightly flat on the last one.)', K());
+  await wait(Math.min(1.8, G.Audio.whistle(1.12, 0.6) + 0.3));
+  await N('(Beside you, she doesn’t stir. Her breathing is very slow, and very even.)', K());
+  NIGHT.door.visible = true;
+  G.cutTo(() => { G.standAt(PLAYER, B().L - 0.6, 0.2, Math.PI / 2); G.releaseCamera(); G.CAM.cut = true; }, 0.4);
+  await wait(0.6);
+  STATE.sceneShot = false;
+  G.hint('The whistle came from the kitchen.', 6);
+}
 // The front door won't open tonight.
 { const fd = findInter('frontdoor'), orig = fd && fd.raw; if (fd) rewire('frontdoor', async () => { if (night() && !S.flags.doorOpen) { await N('(It won’t open. It isn’t locked. It just won’t.)'); return; } return orig(); }); }
-// She's lying there in the dark with her eyes open.
-inter('nBed', [2.4, 0.6, 0.15], 1.0, 'Bed', async () => {
-  await N(cyc('nBed', ['(She’s lying exactly on her side, on her back, hands folded on the blanket. Her eyes are open.)', '(She turns her head and looks at you, and smiles, the right smile, a second too late.)', '(“Come back to bed, Partner.” She says it kindly. She says it like a line.)']));
-}, nightOnly);
 
 /* ---------- the door, and Elsewhere ---------- */
 inter('nDoor', [14.6, 1, 2.45], 0.9, 'The door', async () => {
-  await N('(A door in the kitchen wall. It has never been there. It is standing a little open, and through the gap it is summer: warm air, cut grass, crickets.)');
+  await N('(A door in the kitchen wall, between the fridge and the study. It has never been there. It is standing a little open, and through the gap it is summer: warm air, cut grass, crickets.)');
+  await N('(And somewhere out there, three notes again. Slightly flat on the last one.)');
   const c = await choose(['Go through', 'Not yet']);
   if (c === 1) return;
   S.flags.doorOpen = true;

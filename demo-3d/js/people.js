@@ -573,9 +573,9 @@ function makeRealLids(model) {
   const col = new THREE.Color(0xdcae98).convertSRGBToLinear();
   try {   // average the skin texture (mostly skin), slightly darkened like a lid in the eye's shadow
     const img = skin && skin.material.map && skin.material.map.image;
-    if (img) { const cv = document.createElement('canvas'); cv.width = cv.height = 16; const cx = cv.getContext('2d'); cx.drawImage(img, 0, 0, 16, 16); const d = cx.getImageData(0, 0, 16, 16).data; let r = 0, g = 0, b = 0, n = 0; for (let i = 0; i < d.length; i += 4) if (d[i] > 40) { r += d[i]; g += d[i + 1]; b += d[i + 2]; n++; } if (n) col.setRGB(r / n / 255, g / n / 255, b / n / 255).convertSRGBToLinear().multiplyScalar(0.75); }
+    if (img) { const cv = document.createElement('canvas'); cv.width = cv.height = 16; const cx = cv.getContext('2d'); cx.drawImage(img, 0, 0, 16, 16); const d = cx.getImageData(0, 0, 16, 16).data; let r = 0, g = 0, b = 0, n = 0; for (let i = 0; i < d.length; i += 4) if (d[i] > 40) { r += d[i]; g += d[i + 1]; b += d[i + 2]; n++; } if (n) col.setRGB(r / n / 255, g / n / 255, b / n / 255).convertSRGBToLinear().multiplyScalar(0.62); }
   } catch (e) { /* keep the default */ }
-  const mat = new THREE.MeshStandardMaterial({ color: col, roughness: 0.9, envMapIntensity: 0.35 });
+  const mat = new THREE.MeshStandardMaterial({ color: col, roughness: 0.95, envMapIntensity: 0.12 });
   G.MATS && G.MATS.push(mat);
   const pos = eyes.geometry.attributes.position, v = new THREE.Vector3(), out = [];
   eyes.updateMatrixWorld(true);

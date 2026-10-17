@@ -102,16 +102,20 @@ a queen up her sleeve), and photographs that end up on the fridge.
   a sign only the real one would understand (the pinecones in a line, half a
   pancake with one enormous bite, or a note: *"if it's sure about the night we
   met, it isn't me"*), then walk out into the snow to find them.
-- Built: she repeats this morning's line word for word ("Mm. Don't move,
-  Partner. You're warm."), lies awake looking at the ceiling, and now and then
-  calls you back to bed while you search. Five clues (the chairs, the fridge,
-  the snow globe, the photograph's third shape, three wrong notes drawn in the
-  fogged kitchen window); any two make the door appear in the kitchen wall
-  between the fridge and the study. The front door won't open. Elsewhere is
-  breakfast in a too-bright kitchen: the imitation of you recites the night of
-  the fair exactly; you leave one sign (`S.flags.sign`: pinecones, pancake or
-  note) and go out into the snow. Then: *Act IV · The Same Day — to be
-  continued.*
+- Built (reworked): no clue-hunting. You wake cold, her side empty, a light
+  in the kitchen; she couldn't sleep either. You pick two ordinary
+  sleepless-night things to do together (cocoa at the stove, the last of the
+  fire, the window seat in the reading nook, cold cake from the fridge) and
+  tease her the way you always do. She answers almost right, and nothing says
+  so: the morning's line word for word, the toaster mentioned, the pinecone
+  score remembered exactly ("eleven to nine"), the whistle perfectly in tune, a
+  laugh a beat late, her chair pushed in, the icing given up without a fight.
+  Back in bed she lies exactly on her side; then, from the kitchen, three
+  notes whistled slightly flat on the last one, the real one's way, and the
+  door in the wall between the fridge and the study. Elsewhere: breakfast in
+  a too-bright kitchen with an imitation of you that recites the night of the
+  fair exactly; you leave one sign (`S.flags.sign`: pinecones, pancake or
+  note) and go out into the snow. *Act IV · The Same Day — to be continued.*
 
 ## Act IV · The Same Day
 
