@@ -10,7 +10,8 @@ const world = (G.world = new THREE.Group());
 G.scene.add(world);
 
 /* ---------------- layout ---------------- */
-const CAB = (G.CAB = { x0: 0, z0: 0, x1: 15, z1: 4.6, wallH: 2.7, eave: 2.9, ridge: 4.75, ridgeZ: 2.3 });
+// The cabin: 15 m wide, 7 m deep (the back wall at z = -2.4; the front, the porch and everything outside it are where they always were).
+const CAB = (G.CAB = { x0: 0, z0: -2.4, x1: 15, z1: 4.6, wallH: 2.7, eave: 2.9, ridge: 5.25, ridgeZ: 1.1 });
 const PORCH = (G.PORCH = { x0: 3.4, x1: 11.4, z0: 4.6, z1: 6.6, stepX0: 5.85, stepX1: 7.15, stepZ1: 7.7 });
 const GROUND = -0.35;
 const CLEAR = (G.CLEAR = { x: 6.5, z: 15, r: 23 });
@@ -52,9 +53,9 @@ G.shoreH = shoreH;
 G.inside = (x, z) => x > CAB.x0 && x < CAB.x1 && z > CAB.z0 && z < CAB.z1;
 // On wooden floor or decking (inside, porch or its steps) rather than snow.
 G.onDeck = (x, z) => G.inside(x, z) || (x > PORCH.x0 && x < PORCH.x1 && z >= PORCH.z0 - 0.1 && z < PORCH.z1) || (x > PORCH.stepX0 && x < PORCH.stepX1 && z >= PORCH.z1 && z < PORCH.stepZ1);
-G.underRoof = (x, z) => (x > CAB.x0 - 0.5 && x < CAB.x1 + 0.5 && z > -0.5 && z < 5) || (x > ANNEX.x0 && x < ANNEX.x1 + 0.3 && z > ANNEX.z0 - 0.3 && z < ANNEX.z1 + 0.3) || (x > PORCH.x0 && x < PORCH.x1 && z > PORCH.z0 && z < 6.95);
+G.underRoof = (x, z) => (x > CAB.x0 - 0.5 && x < CAB.x1 + 0.5 && z > CAB.z0 - 0.5 && z < 5) || (x > ANNEX.x0 && x < ANNEX.x1 + 0.3 && z > ANNEX.z0 - 0.3 && z < ANNEX.z1 + 0.3) || (x > PORCH.x0 && x < PORCH.x1 && z > PORCH.z0 && z < 6.95);
 // Rugs muffle footsteps: [x0, z0, x1, z1].
-const RUGS = [[1.1, 2.4, 3.7, 4.0], [6.55, 1.2, 9.45, 3.2], [11.3, 0.85, 13.6, 1.55]];
+const RUGS = (G.RUGS = [[1.1, 2.4, 3.7, 4.0], [6.55, 0.2, 9.45, 2.2], [11.3, -1.55, 13.6, -0.85]]);
 G.onRug = (x, z) => RUGS.some((r) => x > r[0] && x < r[2] && z > r[1] && z < r[3]);
 G.walkable = (x, z) => {
   if (Math.hypot(x - CLEAR.x, (z - CLEAR.z) * 0.9) < CLEAR.r) return true;
@@ -535,32 +536,35 @@ function buildAnnex() {
 G.WINDOWS = [];
 G.buildCabin = () => {
   MAT.logsW = MAT.logs; MAT.boardsW = MAT.boards;
-  const { x1, z1, eave } = CAB;
+  const { x1, z1, z0, eave } = CAB, D = z1 - z0, zc = (z0 + z1) / 2;
   // Foundation
-  G.box(x1 + 0.5, 0.45, z1 + 0.5, MAT.stone, x1 / 2, -0.235, z1 / 2, { uv: [4, 0.5], cast: false });   // top just under the floorboards (it used to cover them)
+  G.box(x1 + 0.5, 0.45, D + 0.5, MAT.stone, x1 / 2, -0.235, zc, { uv: [4, 0.5], cast: false });   // top just under the floorboards (it used to cover them)
   // Floor & ceiling
-  const fl = G.add(new THREE.Mesh(new THREE.PlaneGeometry(x1, z1), MAT.floor), world, false, true);
-  fl.rotation.x = -Math.PI / 2; fl.position.set(x1 / 2, 0.002, z1 / 2);
-  const fuv = fl.geometry.attributes.uv; for (let i = 0; i < fuv.count; i++) fuv.setXY(i, fuv.getX(i) * x1 / 2.4, fuv.getY(i) * z1 / 2.4);
-  const ce = G.add(new THREE.Mesh(new THREE.PlaneGeometry(x1, z1), MAT.boards), world, false, true);
-  ce.rotation.x = Math.PI / 2; ce.position.set(x1 / 2, CAB.wallH, z1 / 2); G.CAMBLOCK.push(ce);
-  const cuv = ce.geometry.attributes.uv; for (let i = 0; i < cuv.count; i++) cuv.setXY(i, cuv.getX(i) * x1 / 2.75, cuv.getY(i) * z1 / 2.75);
-  for (let x = 0.9; x < x1; x += 1.55) G.box(0.16, 0.2, z1, MAT.beam, x, CAB.wallH - 0.1, z1 / 2, { cast: false });
+  const fl = G.add(new THREE.Mesh(new THREE.PlaneGeometry(x1, D), MAT.floor), world, false, true);
+  fl.rotation.x = -Math.PI / 2; fl.position.set(x1 / 2, 0.002, zc);
+  const fuv = fl.geometry.attributes.uv; for (let i = 0; i < fuv.count; i++) fuv.setXY(i, fuv.getX(i) * x1 / 2.4, fuv.getY(i) * D / 2.4);
+  const ce = G.add(new THREE.Mesh(new THREE.PlaneGeometry(x1, D), MAT.boards), world, false, true);
+  ce.rotation.x = Math.PI / 2; ce.position.set(x1 / 2, CAB.wallH, zc); G.CAMBLOCK.push(ce);
+  const cuv = ce.geometry.attributes.uv; for (let i = 0; i < cuv.count; i++) cuv.setXY(i, cuv.getX(i) * x1 / 2.75, cuv.getY(i) * D / 2.75);
+  for (let x = 0.9; x < x1; x += 1.55) G.box(0.16, 0.2, D, MAT.beam, x, CAB.wallH - 0.1, zc, { cast: false });
   // Walls (outer log face, inner boards).
   const W_win = { bedS: { a: 1.6, b: 3.2 }, livS1: { a: 8.6, b: 10.2 }, door: { a: 6.0, b: 7.0 } };
-  wall('x', -WT / 2 + 0.11, -0.11, x1 + 0.11, [], '+z', eave);
+  // Back wall: a window over the kitchen sink, and one in the reading nook.
+  wall('x', z0 - WT / 2 + 0.11, -0.11, x1 + 0.11, [{ a: 9.45, b: 10.65, y0: 0.75, y1: 1.95 }, { a: 12.45, b: 13.65, y0: 1.15, y1: 2.0 }], '+z', eave);
   wall('x', z1 + WT / 2 - 0.11, -0.11, x1 + 0.11, [{ a: 1.6, b: 3.2, y0: 0.85, y1: 2.05 }, { a: 8.6, b: 10.2, y0: 0.85, y1: 2.05 }, { a: 6.0, b: 7.0, y0: -0.4, y1: 2.12 }, { a: 12.2, b: 13.8, y0: 0.85, y1: 2.05 }], '-z', eave);
-  wall('z', -WT / 2 + 0.11, 0, z1, [{ a: 1.5, b: 3.0, y0: 0.85, y1: 2.05 }], '+x', eave);
-  wall('z', x1 + WT / 2 - 0.11, 0, z1, [{ a: 1.4, b: 2.8, y0: 0.85, y1: 2.05 }, { a: 3.4, b: 4.3, y0: -0.4, y1: 2.05 }], '-x', eave);
+  wall('z', -WT / 2 + 0.11, z0, z1, [{ a: -0.9, b: 0.6, y0: 0.85, y1: 2.05 }], '+x', eave);
+  wall('z', x1 + WT / 2 - 0.11, z0, z1, [{ a: 1.4, b: 2.8, y0: 0.85, y1: 2.05 }, { a: 3.4, b: 4.3, y0: -0.4, y1: 2.05 }], '-x', eave);
   // Interior partition (boards both sides).
   const P2 = [MAT.boards, MAT.boards, MAT.boards, MAT.boards, MAT.boards, MAT.boards];
-  wall('z', 5, 0.11, z1 - 0.11, [{ a: 3.0, b: 4.0, y0: -0.4, y1: 2.12 }], 'none', CAB.wallH, P2);
-  wall('z', 11, 0.11, z1 - 0.11, [{ a: 1.5, b: 2.6, y0: -0.4, y1: 2.12 }], 'none', CAB.wallH, P2);   // living room | kitchen
+  wall('z', 5, z0 + 0.11, z1 - 0.11, [{ a: 3.0, b: 4.0, y0: -0.4, y1: 2.12 }], 'none', CAB.wallH, P2);
+  wall('z', 11, z0 + 0.11, z1 - 0.11, [{ a: 1.5, b: 2.6, y0: -0.4, y1: 2.12 }], 'none', CAB.wallH, P2);   // living room | kitchen
   for (const [zz, xx] of [[1.5, 11], [2.6, 11]]) G.box(0.26, 2.12, 0.07, MAT.trim, xx, 1.06, zz);
   G.box(0.26, 0.08, 1.24, MAT.trim, 11, 2.16, 2.05);
   windowAt('x', z1, 1.6, 3.2, 0.85, 2.05, 1);
   windowAt('x', z1, 8.6, 10.2, 0.85, 2.05, 1);
-  windowAt('z', 0, 1.5, 3.0, 0.85, 2.05, -1);
+  windowAt('z', 0, -0.9, 0.6, 0.85, 2.05, -1);
+  windowAt('x', z0, 9.45, 10.65, 0.75, 1.95, -1);   // the reading nook
+  windowAt('x', z0, 12.45, 13.65, 1.15, 2.0, -1);    // over the sink
   windowAt('x', z1, 12.2, 13.8, 0.85, 2.05, 1);
   windowAt('z', x1, 1.4, 2.8, 0.85, 2.05, 1);
   buildAnnex();
@@ -574,18 +578,18 @@ G.buildCabin = () => {
   G.sph(0.03, MAT.metal, 0.85, 1.0, 0.05, [1, 1, 1], leaf);
   // Corner log ends: crossing logs stacked at each corner.
   const logEnd = G.std({ map: TX.bark, color: '#b08860', roughness: 0.9 });
-  for (const [cx, cz] of [[-0.11, -0.11], [x1 + 0.11, -0.11], [-0.11, z1 + 0.11], [x1 + 0.11, z1 + 0.11]]) {
+  for (const [cx, cz] of [[-0.11, z0 - 0.11], [x1 + 0.11, z0 - 0.11], [-0.11, z1 + 0.11], [x1 + 0.11, z1 + 0.11]]) {
     for (let i = 0; i < 7; i++) {
       const y = -0.2 + 0.39 * i + 0.2, alongX = i % 2 === 0;
       const m = G.cyl(0.16, 0.16, 0.75, MAT.logs, cx, y, cz, { seg: 10 });
       if (alongX) m.rotation.z = Math.PI / 2; else m.rotation.x = Math.PI / 2;
-      const e = G.cyl(0.155, 0.155, 0.02, logEnd, alongX ? cx + Math.sign(cx - 5) * 0.37 : cx, y, alongX ? cz : cz + Math.sign(cz - 2) * 0.37, { seg: 10 });
+      const e = G.cyl(0.155, 0.155, 0.02, logEnd, alongX ? cx + Math.sign(cx - 5) * 0.37 : cx, y, alongX ? cz : cz + Math.sign(cz - zc) * 0.37, { seg: 10 });
       if (alongX) e.rotation.z = Math.PI / 2; else e.rotation.x = Math.PI / 2;
     }
   }
   // Gable ends (east and west).
   const gableShape = new THREE.Shape();
-  gableShape.moveTo(-0.11, eave); gableShape.lineTo(z1 + 0.11, eave); gableShape.lineTo(CAB.ridgeZ, CAB.ridge + 0.02); gableShape.closePath();
+  gableShape.moveTo(z0 - 0.11, eave); gableShape.lineTo(z1 + 0.11, eave); gableShape.lineTo(CAB.ridgeZ, CAB.ridge + 0.02); gableShape.closePath();
   const gMat = MAT.logs.clone(); gMat.map = G.rep(TX.logs, 1 / 2.75, 1 / 2.75); gMat.bumpMap = G.rep(TX.logsB, 1 / 2.75, 1 / 2.75); G.MATS.push(gMat);
   for (const x of [-0.11, x1 + 0.11]) {
     const g = new THREE.ExtrudeGeometry(gableShape, { depth: WT, bevelEnabled: false });
@@ -594,7 +598,7 @@ G.buildCabin = () => {
     G.CAMBLOCK.push(m);
   }
   // Roof slabs with thick snow and icicles.
-  const run = 2.75, rise = CAB.ridge - eave, slope = Math.atan2(rise, run), len = Math.hypot(run, rise) + 0.25;
+  const run = D / 2 + 0.45, rise = CAB.ridge - eave, slope = Math.atan2(rise, run), len = Math.hypot(run, rise) + 0.25;
   const RX0 = -0.65, RX1 = x1 + 0.65, rw = RX1 - RX0, rcx = (RX0 + RX1) / 2;
   for (const s of [-1, 1]) {
     const cz = CAB.ridgeZ + s * run / 2, cy = (CAB.ridge + eave) / 2;
@@ -616,10 +620,10 @@ G.buildCabin = () => {
   // Ridge cap snow.
   const rc = G.cyl(0.2, 0.2, rw - 0.05, MAT.snow, rcx, CAB.ridge + 0.12, CAB.ridgeZ, { seg: 12 }); rc.rotation.z = Math.PI / 2; rc.scale.set(0.8, 1, 1);
   // Chimney (stone, outside the north wall) with smoke.
-  G.box(1.05, 6.0, 0.75, MAT.stone, 8, 2.6, -0.5, { uv: [1, 4], cam: true });
-  G.box(1.2, 0.16, 0.9, MAT.stone, 8, 5.65, -0.5);
-  G.box(1.25, 0.14, 0.95, MAT.snow, 8, 5.78, -0.5, { r: 0.06 });
-  G.CHIMNEY = new THREE.Vector3(8, 5.9, -0.5);
+  G.box(1.05, 6.5, 0.75, MAT.stone, 8, 2.85, z0 - 0.5, { uv: [1, 4], cam: true });
+  G.box(1.2, 0.16, 0.9, MAT.stone, 8, 6.15, z0 - 0.5);
+  G.box(1.25, 0.14, 0.95, MAT.snow, 8, 6.28, z0 - 0.5, { r: 0.06 });
+  G.CHIMNEY = new THREE.Vector3(8, 6.4, z0 - 0.5);
   // Porch: deck, posts, railing, roof, steps.
   const deckMat = MAT.wood.clone(); deckMat.map = G.rep(TX.floor, 3, 1.2); deckMat.color.set('#a07a58'); G.MATS.push(deckMat);
   G.box(PORCH.x1 - PORCH.x0, 0.36, PORCH.z1 - PORCH.z0, deckMat, (PORCH.x0 + PORCH.x1) / 2, -0.18, (PORCH.z0 + PORCH.z1) / 2);

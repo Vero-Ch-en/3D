@@ -287,7 +287,7 @@ function buildPuffs() {
   for (let i = 0; i < 40; i++) { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, color: '#f4f7ff', transparent: true, depthWrite: false, opacity: 0 })); s.visible = false; G.scene.add(s); PUFF.push({ s, age: 9, life: 1 }); }
 }
 // Eave lines a clump can fall from: [x0, x1, z, y].
-const EAVES = [[3.3, 11.6, 6.98, 2.35], [11.6, 15.6, 5.15, 2.75], [-0.6, 3.3, 5.15, 2.75], [-0.6, 15.6, -0.75, 2.75]];
+const EAVES = [[3.3, 11.6, 6.98, 2.35], [11.6, 15.6, 5.15, 2.75], [-0.6, 3.3, 5.15, 2.75], [-0.6, 15.6, -3.15, 2.75]];   // the back eave, behind the deeper cabin
 G.snowPuff = (near) => {
   let best = null, bd = 1e9;
   for (const [x0, x1, z, y] of EAVES) { const x = G.clamp(near.x + (Math.random() - 0.5) * 6, x0, x1), dd = Math.hypot(x - near.x, z - near.z); if (dd < bd) { bd = dd; best = { x, y, z }; } }
@@ -329,7 +329,7 @@ function buildGlobeSnow() {
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('seed', new THREE.BufferAttribute(seed, 1));
   const mat = new THREE.ShaderMaterial({
     transparent: true, depthWrite: false,
-    uniforms: { uT: { value: 99 }, uC: { value: new THREE.Vector3(8.5, 1.56, 0.75) }, uPx: { value: 1 } },
+    uniforms: { uT: { value: 99 }, uC: { value: new THREE.Vector3(8.5, 1.56, -1.65) }, uPx: { value: 1 } },
     vertexShader: `
       attribute float seed; uniform float uT; uniform vec3 uC; uniform float uPx; varying float vA;
       void main(){

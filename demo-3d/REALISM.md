@@ -7,7 +7,7 @@ conventions a realistic asset needs to follow.
 
 ## Already realism-ready
 
-- **Units and scale:** metres, y up, real proportions. The cabin is 15 × 4.6 m
+- **Units and scale:** metres, y up, real proportions. The cabin is 15 × 7 m (it was 4.6 m deep; the back wall moved out 2.4 m with the furniture against it, so every room has space to walk round, plus a reading nook beside the hearth; `G.ZM` in core.js maps a position in the old layout to the new one),
   with 2.7 m walls; the characters are 1.84 m and 1.60 m tall.
 - **Lighting:** physically based materials (`MeshStandardMaterial`), physically
   correct light units, ACES tone mapping, sRGB output, image-based lighting

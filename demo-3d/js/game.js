@@ -108,7 +108,7 @@ G.Audio = (() => {
     // Partner humming: a source that follows her around.
     const hs = spot('hum', 0, 1.5, 0, { ref: 0.7, roll: 1.5 }); hs.moving = true;
     // Wind finding the gaps around the window frames.
-    for (const [i, x, z] of [[0, 2.4, 4.6], [1, 9.4, 4.6], [2, 13.0, 4.6], [3, 0, 2.25], [4, 15, 2.1]]) {
+    for (const [i, x, z] of [[0, 2.4, 4.6], [1, 9.4, 4.6], [2, 13.0, 4.6], [3, 0, -0.15], [4, 15, 2.1]]) {
       const s = spot('win' + i, x, 1.4, z, { ref: 0.7, roll: 1.6 }), n = noise(), bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 900 + i * 230; bp.Q.value = 4;
       const g = ctx.createGain(); g.gain.value = 0; n.connect(bp); bp.connect(g); g.connect(s.in); n.start(Math.random()); s.g = g; s.bp = bp;
     }
@@ -385,7 +385,7 @@ function snowSystem(n) {
         p.x = mod(p.x - uCenter.x + 18.0, 36.0) - 18.0 + uCenter.x;
         p.z = mod(p.z - uCenter.z + 18.0, 36.0) - 18.0 + uCenter.z;
         p.y += uCenter.y - 3.0;
-        bool roof = (p.x > -0.6 && p.x < 15.6 && p.z > -0.6 && p.z < 5.1) || (p.x > 3.3 && p.x < 11.5 && p.z > 4.5 && p.z < 7.0 && p.y < 2.6) || (p.x > 15.0 && p.x < 17.3 && p.z > 2.5 && p.z < 5.1 && p.y < 2.7);
+        bool roof = (p.x > -0.6 && p.x < 15.6 && p.z > -3.0 && p.z < 5.1) || (p.x > 3.3 && p.x < 11.5 && p.z > 4.5 && p.z < 7.0 && p.y < 2.6) || (p.x > 15.0 && p.x < 17.3 && p.z > 2.5 && p.z < 5.1 && p.y < 2.7);
         vA = roof ? 0.0 : 1.0;
         vec4 mv = modelViewMatrix * vec4(p, 1.0);
         gl_PointSize = vA * 14.0 * uPx / -mv.z;
@@ -505,7 +505,7 @@ function collide(c, ox, oz) {
       else { const l = c.x - b.x0, r = b.x1 - c.x, t = c.z - b.z0, bb = b.z1 - c.z, m = Math.min(l, r, t, bb); if (m === l) c.x = b.x0 - c.r; else if (m === r) c.x = b.x1 + c.r; else if (m === t) c.z = b.z0 - c.r; else c.z = b.z1 + c.r; }
     }
   }
-  if (!G.walkable(c.x, c.z) || (STATE.bounds && c.z < STATE.bounds.zMin)) { c.x = ox; c.z = oz; }
+  if (!G.walkable(c.x, c.z) || (STATE.bounds && (c.z < STATE.bounds.zMin || (STATE.bounds.zMax != null && c.z > STATE.bounds.zMax)))) { c.x = ox; c.z = oz; }
   // Can't climb onto the porch except by the steps.
   const fy = G.floorAt(c.x, c.z);
   if (fy - c.yFloor > 0.22 && !(c.x > G.PORCH.stepX0 && c.x < G.PORCH.stepX1)) { c.x = ox; c.z = oz; }
@@ -1159,6 +1159,8 @@ const Story = (G.Story = {
       G.S.flags.firefly = 1;
       await wait(0.8);
     }
+    STATE.porchDone = true;
+    if (G.goNight) { G.goNight(); return; }
     showEndcard();
     document.body.classList.remove('playing');
     STATE.porchDone = true;
@@ -1177,6 +1179,7 @@ const Story = (G.Story = {
     }, 0.3);
   },
 });
+G.showEndcard = () => { showEndcard(); document.body.classList.remove('playing'); };
 function showEndcard() {
   const B = G.CFG.closing || {};
   $('endHeading').textContent = G.fmt(B.heading || 'Here’s to another winter.');
@@ -1333,7 +1336,7 @@ function nearest() {
   return best;
 }
 /* Small idle behaviours: warm hands at the fire, hug yourself in the cold, hands in pockets. */
-const FIRE_AT = { x: 8.0, z: 0.6 };   // the fire itself (inside the hearth), so 'face the fire' points at it
+const FIRE_AT = { x: 8.0, z: -1.8 };   // the fire itself (inside the hearth), so 'face the fire' points at it
 function ambientPoses(dt) {
   for (const c of [PLAYER, PARTNER]) {
     const out = !G.inside(c.x, c.z) && !G.underRoof(c.x, c.z);

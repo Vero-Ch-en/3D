@@ -11,7 +11,7 @@ const N = A.N, Pt = A.Pt;
 const pick = (a) => a[Math.floor(Math.random() * a.length)];
 const outside = (c) => !G.inside(c.x, c.z) && !G.underRoof(c.x, c.z);
 const dist = () => Math.hypot(PARTNER.x - PLAYER.x, PARTNER.z - PLAYER.z);
-const FIRE_AT = { x: 8.0, z: 0.6 };
+const FIRE_AT = { x: 8.0, z: -1.8 };
 const L = (S.life = S.life || {});
 G.LIFE = L;
 const freeBark = (line, d) => { if (!G.busy() && !PARTNER.hidden && !PARTNER.bark && dist() < 7 && !(G.S.flags && G.S.flags.noBarks)) { G.bark(line, d || 2.8); return true; } return false; };
@@ -564,7 +564,7 @@ A.rewire('fire', async () => {
   }
   await pokeAct();
 });
-A.inter('basket', [9.42, 0.4, 1.25], 0.8, () => (PLAYER.carry ? 'Fill the log basket' : 'Log basket'), async () => {
+A.inter('basket', [9.42, 0.4, -1.15], 0.8, () => (PLAYER.carry ? 'Fill the log basket' : 'Log basket'), async () => {
   if (PLAYER.carry) {
     const helped = PARTNER.carry; setCarry(PLAYER, false); if (helped) setCarry(PARTNER, false);
     L.basket = Math.min(5, L.basket + (helped ? 5 : 3)); G.Audio.poke();
@@ -661,7 +661,7 @@ function holdCan(on) {
 }
 const alone = () => dist() > 5.5 || !A.sameRoom();
 const SOLO = [
-  { id: 'read', solo: true, stay: true, spot: { x: 6.95, z: 1.5 }, seatAt: { x: 6.22, z: 1.97, yaw: 2.23, y: 0.47 }, dur: [70, 130],
+  { id: 'read', solo: true, stay: true, spot: { x: 6.95, z: 0.5 }, seatAt: { x: 6.22, z: 0.97, yaw: 2.23, y: 0.47 }, dur: [70, 130],
     cond: () => soloOK('read') && !(PLAYER.freeSit && Math.hypot(PLAYER.x - 6.22, PLAYER.z - 1.97) < 0.6) && G.inside(PLAYER.x, PLAYER.z),
     lines: ['I’ll just read for a bit. Don’t let me fall asleep.', 'Chapter eleven. Again.'],
     onArrive: (p) => { book.visible = true; p.holdPose = 'read'; }, onTick: dozeTick, onEnd: (p) => { book.visible = false; p.holdPose = null; wake(p, true); } },
@@ -672,7 +672,7 @@ const SOLO = [
     cond: () => soloOK('radio'),
     onArrive: (p) => { if (!G.Audio.radioOn()) { G.Audio.radio(true); G.KITCHEN.radioDial.material.opacity = 0.9; G.bark(pick(['A little music, I think.', 'This kitchen needs a song.']), 2.6); } else G.bark('Oh, I like this one.', 2.2); },
     onTick: (p, dt, T) => { T.humT = (T.humT == null ? 6 : T.humT) - dt; if (T.humT < 0) { T.humT = 12 + Math.random() * 10; G.Audio.hum(); } if (!G.Audio.radioOn()) T.abort = true; p.swayTarget = 0.6; } },
-  { id: 'water', solo: true, stay: true, spot: { x: 13.78, z: 0.98 }, dur: [90, 90],
+  { id: 'water', solo: true, stay: true, spot: { x: 13.78, z: -1.42 }, dur: [90, 90],
     cond: () => soloOK('water') && !L.watered,
     onArrive: (p, T) => waterRound(p, p.task), onEnd: (p) => { holdCan(false); p.holdPose = null; } },
 ];
@@ -708,7 +708,7 @@ async function waterRound(p, T) {
   if (!(await pour(9.85, 3.72, [10.4, 0.7, 4.2]))) return;
   G.bark(pick(['Basil. Darling. Don’t drink it all at once.', 'You’re doing wonderfully, Basil.']), 2.6);
   L.watered = true;
-  await G.walkTo(p, 13.78, 0.98, 1.1); if (!live()) return;
+  await G.walkTo(p, 13.78, -1.42, 1.1); if (!live()) return;
   T.abort = true;
 }
 function pourSound() { for (let i = 0; i < 14; i++) G.Audio.tone(900 + Math.random() * 1400, 0.03, 0.004, i * 0.2 + Math.random() * 0.1); }

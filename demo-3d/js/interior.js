@@ -85,6 +85,98 @@ function polaroid(x, y, z, ry, kind, tilt = 0) {
 
 /* ---------------- build ---------------- */
 G.buildInterior = () => {
+  // Everything built here is laid out in the old, shallower cabin; afterwards it's moved to the deeper one (G.ZM).
+  const n0 = { w: G.world.children.length, c: G.COLL.length, i: G.INTER.length };
+  buildRooms();
+  for (const o of G.world.children.slice(n0.w)) o.position.z = G.ZM(o.position.x, o.position.z);
+  for (const b of G.COLL.slice(n0.c)) { const cx = (b.x0 + b.x1) / 2, cz = (b.z0 + b.z1) / 2, d = G.ZM(cx, cz) - cz; b.z0 += d; b.z1 += d; }
+  for (const it of G.INTER.slice(n0.i)) it.pos[2] = G.ZM(it.pos[0], it.pos[2]);
+  G.BED.z = G.ZM(G.BED.x, G.BED.z);
+  G.FIRE.lightAt.copy(G.FIRE.light.position);
+  for (const v of Object.values(G.KITCHEN || {})) if (v && typeof v.x === 'number' && typeof v.z === 'number') v.z = G.ZM(v.x, v.z);
+  buildNook();
+  buildHomely();
+};
+/* ---------- the reading nook: the new back corner of the living room, beside the hearth ----------
+ * An alcove under its own window: a window seat piled with cushions, books on the side wall, a reading lamp,
+ * a beam across the opening with fairy lights, and curtains tied back. */
+function buildNook() {
+  const W = G.world, z0 = G.CAB.z0, NX0 = 9.2, NX1 = 10.89, nz = -0.75;
+  // the opening: a beam and two posts, softened with a pair of curtains
+  box(0.12, 2.12, 0.12, MAT.darkWood, NX0, 1.06, nz, { coll: true });
+  box(NX1 - NX0 + 0.1, 0.16, 0.14, MAT.darkWood, (NX0 + NX1) / 2, 2.2, nz);
+  const curtainM = G.std({ map: TX.knitCream, color: '#c98f6a', roughness: 1, side: THREE.DoubleSide });
+  for (const [x, s] of [[NX0 + 0.2, 1], [NX1 - 0.18, -1]]) curtain(x, nz + 0.05, 0.42, 2.05, curtainM, s, true);
+  for (let i = 0; i <= 18; i++) { const t = i / 18, b = new THREE.Mesh(new THREE.SphereGeometry(0.013, 6, 4), MAT.bulb); b.position.set(NX0 + 0.05 + t * (NX1 - NX0 - 0.1), 2.08 - Math.sin(t * Math.PI) * 0.12, nz + 0.08); W.add(b); }
+  // the window seat
+  const sx = 10.05, sz = z0 + 0.38;
+  box(1.5, 0.42, 0.62, MAT.wood, sx, 0.21, sz, { coll: true, r: 0.02 });
+  box(1.46, 0.1, 0.58, MAT.knitCream, sx, 0.47, sz, { r: 0.04, seg: 3 });
+  const cush = [['#b65a3e', -0.5, -0.15], ['#d9cbb4', -0.15, 0.1], ['#6e7f62', 0.42, -0.2]];
+  for (const [c, dx, ry] of cush) { const m = box(0.38, 0.34, 0.12, G.std({ map: TX.knitCream, color: c, roughness: 1 }), sx + dx, 0.66, sz - 0.18, { r: 0.06, seg: 3 }); m.rotation.set(-0.35, ry, 0.08); }
+  const th = box(0.7, 0.04, 0.5, MAT.plaid, sx + 0.3, 0.54, sz + 0.08, { r: 0.02 }); th.rotation.set(0.05, 0.4, -0.15);
+  for (let i = 0; i < 3; i++) box(0.2, 0.04, 0.15, G.shared({ color: ['#2d4659', '#8a3a2e', '#d4c6a8'][i], roughness: 0.8 }), sx - 0.62, 0.54 + i * 0.04, sz + 0.1, { r: 0.005 }).rotation.y = i * 0.2;
+  cyl(0.04, 0.035, 0.09, G.std({ color: '#efe7da', roughness: 0.3, env: 0.8 }), sx + 0.66, 0.565, sz + 0.12, { seg: 16 });
+  // books along the side wall, a plant, and a little round rug
+  bookshelf(NX1 - 0.18, z0 + 1.15, 0.34, 1.1, 1.85, Math.PI / 2);
+  plant(NX0 + 0.25, z0 + 0.35, 0.9);
+  const rug = G.add(new THREE.Mesh(new THREE.CircleGeometry(0.7, 32), MAT.rug), W, false, true); rug.rotation.x = -Math.PI / 2; rug.position.set(sx, 0.007, z0 + 1.15);
+  G.NOOK = { x: sx, z: sz + 0.12, seatY: 0.5 };
+  G.INTER.push({ id: 'nook', pos: [sx, 0.6, sz + 0.5], r: 1.0, label: 'Window seat', act: () => G.Story.nook && G.Story.nook() });
+}
+// A curtain: a hanging panel of soft folds; tied back (narrow at the waist) or hanging straight.
+function curtain(x, z, w, h, mat, side = 1, tied = false, alongX = true) {
+  const g = new THREE.PlaneGeometry(w, h, 16, 12), p = g.attributes.position;
+  for (let i = 0; i < p.count; i++) {
+    const u = p.getX(i) / w + 0.5, v = p.getY(i) / h + 0.5;
+    const pinch = tied ? 1 - 0.55 * Math.exp(-((v - 0.42) ** 2) / 0.02) : 1;
+    p.setX(i, (u - 0.5) * w * pinch + (tied ? side * (1 - pinch) * w * 0.4 : 0));
+    p.setZ(i, Math.sin(u * Math.PI * 6) * 0.03 * pinch + 0.02);
+  }
+  g.computeVertexNormals();
+  const m = new THREE.Mesh(g, mat); m.castShadow = true; m.receiveShadow = true;
+  m.position.set(x, h / 2 + 0.08, z); if (!alongX) m.rotation.y = Math.PI / 2; G.world.add(m);
+  return m;
+}
+/* ---------- lived-in: curtains at the windows, rugs, throws, plants, boots by the door, a kitchen pendant ---------- */
+function buildHomely() {
+  const W = G.world, z0 = G.CAB.z0, z1 = G.CAB.z1;
+  const cM = G.std({ map: TX.knitCream, color: '#d7b48e', roughness: 1, side: THREE.DoubleSide });
+  const rod = (x0, x1, z, y) => { const r = cyl(0.012, 0.012, x1 - x0 + 0.2, MAT.darkMetal, (x0 + x1) / 2, y, z, { seg: 8 }); r.rotation.z = Math.PI / 2; };
+  // front windows (inside face of the front wall) and the one over the sink
+  for (const [a, b] of [[1.6, 3.2], [8.6, 10.2], [12.2, 13.8]]) { rod(a, b, z1 - 0.2, 2.2); curtain(a - 0.12, z1 - 0.2, 0.36, 2.1, cM, 1, true); curtain(b + 0.12, z1 - 0.2, 0.36, 2.1, cM, -1, true); }
+  // the west (bedroom) window: on the side wall
+  for (const zz of [-1.02, 0.72]) { const c = curtain(0.2, zz, 0.36, 2.1, cM, 1, true, false); c.position.x = 0.2; }
+  // a café curtain at the sink window
+  { const g = new THREE.PlaneGeometry(1.2, 0.42, 12, 3); const p = g.attributes.position; for (let i = 0; i < p.count; i++) p.setZ(i, Math.sin(p.getX(i) * 30) * 0.015); g.computeVertexNormals(); const m = new THREE.Mesh(g, G.std({ color: '#efe2c8', roughness: 1, side: THREE.DoubleSide })); m.position.set(13.05, 1.4, z0 + 0.2); W.add(m); }
+  // rugs: a long runner by the bed, a sheepskin by the hearth, a mat inside the door
+  const rug = (w, d, x, z, mat, ry = 0) => { const m = G.add(new THREE.Mesh(new THREE.PlaneGeometry(w, d), mat), W, false, true); m.rotation.set(-Math.PI / 2, 0, ry); m.position.set(x, 0.007, z); return m; };
+  rug(0.7, 2.0, 0.95, -0.8, MAT.rug);
+  const sheep = G.add(new THREE.Mesh(new THREE.CircleGeometry(0.55, 24), G.std({ map: TX.knitCream, color: '#f4eee4', roughness: 1 })), W, false, true); sheep.rotation.x = -Math.PI / 2; sheep.scale.set(1.3, 0.9, 1); sheep.position.set(8.6, 0.008, -0.9);
+  rug(1.0, 0.6, 6.5, z1 - 0.5, G.std({ color: '#5a4636', roughness: 1 }));
+  // boots on the mat, and a basket of hats and mittens
+  for (const [x, c] of [[6.0, '#4a3426'], [6.18, '#4a3426'], [6.95, '#6b4a32'], [7.1, '#6b4a32']]) { const b = box(0.11, 0.24, 0.27, G.shared({ color: c, roughness: 0.6 }), x, 0.12, z1 - 0.38, { r: 0.04 }); b.rotation.y = (x * 7) % 0.3 - 0.15; }
+  cyl(0.2, 0.17, 0.3, G.std({ map: TX.bark, color: '#c9a26e', roughness: 1 }), 4.65, 0.15, z1 - 0.45, { seg: 16 });
+  sph(0.11, G.std({ map: TX.knitCream, color: '#b8322a', roughness: 1 }), 4.6, 0.32, z1 - 0.42, [1, 0.6, 1]);
+  // plants: the bedroom corner and the kitchen
+  plant(0.45, z0 + 0.5, 1.1); plant(14.55, 1.4, 0.8);
+  // a bench at the foot of the bed with a folded blanket, and a stack of books by the bed
+  box(1.3, 0.42, 0.4, MAT.wood, 2.4, 0.21, 0.45, { coll: true, r: 0.02 });
+  box(0.8, 0.12, 0.34, MAT.plaid, 2.2, 0.48, 0.45, { r: 0.04 });
+  for (let i = 0; i < 4; i++) box(0.22, 0.045, 0.16, G.shared({ color: ['#5e4870', '#9a5a36', '#2d4659', '#d4c6a8'][i], roughness: 0.8 }), 0.75, 0.025 + i * 0.045, -2.0, { r: 0.004 }).rotation.y = i * 0.25;
+  // a throw over the sofa back and a knitted pouffe
+  const pf = cyl(0.3, 0.3, 0.36, G.std({ map: TX.knitCream, color: '#c0a07a', roughness: 1 }), 9.55, 0.18, 2.0, { seg: 20 }); G.COLL.push({ x0: 9.25, z0: 1.7, x1: 9.85, z1: 2.3 });
+  // a pendant lamp over the kitchen table, warm and low
+  const pend = new THREE.Group(); pend.position.set(13.0, 1.75, 2.95); W.add(pend);
+  cyl(0.004, 0.004, 0.95, MAT.darkMetal, 0, 0.48, 0, { parent: pend, seg: 4 });
+  const shade = cyl(0.04, 0.13, 0.13, G.std({ color: "#b8603a", roughness: 0.6, emissive: "#ff9a50", emissiveIntensity: 0.25, side: THREE.DoubleSide }), 0, 0, 0, { parent: pend, open: true, cast: false });
+  const bulb = sph(0.035, MAT.bulb, 0, -0.05, 0, [1, 1, 1], pend);
+  const pl = new THREE.PointLight('#ffb062', 0, 5, 2); pl.position.set(0, -0.1, 0); pend.add(pl);
+  LAMPS.push({ g: pend, light: pl, shade, on: true, power: 4, flick: 1 });
+  // fairy lights along the living-room beam, over the sofa
+  for (let i = 0; i <= 36; i++) { const t = i / 36, b = new THREE.Mesh(new THREE.SphereGeometry(0.013, 6, 4), MAT.bulb); b.position.set(5.3 + t * 5.4, 2.5 - Math.sin(t * Math.PI * 4) * 0.07, 3.95); W.add(b); }
+}
+function buildRooms() {
   const W = G.world;
   /* ===== Bedroom ===== */
   const bx = 2.4;

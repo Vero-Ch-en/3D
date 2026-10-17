@@ -33,7 +33,7 @@ function whereWhen() {
  * ===================================================================== */
 const PHOTO = { cool: 0, last: 0 };
 const FRIDGE = (() => {
-  const slots = [[14.36, 1.42, 0.06], [14.83, 1.45, -0.08], [14.4, 0.98, -0.05], [14.8, 1.02, 0.07]];
+  const slots = [[14.36, 1.42, -2.34], [14.83, 1.45, -2.48], [14.4, 0.98, -2.45], [14.8, 1.02, -2.33]];
   const frameM = G.shared({ color: '#f6f1e6', roughness: 0.85 });
   return slots.map(([x, y, rz]) => {
     const g = new THREE.Group(); g.position.set(x, y, 0.789); g.rotation.z = rz; g.visible = false; G.world.add(g);

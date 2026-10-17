@@ -87,7 +87,7 @@ a queen up her sleeve), and photographs that end up on the fridge.
   *"It's the first snow, Partner. There aren't any fireflies."* Her hand finds
   yours. *"Inside. Please."* *(done)*
 
-## Act III · Recognition — the night
+## Act III · Recognition — the night *(done: the first version)*
 
 - You wake cold. The blanket is all on your side; hers is empty but still
   warm. She comes back ("Couldn't sleep. Got water.") and lies down exactly on
@@ -102,6 +102,16 @@ a queen up her sleeve), and photographs that end up on the fridge.
   a sign only the real one would understand (the pinecones in a line, half a
   pancake with one enormous bite, or a note: *"if it's sure about the night we
   met, it isn't me"*), then walk out into the snow to find them.
+- Built: she repeats this morning's line word for word ("Mm. Don't move,
+  Partner. You're warm."), lies awake looking at the ceiling, and now and then
+  calls you back to bed while you search. Five clues (the chairs, the fridge,
+  the snow globe, the photograph's third shape, three wrong notes drawn in the
+  fogged kitchen window); any two make the door appear in the kitchen wall
+  between the fridge and the study. The front door won't open. Elsewhere is
+  breakfast in a too-bright kitchen: the imitation of you recites the night of
+  the fair exactly; you leave one sign (`S.flags.sign`: pinecones, pancake or
+  note) and go out into the snow. Then: *Act IV · The Same Day — to be
+  continued.*
 
 ## Act IV · The Same Day
 

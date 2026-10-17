@@ -8,6 +8,16 @@ G.$ = (id) => document.getElementById(id);
 G.clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 G.lerp = (a, b, t) => a + (b - a) * t;
 G.smooth = (a, b, x) => { const t = G.clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+/* The deeper cabin: furniture that stood against the back wall moved back with it, and the middle of the living
+ * room opened up. G.ZM maps a position in the old 4.6 m-deep layout to where it is now (bedroom: the bed and
+ * everything round it 2.4 m back; living room: the hearth wall 2.4 m, the coffee table and armchair 1 m; kitchen:
+ * the counters 2.4 m). Anything nearer the front, and everything outside, is where it always was. */
+G.ZM = (x, z) => {
+  if (!(x > 0 && x < 15 && z > -0.2 && z < 4.6)) return z;
+  if (x < 5) return z < 2.7 ? z - 2.4 : z;
+  if (x < 11) return z < 1.45 ? z - 2.4 : z < 2.6 ? z - 1.0 : z;
+  return z < 1.5 ? z - 2.4 : z;
+};
 G.smooth01 = (x) => x * x * (3 - 2 * x);
 G.unsmooth01 = (y) => 0.5 - Math.sin(Math.asin(1 - 2 * Math.max(0, Math.min(1, y))) / 3);   // inverse of smooth01
 /* A critically damped spring on o[key] toward target (velocity kept in o[key + 'V']): starts gently, no overshoot.
@@ -239,9 +249,9 @@ const MAT = (G.MAT = {});
 G.buildMaterials = () => {
   const std = G.std;
   Object.assign(MAT, {
-    boards: std({ map: TX.boards, bumpMap: TX.boardsB, bumpScale: 0.003, roughness: 0.7, env: 0.25 }),
+    boards: std({ map: TX.boards, bumpMap: TX.boardsB, bumpScale: 0.003, color: '#f2dcc4', roughness: 0.75, env: 0.22 }),   // a warm honey tint
     logs: std({ map: TX.logs, bumpMap: TX.logsB, bumpScale: 0.03, roughness: 0.85, env: 0.4 }),
-    floor: std({ map: TX.floor, bumpMap: TX.floorB, bumpScale: 0.003, roughness: 0.5, env: 0.45 }),
+    floor: std({ map: TX.floor, bumpMap: TX.floorB, bumpScale: 0.003, color: '#f0d9c0', roughness: 0.55, env: 0.4 }),
     shingle: std({ map: TX.shingle, roughness: 0.9 }),
     stone: std({ map: TX.stone, bumpMap: TX.stone, bumpScale: 0.02, roughness: 0.9, env: 0.3 }),
     beam: std({ map: TX.bark, color: '#7a5a42', roughness: 0.8 }),

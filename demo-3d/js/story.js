@@ -279,18 +279,18 @@ function react(id) {
 }
 
 // Bedroom
-inter('bed', [2.4, 0.5, 2.55], 1.25, () => (morning() && PARTNER.lie ? 'Lie back down' : 'Bed'), async () => {
+inter('bed', [2.4, 0.5, 0.15], 1.25, () => (morning() && PARTNER.lie ? 'Lie back down' : 'Bed'), async () => {
   if (morning() && PARTNER.lie) { await Story.morningCuddle(); S.pSpoke = true; return; }
   await N(cyc('bed', ['(The bed. Her side and your side exist in theory. In practice, it is all her side.)', '(You straighten the duvet. It will not survive the night.)', '(Not yet. There’s too much day left.)']));
 });
-inter('wardrobe', [4.3, 1, 1.05], 0.9, 'Wardrobe', () => N(cyc('wardrobe', ['(Your grey jumper should be in here. It is not. It is in {P}’s possession now, permanently.)', '(Half the hangers are empty. The other half hold jumpers neither of you has worn since a wedding.)', '(A shoebox labelled “IMPORTANT”. It contains one shoe.)'])));
+inter('wardrobe', [4.3, 1, -1.35], 0.9, 'Wardrobe', () => N(cyc('wardrobe', ['(Your grey jumper should be in here. It is not. It is in {P}’s possession now, permanently.)', '(Half the hangers are empty. The other half hold jumpers neither of you has worn since a wedding.)', '(A shoebox labelled “IMPORTANT”. It contains one shoe.)'])));
 inter('chest', [3.6, 0.5, 3.6], 0.8, 'Blanket chest', () => N(cyc('chest', ['(Spare blankets, and a hot-water bottle shaped like a sheep. His name is Kevin, apparently.)', '(Kevin the sheep is lukewarm, and somehow disapproving.)'])));
 inter('bwin', [2.4, 1.3, 4.05], 0.9, 'Window', async () => {
   if (!morning()) return N('(Snow, blue in the dark, all the way to the trees.)');
   await N(cyc('bwin', ['(Morning. A round little bullfinch is regarding you from the sill.)', '(The bullfinch remains. So does its opinion of you.)']));
   if (S.n.bwin === 1 && canHear() && !PARTNER.lie) await Pt('That’s Gerald. He isn’t judging you. That’s simply his face.');
 });
-inter('wwin', [0.6, 1.3, 2.25], 0.9, 'Window', () => N(morning() ? cyc('wwin', ['(The pines are still holding last night’s snow, very carefully, as if it might break.)', '(A clump of snow slides off a branch. The tree looks relieved.)']) : '(The trees, and the dark between them.)'));
+inter('wwin', [0.6, 1.3, -0.15], 0.9, 'Window', () => N(morning() ? cyc('wwin', ['(The pines are still holding last night’s snow, very carefully, as if it might break.)', '(A clump of snow slides off a branch. The tree looks relieved.)']) : '(The trees, and the dark between them.)'));
 rewire('clock', () => N(cyc('clock', ['(The clock is four minutes fast. It has been four minutes fast for as long as anyone can remember. Nobody fixes it.)', '(Tick. Tock. Four minutes ahead of the rest of the world, and perfectly content.)'])));
 rewire('photos', () => N('(Six polaroids on a string. The lake. The fire. The night you both got lost and didn’t mind.)'));
 for (const id of ['lampL', 'lampR']) { const it = findInter(id); const was = it.act; it.act = () => { was(); S.lastUse = { id, t: G.simT, room: hereRoom() }; react(id); }; }
@@ -307,12 +307,14 @@ const fire = rewire('fire', async () => {
   if (canHear()) await Pt('The fire person, at work. My hero, Partner.');
 });
 fire.label = () => (G.FIRE.on ? 'Poke the fire' : 'Light the fire');
+// The window seat in the reading nook.
+G.Story.nook = () => run(() => sitFree({ id: 'nook', x: G.NOOK.x, z: G.NOOK.z, yaw: 0, y: G.NOOK.seatY, line: '(The window seat. Cushions in every colour you own, a pile of books you are both halfway through, and the snow going past the glass at your back.)' }), 'nook');
 const sofa = findInter('sofa');
 sofa.label = () => (ch() === 'evening' ? (STATE.cuddled ? 'Sofa' : 'Curl up together') : 'Sit');
 sofa.act = () => { if (ch() === 'evening') return G.Story.cuddle(); return run(sitSofa, 'sofa'); };
 const cake = findInter('cake');
 cake.when = () => G.CAKE.shown !== false;
-inter('ctable', [8, 0.5, 1.85], 1.0, 'Coffee table', () => N(cyc('ctable', ['(Two mugs from last night. One has a lipstick mark; the other has a spoon standing upright in it.)', '(The coaster is a beer mat from somewhere neither of you has ever been.)'])), () => G.CAKE.shown === false);
+inter('ctable', [8, 0.5, 0.85], 1.0, 'Coffee table', () => N(cyc('ctable', ['(Two mugs from last night. One has a lipstick mark; the other has a spoon standing upright in it.)', '(The coaster is a beer mat from somewhere neither of you has ever been.)'])), () => G.CAKE.shown === false);
 const scrapShelf = rewire('shelf6.15', () => G.UI.scrapbook(S.scrap));
 scrapShelf.label = 'Scrapbook';
 REACT['shelf6.15'] = REACT.scrap;
@@ -324,12 +326,12 @@ inter('basil', [10.4, 0.8, 4.2], 0.85, 'Basil', async () => {
 });
 inter('lwin', [9.4, 1.3, 4.05], 0.9, 'Window', () => N(morning() ? cyc('lwin', ['(A cloud shaped like a cat. Or a pancake.)', '(A cloud shaped like a pancake. Definitely a pancake.)']) : '(The porch lights, and the snow coming down through them.)'));
 inter('coats', [5.5, 1.3, 4.1], 0.8, 'Coats', () => N(cyc('coats', ['(Your coat. Her coat. And a scarf neither of you will claim. Grey? Blue? The light in here is bad.)', '(The unclaimed scarf. Each of you insists it belongs to the other.)'])));
-inter('cushion', [9.2, 0.6, 2.5], 0.6, 'Under the cushions', async () => {
+inter('cushion', [9.2, 0.6, 1.5], 0.6, 'Under the cushions', async () => {
   const pancake = S.mem.foodStolen > 0 ? ' a bite of pancake (fresh),' : '';
   await N(`(Under the cushion: three of your socks, a pen, the remote for a radio you no longer own,${pancake} and half a biscuit.)`);
   if (!S.flags.stash) { S.flags.stash = 1; await N('(It’s her stash. Everything in it was taken from you. You decide to let it grow.)'); }
 }, () => morning());
-inter('armchair', [6.62, 0.6, 1.68], 0.8, 'Sit in the armchair', () => sitFree(SEATS.armchair));
+inter('armchair', [6.62, 0.6, 0.68], 0.8, 'Sit in the armchair', () => sitFree(SEATS.armchair));
 inter('frontdoor', [6.5, 1, 4.15], 0.8, 'Front door', async () => {
   if (morning()) {
     if (!S.flags.breakfastDone) { await N('(Breakfast first. Snow-day law, apparently.)'); if (canHear() && !PARTNER.lie) await Pt('Not without breakfast, Partner. I won’t allow it.'); return; }
@@ -338,7 +340,7 @@ inter('frontdoor', [6.5, 1, 4.15], 0.8, 'Front door', async () => {
   return N('(The front door. Somebody has hung a sprig of pine on it.)');
 });
 // Kitchen
-inter('kettle', [11.55, 1, 0.75], 0.75, () => (morning() && !S.flags.teaMade ? 'Make tea' : 'Kettle'), async () => {
+inter('kettle', [11.55, 1, -1.65], 0.75, () => (morning() && !S.flags.teaMade ? 'Make tea' : 'Kettle'), async () => {
   if (morning() && !S.flags.teaMade) {
     S.flags.teaMade = true;
     G.Audio.kettle(); G.steam('kettle', 11.65, 1.12, 0.36, { rate: 3, dur: 9 });
@@ -349,13 +351,13 @@ inter('kettle', [11.55, 1, 0.75], 0.75, () => (morning() && !S.flags.teaMade ? '
   }
   await N('(The kettle’s still warm.)');
 });
-inter('stove', [12.35, 1, 0.8], 0.7, () => (morning() && !S.flags.pancakesMade ? 'Make pancakes' : 'Stove'), async () => {
+inter('stove', [12.35, 1, -1.6], 0.7, () => (morning() && !S.flags.pancakesMade ? 'Make pancakes' : 'Stove'), async () => {
   if (morning() && !S.flags.pancakesMade) { await Story.makePancakes(); S.pSpoke = true; return; }
   await N(cyc('stove', ['(The pan is still a little warm from breakfast.)', '(You resist the urge to make more pancakes.)']));
 });
-inter('ksink', [13.05, 1, 0.8], 0.6, 'Sink', () => N(cyc('ksink', ['(Dishes from last night: two mugs, two forks, one suspiciously licked spoon.)', '(You wash the spoon. Some mysteries are better left clean.)'])));
-inter('toaster', [13.48, 1, 0.75], 0.55, 'Toaster', () => N(cyc('toaster', ['(The toaster has two settings: “warm bread” and “house fire”.)', '(You leave the toaster alone. Today is not a house-fire day.)'])));
-inter('fridge', [14.45, 1, 1.05], 0.75, 'Fridge', async () => {
+inter('ksink', [13.05, 1, -1.6], 0.6, 'Sink', () => N(cyc('ksink', ['(Dishes from last night: two mugs, two forks, one suspiciously licked spoon.)', '(You wash the spoon. Some mysteries are better left clean.)'])));
+inter('toaster', [13.48, 1, -1.65], 0.55, 'Toaster', () => N(cyc('toaster', ['(The toaster has two settings: “warm bread” and “house fire”.)', '(You leave the toaster alone. Today is not a house-fire day.)'])));
+inter('fridge', [14.45, 1, -1.35], 0.75, 'Fridge', async () => {
   const n = ++S.mem.fridge;
   if (n === 1) { S.flags.knowsPancakes = true; return N('(Eggs. Milk. Butter. A sad lemon. Pancakes are possible.)'); }
   if (n === 2) return N('(Still eggs. Still milk. The lemon is still sad.)');
@@ -393,8 +395,8 @@ G.SMART = [
   { id: 'sofa', spot: { x: 6.55, z: 2.95 }, seatAt: { x: 7.5, z: 2.95, yaw: Math.PI, y: 0.6 }, dur: [10, 18], lines: ['I’m claiming the sofa.', 'This sofa is mine now. Rent is one cushion a week.', '*settles in with great ceremony*'] },
   { id: 'lwin', spot: { x: 9.4, z: 4.08 }, yaw: 0, dur: [5, 8], look: { x: 9.4, y: 1.6, z: 8 }, lines: ['That cloud looks like you. Tall. Soft.', 'There’s a squirrel out there behaving very oddly about the snow.'] },
   { id: 'basil', spot: { x: 9.85, z: 3.72 }, yaw: 0.8, dur: [4, 7], look: { x: 10.4, y: 0.7, z: 4.2 }, lines: ['You’re doing wonderfully, Basil.', 'Don’t tell Partner, Basil, but you’re my favourite.'] },
-  { id: 'books', spot: { x: 6.2, z: 0.95 }, yaw: Math.PI, dur: [5, 9], look: { x: 6.15, y: 1.2, z: 0.2 }, lines: ['I am reading this one. I have been reading it for a year.', 'Who owns six copies of the same cookbook? We do, apparently.'] },
-  { id: 'fridge', spot: { x: 14.35, z: 1.22 }, yaw: Math.PI, dur: [3, 5], look: { x: 14.5, y: 1.1, z: 0.4 }, lines: ['*rustling* …nothing. I was looking at nothing.', '*takes a single grape*', 'We need cheese. Spiritually.'] },
+  { id: 'books', spot: { x: 6.2, z: -1.45 }, yaw: Math.PI, dur: [5, 9], look: { x: 6.15, y: 1.2, z: -2.2 }, lines: ['I am reading this one. I have been reading it for a year.', 'Who owns six copies of the same cookbook? We do, apparently.'] },
+  { id: 'fridge', spot: { x: 14.35, z: -1.18 }, yaw: Math.PI, dur: [3, 5], look: { x: 14.5, y: 1.1, z: -2 }, lines: ['*rustling* …nothing. I was looking at nothing.', '*takes a single grape*', 'We need cheese. Spiritually.'] },
   { id: 'study', spot: { x: 14.5, z: 3.85 }, yaw: Math.PI / 2, dur: [12, 22], hide: true, exit: { x: 14.45, z: 3.85, yaw: -Math.PI / 2 }, line: 'Private business. Please don’t follow me.', cond: () => morning() && !S.flags.pancakesMade },
   { id: 'bwin', spot: { x: 2.4, z: 4.05 }, yaw: 0, dur: [4, 6], look: { x: 2.4, y: 1.4, z: 7 }, lines: ['Good morning, Gerald.', 'Gerald’s back. Hello, Gerald.'] },
   { id: 'kwin', spot: { x: 13.0, z: 4.1 }, yaw: 0, dur: [4, 6], look: { x: 13, y: 1.4, z: 8 }, lines: ['It’s so white out there. As if someone had tidied the world away.', 'Somebody drew a heart on the porch rail. It was me. Please don’t look.'] },
@@ -402,7 +404,7 @@ G.SMART = [
 
 /* ---------- other places to sit, and Partner coming to join you ---------- */
 const SEATS = {
-  armchair: { id: 'armchair', x: 6.22, z: 1.97, yaw: 2.23, y: 0.47, line: '(The armchair. Technically yours. {P}’s blanket lives on it, and it smells of her.)' },
+  armchair: { id: 'armchair', x: 6.22, z: 0.97, yaw: 2.23, y: 0.47, line: '(The armchair. Technically yours. {P}’s blanket lives on it, and it smells of her.)' },
   chairB: { id: 'chairB', x: 13.3, z: 3.58, yaw: Math.PI, y: 0.49, join: 'kitA', line: '(The kitchen chair creaks the way it always has. You know exactly which one it is by the creak.)' },
   chairC: { id: 'chairC', x: 13.0, z: 2.3, yaw: 0, y: 0.49, join: 'kitA' },
   bench: { id: 'bench', x: 9.83, z: 5.52, yaw: 0, y: 0.47, join: 'bench', line: '(The bench is cold enough to count as a dare. The clearing is white and still, all the way to the trees.)' },
@@ -428,9 +430,9 @@ const breakfastNow = () => morning() && S.flags.pancakesMade && !S.flags.breakfa
 inter('chairB', [13.3, 0.5, 3.95], 0.55, 'Sit', () => sitFree(SEATS.chairB), () => !breakfastNow());
 inter('chairC', [13.0, 0.5, 1.95], 0.55, 'Sit', () => sitFree(SEATS.chairC), () => !breakfastNow());
 // The old snow globe on the mantle: pick it up and shake it.
-inter('globe', [8.5, 1.5, 1.0], 0.7, 'Shake the snow globe', async () => {
+inter('globe', [8.5, 1.5, -1.4], 0.7, 'Shake the snow globe', async () => {
   STATE.sceneShot = true;
-  G.setShot(fixed(V(8.62, 1.66, 1.17), V(8.5, 1.555, 0.75), 30, 0.012));
+  G.setShot(fixed(V(8.62, 1.66, -1.23), V(8.5, 1.555, -1.65), 30, 0.012));
   G.shakeGlobe(); G.Audio.musicBox();
   await N(cyc('globe', ['(You give the snow globe a shake. Inside: a tiny cabin and a single, very determined pine. The snow takes its time.)', '(The snow swirls and settles. The little cabin’s window is painted yellow, as if someone were home.)']), { shot: 'keep' });
   await wait(1.5);
@@ -660,9 +662,9 @@ const EXTRA = (G.TOGETHER_EXTRA = []);
  * ===================================================================== */
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const fixed = (pos, look, fov = 38, aperture = 0.012) => () => ({ pos: pos.clone(), look: look.clone(), fov, focus: pos.distanceTo(look), aperture });
-const bedShot = () => { const B = G.BED; return fixed(V(B.x + 0.05, 2.2, 1.5), V(B.x + 0.02, 0.72, 0.75), 44, 0.008); };
-const bedCloseShot = () => { const B = G.BED; return fixed(V(B.x + 0.04, 2.1, 1.12), V(B.x + 0.02, 0.76, 0.6), 34, 0.012); };
-const panShot = () => fixed(V(13.05, 1.5, 1.2), V(12.45, 0.95, 0.5), 38, 0.016);
+const bedShot = () => { const B = G.BED; return fixed(V(B.x + 0.05, 2.2, -0.9), V(B.x + 0.02, 0.72, -1.65), 44, 0.008); };
+const bedCloseShot = () => { const B = G.BED; return fixed(V(B.x + 0.04, 2.1, -1.28), V(B.x + 0.02, 0.76, -1.8), 34, 0.012); };
+const panShot = () => fixed(V(13.05, 1.5, -1.2), V(12.45, 0.95, -1.9), 38, 0.016);
 const tableShot = (seat) => (seat === 'C' ? fixed(V(11.3, 1.42, 2.62), V(13.0, 1.02, 3.0), 50, 0.008) : fixed(V(13.0, 1.4, 1.55), V(13.0, 0.98, 3.4), 42, 0.01));
 
 /* =====================================================================
@@ -680,7 +682,7 @@ Object.assign(Story, {
   partnerGetsUp(silent) {
     const p = PARTNER;
     if (!p.lie) return;
-    G.standAt(p, 3.72, 1.55, -Math.PI / 2); p.mode = 'follow';
+    G.standAt(p, 3.72, -0.85, -Math.PI / 2); p.mode = 'follow';
     G.shapeBed({});
     STATE.autonomy = true;
     if (!silent) G.bark(['*an enormous yawn* Good morning, Partner.', '*stretches* I’m up. Spiritually and now physically.'], 2.6);
@@ -688,7 +690,7 @@ Object.assign(Story, {
   async morningCuddle() {
     S.flags.inBedScene = true; S.flags.cuddled = true;
     STATE.sceneShot = true;
-    await G.cutTo(() => { G.lieDown(PLAYER, G.BED.L, 2.26, 0.15, 0.35); G.shapeBed({ L: true, R: true }); G.setShot(bedCloseShot()); });
+    await G.cutTo(() => { G.lieDown(PLAYER, G.BED.L, -0.14, 0.15, 0.35); G.shapeBed({ L: true, R: true }); G.setShot(bedCloseShot()); });
     await N('(You climb back in. She doesn’t open her eyes. She simply shifts until she’s against you again.)', { shot: 'keep' });
     PARTNER.lidsClosed = true;
     await P('I knew you’d come back.', { shot: 'keep' });
@@ -699,14 +701,14 @@ Object.assign(Story, {
     await N('(It is not ten minutes.)', { shot: 'keep' });
     PARTNER.lidsClosed = false;
     await P('…All right. All right. Pancakes. I am getting up. In spirit.', { shot: 'keep' });
-    await G.cutTo(() => { G.standAt(PLAYER, 1.1, 1.9, Math.PI / 2); Story.partnerGetsUp(true); STATE.sceneShot = false; G.releaseCamera(); });
+    await G.cutTo(() => { G.standAt(PLAYER, 1.1, -0.5, Math.PI / 2); Story.partnerGetsUp(true); STATE.sceneShot = false; G.releaseCamera(); });
     addScrap('blanket', 'Ten more minutes. (It was not ten minutes.)');
     S.flags.inBedScene = false;
   },
   async makePancakes() {
     const k = K();
     STATE.sceneShot = true;
-    await G.slideTo(PLAYER, 12.22, 0.97, Math.PI, 0.35);   // stand at the hob, a little left of the pan, so the camera can see both
+    await G.slideTo(PLAYER, 12.22, -1.43, Math.PI, 0.35);   // stand at the hob, a little left of the pan, so the camera can see both
     G.setShot(panShot());
     k.burner.material.opacity = 0.8; G.Audio.sizzle(true); G.steam('pan', 12.5, 0.96, 0.51, { rate: 4, size: 1.3 });
     await N('(Flour, eggs, milk, a pinch of salt. The pan hisses.)', { shot: 'keep' });
@@ -991,8 +993,8 @@ CH.morning = async () => {
   houseFor('morning');
   Object.assign(S.flags, { teaMade: false, pancakesMade: false, breakfastDone: false, leaveHouse: false, cuddled: false });
   const B = G.BED;
-  G.lieDown(PLAYER, B.L, 2.26, 0.15, 0.35);
-  G.lieDown(PARTNER, B.R, 2.0, -0.3, -0.4); PARTNER.mode = 'lying'; PARTNER.lidsClosed = true;
+  G.lieDown(PLAYER, B.L, -0.14, 0.15, 0.35);
+  G.lieDown(PARTNER, B.R, -0.40, -0.3, -0.4); PARTNER.mode = 'lying'; PARTNER.lidsClosed = true;
   STATE.sceneShot = true; G.setShot(bedShot());
   await wait(0.4);
   f.style.transition = 'opacity 2.2s'; f.classList.remove('on'); wait(2.4).then(() => { f.style.transition = ''; f.style.background = ''; });
@@ -1034,7 +1036,7 @@ CH.morning = async () => {
   await Y('You woke up first.', { shot: 'keep' });
   await P('I have no recollection of that. …Pancakes, please. I’ll be up in a minute.', { shot: 'keep' });
   await G.cutTo(() => {
-    G.standAt(PLAYER, 1.1, 1.9, Math.PI / 2);
+    G.standAt(PLAYER, 1.1, -0.5, Math.PI / 2);
     G.shapeBed({ R: true }, c === 1 ? 0.35 : 0);
     PARTNER.lieLook = -0.2; PARTNER.lidsClosed = true;
     STATE.sceneShot = false; G.releaseCamera(); G.CAM.yaw = -Math.PI / 2 + Math.PI; G.CAM.cut = true;
