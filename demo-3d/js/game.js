@@ -855,7 +855,12 @@ const stick = { x: 0, y: 0, on: false };
  * Dialogue (cinematic subtitles) with automatic shot selection
  * ===================================================================== */
 const DLG = { q: [], cur: null, shown: 0, t: 0, auto: false };
-G.say = (who, text, o = {}) => new Promise((res) => DLG.q.push({ who, text: G.fmt(text), res, o }));
+// Playing as Partner: in the chapters told around her (free time and the endings) the narration is her side of it,
+// and the speaker labels turn round ("You" is her, "Partner" is him).
+const HER_CH = /^(prologue|morning|walk|evening|ending_(foundme|uncertain|iknow|perfect|stay))$/;
+G.herSide = () => SETTINGS.playAs === 'partner' && !!G.S && HER_CH.test(G.S.chapter || '');
+const herLine = (who, text) => (who == null && G.herSide() && window.CBS_NARR_HER && window.CBS_NARR_HER[text]) || text;
+G.say = (who, text, o = {}) => new Promise((res) => DLG.q.push({ who, text: G.fmt(herLine(who, text)), res, o }));
 const busy = () => !!DLG.cur || DLG.q.length > 0 || STATE.busy || !!(G.UI && G.UI.blocking());
 G.busy = busy; G.DLG = DLG;
 function pickShotFor(who, o) {
@@ -872,7 +877,7 @@ function updateDialogue(dt) {
   if (!DLG.cur && DLG.q.length) {
     DLG.cur = DLG.q.shift(); DLG.shown = 0; DLG.t = 0;
     box.className = 'show ' + (DLG.cur.who ? 'who-' + DLG.cur.who : 'narr');
-    $('who').textContent = DLG.cur.who === 'partner' ? G.CFG.partnerLabel : DLG.cur.who === 'player' ? G.CFG.playerLabel : '';
+    { const hs = G.herSide(); $('who').textContent = DLG.cur.who === 'partner' ? (hs ? G.CFG.playerLabel : G.CFG.partnerLabel) : DLG.cur.who === 'player' ? (hs ? G.CFG.partnerLabel : G.CFG.playerLabel) : ''; }
     pickShotFor(DLG.cur.who, DLG.cur.o);
   }
   if (!DLG.cur) { if (box.className !== '') { box.className = ''; if (!STATE.sceneShot && CAM.shot) releaseCamera(); } return; }
