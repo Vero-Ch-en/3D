@@ -935,6 +935,16 @@ G.animate = (c, dt, t) => {
     mcSample(MC.walk, wu * MC.walk.n, S.w);
     mb = mcMix(S.i, S.w, w, S.m);
     if (sit > 0.01) { mcSample(MC.sit, (t * 0.9 + sd * 5) * MC.sit.fps, S.s); mb = mcMix(mb, S.s, sit, S.m2); }
+    // Talking: while it's your line, the recorded conversation's hand gestures come in (and a laugh, when the line
+    // laughs), eased in and out, softer when sitting or walking. Each person at their own point in the recording.
+    const D = G.DLG && G.DLG.cur, mine = !!D && ((D.who === 'partner' && c === G.PARTNER) || (D.who === 'player' && c === G.PLAYER));
+    const laughing = mine && /\bha\b|haha|\bheh|laugh/i.test(D.text);
+    if (D && D !== c._line) { c._line = D; if (laughing) c._laughT = 2.6; if (!mine && /laugh/i.test(D.text) && !D.who) c._laughT = 2.2; }
+    c._laughT = Math.max(0, (c._laughT || 0) - dt);
+    G.spring(c, '_talkW', mine && !c.hugWith && !c.lie ? 1 : 0, 3.2, dt);
+    G.spring(c, '_laughW', c._laughT > 0 ? 1 : 0, 4, dt);
+    if (MC.talk && c._talkW > 0.01) { S.t = S.t || {}; mcSample(MC.talk, (t + sd * 13) * MC.talk.fps, S.t); mb = mcMix(mb, S.t, Math.min(1, c._talkW) * 0.5 * (1 - w * 0.8) * (1 - sit * 0.5), S.m3 || (S.m3 = {})); }
+    if (MC.laugh && c._laughW > 0.01) { S.l = S.l || {}; mcSample(MC.laugh, (t + sd * 7) * MC.laugh.fps, S.l); mb = mcMix(mb, S.l, Math.min(1, c._laughW) * 0.7 * (1 - w * 0.8), S.m4 || (S.m4 = {})); }
   }
   u.legs.forEach((Lg, i) => {
     const p = ph + (i ? Math.PI : 0), s = i ? 1 : -1;

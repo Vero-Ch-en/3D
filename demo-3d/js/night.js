@@ -144,6 +144,8 @@ CH.night = async () => {
 };
 // Getting up: you're on your feet beside the bed.
 const getUp = () => G.cutTo(() => { G.standAt(PLAYER, B().L - 0.6, 0.2, Math.PI / 2); G.releaseCamera(); G.CAM.cut = true; }, 0.4);
+// Moving while you're lying there gets you up (the bed's prompt still offers going back to sleep).
+G.lieMove = () => { if (!night() || !S.flags.nightUp || S.flags.doorOpen || NIGHT.rising) return; NIGHT.rising = true; S.flags.upT = G.simT; A.run(async () => { await getUp(); NIGHT.rising = false; }); };
 
 function nightLoops(run) {
   const live = () => S.run === run && night() && !S.flags.doorOpen;

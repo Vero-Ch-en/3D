@@ -48,6 +48,10 @@ function walkCycle(c) {
 const round = (c) => { const o = { fps: c.fps, n: c.n }; for (const k of KEYS) o[k] = c[k].map((v) => (isArr(v) ? v.map((x) => +x.toFixed(3)) : +v.toFixed(3))); return o; };
 const idle = chain([seg('82_08', 0.2, 8.0), seg('40_10', 0.1, 5.4), seg('40_11', 2.5, 5.4), seg('77_02', 0.1, 2.2)], 24);
 const sitIdle = chain([seg('86_09', 10.6, 23.2)], 30);
+// Talking: conversation with hand gestures, both sides of the same recorded conversation (18_08, 19_08).
+const talk = chain([seg('18_08', 0.5, 16.5), seg('19_08', 0.5, 16.5)], 30);
+// Laughing (13_14).
+const laugh = chain([seg('13_14', 0.3, 19.5)], 30);
 const walk = walkCycle(seg('16_15', 0.1, 3.9, { headingWin: 45 }));
 // Standing hip height is the clip's own mean, so the game can scale to each character.
 // The recording's rest pose has the head bowed a little: keep the motion, drop the constant offset.
@@ -59,13 +63,15 @@ function unbias(c, keys, scale = {}) {
 unbias(idle, ['neck', 'head', 'chest', 'spineW'], { neck: [0.6, 0.45, 0.6], head: [0.7, 0.6, 0.7], spineW: [0.6, 0.7, 0.7] });
 unbias(sitIdle, ['neck', 'head', 'chest', 'spineW'], { neck: [0.7, 0.6, 0.7], spineW: [0.6, 0.7, 0.7] });
 unbias(walk, ['neck', 'head']);
+unbias(talk, ['neck', 'head', 'chest', 'spineW'], { neck: [0.6, 0.5, 0.6], head: [0.6, 0.5, 0.6], spineW: [0.6, 0.6, 0.6] });
+unbias(laugh, ['neck', 'head', 'chest', 'spineW'], { spineW: [0.8, 0.6, 0.6] });
 // This conversion reads every knee about 0.3 rad more bent than it is (a standing knee comes out at ~20°):
 // take that off, keeping the shape of the stride.
 const kneeMin = Math.min(...walk.kn0, ...walk.kn1), kneeFix = Math.max(0, kneeMin - 0.06);
 for (const k of ['kn0', 'kn1']) walk[k] = walk[k].map((v) => Math.max(0.03, v - kneeFix));
 console.log('knee offset removed', kneeFix.toFixed(2));
 const meanY = (c) => c.hipsPos.reduce((s, v) => s + v[1], 0) / c.n;
-const data = { source: 'CMU Graphics Lab Motion Capture Database (mocap.cs.cmu.edu): 82_08, 40_10, 40_11, 77_02 (idle), 86_09 (seated), 16_15 (walk)', idle: round(idle), walk: round(walk), sit: round(sitIdle), idleY: +meanY(idle).toFixed(3), walkY: +meanY(walk).toFixed(3) };
+const data = { source: 'CMU Graphics Lab Motion Capture Database (mocap.cs.cmu.edu): 82_08, 40_10, 40_11, 77_02 (idle), 86_09 (seated), 16_15 (walk), 18_08 + 19_08 (talking), 13_14 (laughing)', idle: round(idle), talk: round(talk), laugh: round(laugh), walk: round(walk), sit: round(sitIdle), idleY: +meanY(idle).toFixed(3), walkY: +meanY(walk).toFixed(3) };
 const js = '/* Motion clips retargeted from motion capture (tools/mocap, build_clips.js). ' + data.source + '. CMU places no restrictions on the use of the data. */\nwindow.CBS_MOCAP = ' + JSON.stringify(data) + ';\n';
 fs.writeFileSync(process.argv[2] || 'mocap.js', js);
 console.log('idle', idle.n, 'frames', (idle.n / 30).toFixed(1) + 's', 'walk', walk.n, 'frames', walk.peaks, 'sit', sitIdle.n, 'bytes', js.length, 'idleY', data.idleY, 'walkY', data.walkY);

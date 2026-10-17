@@ -742,10 +742,21 @@ let handT = 0;
 function updateCamera(dt, t) {
   const c = CAM;
   c.run = damp(c.run || 0, clamp((PLAYER.speed - 1.6) / 1.4, 0, 1), 2.5, dt);
-  if (G.keys.has('KeyZ') || G.keys.has('Comma')) { c.yaw += dt * 1.6; c.lastDrag = t; }
-  if (G.keys.has('KeyC') || G.keys.has('Period')) { c.yaw -= dt * 1.6; c.lastDrag = t; }
+  if (G.keys.has('KeyZ') || G.keys.has('Comma')) { c.yaw += dt * 1.6; c.lookYaw = clamp((c.lookYaw || 0) + dt * 1.2, -1.4, 1.4); c.lastDrag = t; }
+  if (G.keys.has('KeyC') || G.keys.has('Period')) { c.yaw -= dt * 1.6; c.lookYaw = clamp((c.lookYaw || 0) - dt * 1.2, -1.4, 1.4); c.lastDrag = t; }
   let s;
-  if (c.shot) s = c.shot(t);
+  const walking = c.shot && !STATE.sceneShot && t - (c.lastMove || -99) < 1.6 && STATE.started && !STATE.lockMove;
+  if (walking && !c.wasWalking) c.yaw = PLAYER.yaw + Math.PI;
+  c.wasWalking = walking;
+  if (c.shot && !walking) {
+    s = c.shot(t);
+    // Looking around inside a scene: drag (or Z / C) turns the view from where the camera stands; it eases back when you let go.
+    if (t - c.lastDrag > 4) { c.lookYaw = damp(c.lookYaw || 0, 0, 1.6, dt); c.lookPitch = damp(c.lookPitch || 0, 0, 1.6, dt); }
+    if (Math.abs(c.lookYaw || 0) > 1e-3 || Math.abs(c.lookPitch || 0) > 1e-3) {
+      const d = s.look.clone().sub(s.pos), r = d.length(), yaw = Math.atan2(d.x, d.z) + c.lookYaw, pit = Math.asin(clamp(d.y / r, -1, 1)) - c.lookPitch;
+      s = { ...s, look: s.pos.clone().add(new THREE.Vector3(Math.sin(yaw) * Math.cos(pit), Math.sin(pit), Math.cos(yaw) * Math.cos(pit)).multiplyScalar(r)) };
+    }
+  }
   else {
     // Exploration: recentre behind the player while moving; drift toward an
     // over-the-shoulder framing of Partner when standing still near them.
@@ -824,7 +835,7 @@ const hit = (...c) => c.some((k) => pressed.has(k));
 G.hit = hit; G.pressed = pressed;
 let drag = null;
 G.canvas.addEventListener('pointerdown', (e) => { drag = { id: e.pointerId, x: e.clientX, y: e.clientY }; try { G.canvas.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ } G.Audio.start(); });
-G.canvas.addEventListener('pointermove', (e) => { if (!drag || drag.id !== e.pointerId || CAM.shot || STATE.paused) return; CAM.yaw -= (e.clientX - drag.x) * 0.006; if (SETTINGS.view === 'first') CAM.fpPitch = clamp((CAM.fpPitch || 0) + (e.clientY - drag.y) * 0.004, -0.9, 1.0); else CAM.pitch = clamp(CAM.pitch + (e.clientY - drag.y) * 0.004, -0.2, 0.85); drag.x = e.clientX; drag.y = e.clientY; CAM.lastDrag = G.simT; });
+G.canvas.addEventListener('pointermove', (e) => { if (!drag || drag.id !== e.pointerId || STATE.paused) return; if (CAM.shot && G.simT - (CAM.lastMove || -99) > 1.6) { CAM.lookYaw = clamp((CAM.lookYaw || 0) - (e.clientX - drag.x) * 0.004, -1.4, 1.4); CAM.lookPitch = clamp((CAM.lookPitch || 0) + (e.clientY - drag.y) * 0.003, -0.5, 0.5); drag.x = e.clientX; drag.y = e.clientY; CAM.lastDrag = G.simT; return; } CAM.yaw -= (e.clientX - drag.x) * 0.006; if (SETTINGS.view === 'first') CAM.fpPitch = clamp((CAM.fpPitch || 0) + (e.clientY - drag.y) * 0.004, -0.9, 1.0); else CAM.pitch = clamp(CAM.pitch + (e.clientY - drag.y) * 0.004, -0.2, 0.85); drag.x = e.clientX; drag.y = e.clientY; CAM.lastDrag = G.simT; });
 G.canvas.addEventListener('pointerup', () => { drag = null; });
 G.canvas.addEventListener('wheel', (e) => { e.preventDefault(); if (SETTINGS.view === 'first') return; CAM.zoom = clamp(CAM.zoom * (e.deltaY > 0 ? 1.1 : 0.9), 0.6, 1.8); }, { passive: false });
 const stick = { x: 0, y: 0, on: false };
@@ -851,7 +862,7 @@ function pickShotFor(who, o) {
   if (o.shot === 'keep') return;
   if (o.shot) { setShot(o.shot, o.cut !== false); return; }
   const d = Math.hypot(PARTNER.x - PLAYER.x, PARTNER.z - PLAYER.z);
-  if (d > 3.6 || STATE.sceneShot) return;
+  if (d > 3.6 || STATE.sceneShot || G.simT - (CAM.lastMove || -99) < 1.6) return;
   if (who === 'partner') setShot(() => SHOTS.ots(PARTNER, PLAYER, 1));
   else if (who === 'player') setShot(() => SHOTS.ots(PLAYER, PARTNER, -1));
   else setShot(() => SHOTS.twoShot(), true);
@@ -1399,8 +1410,14 @@ function step(dt, t) {
     PLAYER.x = lerp(R.from.x, R.to.x, k); PLAYER.z = lerp(R.from.z, R.to.z, k); PLAYER.yFloor = G.floorAt(PLAYER.x, PLAYER.z);
     if (R.t > 0.6) { PLAYER.rise = null; if (R.to.yaw != null) PLAYER.yaw = R.to.yaw; }
   }
-  const free = !busy() && !PLAYER.script && (PLAYER.sit || 0) < 0.05 && !PLAYER.rise && !PLAYER.lie && !STATE.noControl;
+  // Lying in bed: a push on the stick or the keys gets you up, if the story has a way to.
+  if (PLAYER.lie && !busy() && Math.hypot(ix, iy) > 0.4 && G.lieMove) G.lieMove();
+  // In conversation you can keep walking. In a staged cutscene you stay put, but can always look around
+  // (drag, or Z / C); a hug, a dance or a game holds you too.
+  const staged = STATE.sceneShot || STATE.lockMove || STATE.kiss || PLAYER.hugWith || STATE.dancing || (G.UI && (G.UI.modal === 'minigame' || G.UI.modal === 'scrapbook')) || (G.UI && G.UI.blocking() && G.UI.modal !== 'choices');
+  const free = (!busy() || (STATE.started && !staged)) && !PLAYER.script && (PLAYER.sit || 0) < 0.05 && !PLAYER.rise && !PLAYER.lie && !STATE.noControl;
   if (!free) ix = iy = 0;
+  if (Math.hypot(ix, iy) > 0.3 && busy()) CAM.lastMove = G.simT;
   const l = Math.hypot(ix, iy);
   if (PLAYER.script) {
     const s = PLAYER.script;

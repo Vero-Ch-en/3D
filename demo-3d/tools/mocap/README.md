@@ -4,6 +4,7 @@
 **CMU Graphics Lab Motion Capture Database** (mocap.cs.cmu.edu — "the data is free for all uses"),
 via the cgspeed BVH conversion at github.com/Shriinivas/cmubvh:
 
+- talk: 18_08 + 19_08 (conversation, explaining with hand gestures); laugh: 13_14
 - idle: 82_08 (stand still), 40_10 and 40_11 (waiting for a bus), 77_02 (standing)
 - walk: 16_15
 - seated: 86_09 (sitting, looking around)
