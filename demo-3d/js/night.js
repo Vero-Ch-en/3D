@@ -320,7 +320,7 @@ G.swapBodies = () => {
 };
 async function elsewhere() {
   const f = G.$('fade'); f.style.background = S.flags.sleptBeside ? '#000' : '#dfe9f5'; f.style.transition = 'opacity 1.6s'; f.classList.add('on'); await wait(1.8);
-  STATE.busy = true; STATE.sceneShot = false;
+  STATE.busy = true; STATE.sceneShot = false; NIGHT.left = false; NIGHT.outside = false;
   NIGHT.door.visible = false; STATE.bounds = { zMin: -5, zMax: 4.3 };
   G.swapBodies();
   // Earlier, the same night. She's up for water. He's asleep.
@@ -353,7 +353,8 @@ async function elsewhere() {
   await N('(He doesn’t wait for you.)');
   STATE.busy = false;
   NIGHT.canWhistle = true;
-  G.hint(G.MOBILE ? 'Go to the kitchen window and tap Use to whistle.' : 'Go to the kitchen window and whistle (' + G.keyFor('interact') + ').', 6);
+  const wh = () => G.hint(G.MOBILE ? 'Any window in the kitchen: tap Use to whistle.' : 'Any window in the kitchen: ' + G.keyFor('interact') + ' to whistle.', 7);
+  wh(); (async () => { for (let i = 0; i < 20 && !S.flags.povWhistled; i++) { await wait(25); if (!S.flags.povWhistled && NIGHT.canWhistle && !G.busy()) wh(); } })();
   await until(() => S.flags.povWhistled && !G.busy());
   STATE.busy = true;
   await N('(You leave him something. Just in case.)');
@@ -364,8 +365,10 @@ async function elsewhere() {
   else await N('(You write: “If it’s sure about the night we met, it isn’t me. — your {gremlin}”)');
   await N('(Then you walk out into the snow, towards wherever he is.)');
   STATE.busy = false; STATE.bounds = null; NIGHT.outside = true;
-  G.hint('The front door.', 4);
-  await until(() => PLAYER.z > 4.9);
+  G.hint('Out through the front door.', 6);
+  (async () => { for (let i = 0; i < 20 && NIGHT.outside && !NIGHT.left; i++) { await wait(25); if (NIGHT.outside && !NIGHT.left && !G.busy()) G.hint('Out through the front door, into the snow.', 6); } })();
+  await until(() => PLAYER.z > 4.75 || (Math.hypot(PLAYER.x - G.FRONT_DOOR.x, PLAYER.z - G.FRONT_DOOR.z) < 0.7));
+  NIGHT.left = true;
   STATE.busy = true;
   f.style.background = '#ffffff'; f.style.transition = 'opacity 2.2s'; f.classList.add('on'); await wait(2.4);
   G.swapBodies(); G.post.grade.uniforms.uMem.value = 0;
@@ -386,11 +389,15 @@ CH.elsewhere = async () => {
   await elsewhere();
 };
 // Her whistle, at the kitchen window (only in Elsewhere).
-inter('eWhistle', [13.05, 1.3, -1.45], 0.8, 'Whistle', async () => {
+const herWhistle = async () => {
   await wait(Math.min(1.8, G.Audio.whistle(1.12, 0.6) + 0.3));
   await N('(Three notes, out into the dark. Slightly flat on the last one. If he’s awake, he’ll know.)');
   S.flags.povWhistled = true; NIGHT.canWhistle = false;
-}, () => NIGHT.canWhistle);
+};
+// Either kitchen window will do (the one over the sink, the one by the table), and it wins over the sink's own prompt.
+inter('eWhistle', [13.05, 1.3, -1.45], 1.1, 'Whistle', herWhistle, () => NIGHT.canWhistle);
+inter('eWhistle2', [13.0, 1.3, 3.85], 1.2, 'Whistle', herWhistle, () => NIGHT.canWhistle);
+for (const id of ['eWhistle', 'eWhistle2']) findInter(id).prio = 1;
 // In Elsewhere the front door opens: that's the way out to find him.
 { const fd = findInter('frontdoor'), raw = fd && fd.raw; if (fd) rewire('frontdoor', async () => { if (NIGHT.outside) { await N('(Out into the snow.)'); return; } return raw(); }); }
 

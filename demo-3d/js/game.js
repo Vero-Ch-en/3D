@@ -1341,7 +1341,7 @@ function nearest() {
     const dx = it.pos[0] - PLAYER.x, dz = it.pos[2] - PLAYER.z, d = Math.hypot(dx, dz);
     if (d > it.r || (it.when && !it.when())) continue;
     if (it.y != null && Math.abs(it.y - PLAYER.y) > 1.2) continue;
-    const s = d - ((dx * fx + dz * fz) / (d || 1)) * 0.4;
+    const s = d - ((dx * fx + dz * fz) / (d || 1)) * 0.4 - (it.prio || 0);
     if (s < bd) { bd = s; best = it; }
   }
   return best;
