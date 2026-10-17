@@ -121,6 +121,15 @@ You wake in a house that's almost exactly right. It's dark outside, the lamps ar
 - *The Perfect Partner*: everything exactly right, every day. Then, somewhere else, she sits in the last of the summer circle and whistles.
 - *Stay Here*: the cake, still snow, "Day 1. Day 2. Day 41. Day 412." With low bond she leaves: "I can't live inside a photograph."
 
+### Act IV, deepened (build 40)
+- **Less spelled out.** The night and Elsewhere no longer narrate the tells ("a second late", "he always waits", "right words, wrong answer"). The behaviour is shown and the player notices it. The only hint about the whistle comes after 2 minutes: "(Three notes, somewhere outside.)"
+- **The imitation on your birthday.** It wakes you ("What dream?" → "Something about a door"). You can talk to it and tease it: it turns its hat "the right way round" when it already was, offers to "do yesterday again, exactly the same", and answers the first-meeting question perfectly, which is the mistake. It explains the whistles away as "The kettle." and "Wind in the chimney." Its present is a snow globe where the snow never settles.
+- **Her trail.** She left a red mitten on the bottom porch step, one pinecone on the contest stump, and three flat stones pointing west by the lake. Nothing tells you to follow them, and she asks at the reunion how many you found.
+- **The circle**, now a sit-down scene: what was it like ("It agreed with me about everything." → "Then you knew."), the kitchen-door tell now told by her ("The floor is cold. That's when I knew."), and the two sets of small footprints toe to toe.
+- **The walk home**, holding hands, with three conversations as you go.
+- **The Entity's offer** is built from what it observed about how you played (the fire, agreeing, staring, the globe, the sign).
+- **Endings:** *You Found Me* ends on her three notes from the kitchen, which you can whistle back. *Uncertain Morning* just shows the drying rack and lets the player count the mugs.
+
 The Echo cycle and *The First Snow* (the canonical ending, with the full birthday message) are still to come.
 
 ## Act IV · The Same Day

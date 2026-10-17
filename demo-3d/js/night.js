@@ -223,16 +223,16 @@ async function nightMenu() {
   if (k === 1) {
     suspect(2, 'confront');
     await P('Partner. It’s three in the morning. I’m me. Who else would I be?');
-    await N('(She smiles. It’s the right smile, a second late.)');
+    await N('(She smiles.)');
     return;
   }
   await P('All right.');
 }
 async function tease() {
   const c = await choose(['“You stole the whole blanket. Then gave it back.”', '“Nice hat.”', 'Poke her in the side']);
-  if (c === 0) { await P('I gave it to you. You looked cold.'); await Y('That isn’t how it works. You steal it; I complain.'); await P('Yes. Sorry. Next time I’ll steal it properly.'); await N('(She laughs, a moment after you’d expect.)'); NIGHT.seen.add('blanket'); }
+  if (c === 0) { await P('I gave it to you. You looked cold.'); await Y('That isn’t how it works. You steal it; I complain.'); await P('Yes. Sorry. Next time I’ll steal it properly.'); NIGHT.seen.add('blanket'); }
   else if (c === 1) { await P('Thank you. You said that at the fair, the first thing you ever said to me.'); const d = await choose(['“I did, didn’t I.”', '“Did I? I don’t remember.”']); if (d === 0) corrupt(1, 'agree'); else { await P('I remember everything, Partner.'); NIGHT.seen.add('certain'); } }
-  else { await N('(She doesn’t flinch. She always flinches, and then pretends she didn’t.)'); await P('Goodness. What was that for?'); NIGHT.seen.add('flinch'); }
+  else { await N('(She doesn’t flinch.)'); await P('Goodness. What was that for?'); NIGHT.seen.add('flinch'); }
 }
 const two = (px, pz, qx, qz, pyaw, qyaw) => G.cutTo(() => { G.standAt(PLAYER, px, pz, pyaw); G.standAt(PARTNER, qx, qz, qyaw); PARTNER.mode = 'still'; }, 0.35);
 async function cocoa() {
@@ -242,7 +242,7 @@ async function cocoa() {
   await N('(Milk in the little pan, the hob ticking, the window black and full of snow.)', { shot });
   await P('How many sugars?', { shot });
   const c = await choose(['“Two.”', '“One, and a second one that doesn’t count.”', '“None. I’m sweet enough.”']);
-  if (c === 0) { await P('One. And a second one that doesn’t count.', { shot }); await N('(The same small pause before “count” as this morning.)', { shot }); NIGHT.seen.add('verbatim'); }
+  if (c === 0) { await P('One. And a second one that doesn’t count.', { shot }); NIGHT.seen.add('verbatim'); }
   else if (c === 1) { await P('That’s my line.', { shot }); await Y('I know. I’m stealing it.', { shot }); await P('That’s fair. You can have it.', { shot }); NIGHT.seen.add('gaveup'); }
   else await P('That’s not true, Partner. You’re an ordinary amount of sweet.', { shot });
   const t = await choose(['“Toast with it?”', '“Don’t burn it this time.”', 'Just stir']);
@@ -262,7 +262,7 @@ async function fire() {
   if (c === 0) corrupt(1, 'agree');
   else if (c === 1) { await P('I remember this one.', { shot }); NIGHT.seen.add('score'); suspect(0.5, 'notice'); }
   else await P('It was. I counted.', { shot });
-  await N('(She leans her head on your shoulder. It’s the right weight.)', { shot });
+  await N('(She leans her head on your shoulder.)', { shot });
   await G.cutTo(() => { for (const c2 of [PLAYER, PARTNER]) { c2.sitTarget = c2.sit = 0; } G.standAt(PLAYER, S0.x + 1.55, S0.z - 0.1, -Math.PI / 2); G.standAt(PARTNER, S0.x - 1.55, S0.z - 0.1, Math.PI / 2); }, 0.3);
   G.FIRE.level = 0.35;
 }
@@ -328,35 +328,33 @@ async function elsewhere() {
   await wait(0.3);
   f.classList.remove('on'); wait(1.8).then(() => { f.style.transition = ''; f.style.background = ''; });
   await G.UI.card(['Earlier.'], { hold: 2.2 });
-  await N('(For a little while, you are her.)');
-  await N('(Water. A cold glass. The house making its house noises. In the bedroom, he is asleep and snoring, lovingly.)');
+    await N('(Water. A cold glass. The house making its house noises. In the bedroom, he is asleep and snoring, lovingly.)');
   STATE.busy = false; S.flags.noTogether = true;
-  G.hint('You are her now.', 4);
-  await wait(4);
+    await wait(4);
   // Something in his shape comes into the kitchen.
   STATE.busy = true;
   PARTNER.hidden = false; PARTNER.m.visible = true; G.placeChar(PARTNER, 10.6, 2.0, Math.PI / 2); PARTNER.mode = 'script';
   await G.walkTo(PARTNER, PLAYER.x - 1.1, PLAYER.z + 0.9, 0.9);
   G.gaze(PARTNER, [PLAYER.x, PLAYER.y + 1.5, PLAYER.z], 9); G.gaze(PLAYER, [PARTNER.x, PARTNER.y + 1.7, PARTNER.z], 9);
   await Y('Come back to bed, Partner.');
-  await N('(He came all the way into the kitchen. He never comes all the way into the kitchen. He calls from the bedroom door, and then complains about the floor being cold.)');
+  await N('(He’s come all the way into the kitchen, in his bare feet.)');
   const c = await choose(['“Did you call from the door?”', '“Two minutes.”', '“…Hello, {giant}.”']);
-  if (c === 0) { await Y('No. I came for you.'); await N('(Right words. Wrong answer.)'); }
-  else if (c === 1) { await Y('I’ll wait.'); await N('(…Since when?)'); }
-  else { await Y('Hello.'); await N('(No “hello, {gremlin}”. Nothing.)'); }
+  if (c === 0) { await Y('No. I came for you.'); }
+  else if (c === 1) { await Y('I’ll wait.'); }
+  else { await Y('Hello.'); }
   await Y('Come on.');
   STATE.busy = false;
   G.walkTo(PARTNER, 5.6, 1.2, 0.9).then(() => { PARTNER.hidden = true; PARTNER.m.visible = false; });
   await until(() => PLAYER.x < 11.4 || PARTNER.hidden);
   await until(() => !G.busy());
   STATE.busy = true;
-  await N('(…He didn’t wait. He always waits.)');
+  await N('(He doesn’t wait for you.)');
   STATE.busy = false;
   NIGHT.canWhistle = true;
   G.hint(G.MOBILE ? 'Go to the kitchen window and tap Use to whistle.' : 'Go to the kitchen window and whistle (' + G.keyFor('interact') + ').', 6);
   await until(() => S.flags.povWhistled && !G.busy());
   STATE.busy = true;
-  await N('(Then you leave him something. Something only he would understand. Something it wouldn’t think to copy.)');
+  await N('(You leave him something. Just in case.)');
   const s = await choose(['Line the pinecones up along the windowsill', 'Leave half a pancake, one enormous bite out of it', 'Write on a page of the scrapbook']);
   S.flags.sign = ['pinecones', 'pancake', 'note'][s];
   if (s === 0) await N('(Seven pinecones, in a row along the sill, biggest to smallest. The contest. He won it, and you said you let him.)');
