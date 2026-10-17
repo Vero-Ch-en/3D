@@ -155,7 +155,7 @@ function loops(run) {
     // The circle.
     if (!S.flags.reunited && Math.hypot(PLAYER.x - CIRCLE.x, PLAYER.z - CIRCLE.z) < 5.2) A.run(reunion);
     // On the way home: let go of her hand, and the snow closes in.
-    if (S.flags.reunited && !S.flags.offerDone && !PARTNER.hold && dist() > 2.2) { NIGHTT.t = (NIGHTT.t || 0) + dt; if (NIGHTT.t > 3) { NIGHTT.t = -10; G.bark('Hand. Now. Just— hold my hand, {giant}.', 3); } }
+    if (S.flags.reunited && !S.flags.offerDone && !PARTNER.hold && dist() > 2.2) { NIGHTT.t = (NIGHTT.t || 0) + dt; if (NIGHTT.t > 3) { NIGHTT.t = -10; G.bark('Hand. Now. Just— hold my hand.', 3); } }
   });
 }
 const NIGHTT = {}, A4 = {};
@@ -404,7 +404,7 @@ async function offer() {
   await N('(It doesn’t have her face any more. It doesn’t have any face. It stands there like snow that has decided to stand.)', { shot });
   for (const t of said.slice(0, 2)) await E(t, { shot });
   await E('You could stay. I would remember all of it. Every bit you’d get wrong.', { shot });
-  if ((S.vars.bond || 0) >= 5) await P('…Your call, {giant}. I’m with you. Either way.', { shot });
+  if ((S.vars.bond || 0) >= 5) await P('…Your call. I’m with you. Either way.', { shot });
   else await P('Please. Let’s just go home.', { shot });
   const c = await choose(['Stay', 'Go home']);
   if (c === 0) { S.flags.ending = 'stay'; await fade(true, 1.8); return A.go('ending_stay'); }
@@ -425,7 +425,7 @@ inter('aSign', [13.0, 1.0, 2.6], 0.9, () => (S.flags.sign === 'pinecones' ? 'Pin
   S.flags.foundSign = true; G.observe('sign', 'It found what she left. I did not think to copy that.');
   if (S.flags.sign === 'pinecones') await N('(Seven pinecones in a row along the sill, biggest to smallest. You won by two. She let you. She’d say she let you.)');
   else if (S.flags.sign === 'pancake') await N('(Half a pancake on a plate, with one enormous bite out of it. You would know that bite anywhere.)');
-  else await N('(In her terrible handwriting: “If it’s sure about the night we met, it isn’t me. — your {gremlin}”)');
+  else await N('(In her terrible handwriting: “If it’s sure about the night we met, it isn’t me. — me”)');
 }, () => here() && !S.flags.foundSign);
 G.TICKERS.add(() => { const it = findInter('aSign'); if (it) { const p = SIGN.pos[S.flags.sign || 'pinecones']; it.pos[0] = p[0]; it.pos[1] = p[1]; it.pos[2] = p[2]; } });
 // The front door opens in Act IV; it's the only way to her.
@@ -478,8 +478,8 @@ CH.ending_uncertain = async () => {
   checkpoint('ending_uncertain'); home(true);
   await wait(0.3); fade(false, 2.2, '#fff');
   await N('(Morning. Home. The snow has stopped.)', K());
-  await P('Morning, {giant}.', K());
-  await Y('Morning, {gremlin}.', K());
+  await P('Morning, you.', K());
+  await Y('Morning.', K());
   await stand(); free();
   G.hint('(Put the kettle on. It’s a normal morning.)', 6);
   await until(() => PLAYER.x > 11.6 && PLAYER.z < 0.6 && !G.busy());

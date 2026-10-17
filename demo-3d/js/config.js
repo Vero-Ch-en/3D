@@ -11,8 +11,6 @@
   const defaults = {
     playerLabel: 'You',
     partnerLabel: 'Partner',
-    nickForPlayer: 'giant',
-    nickForPartner: 'gremlin',
     // What they call each other in the 3D game.
     callPlayer: 'Partner',
     callPartner: 'Partner',

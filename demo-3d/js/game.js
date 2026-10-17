@@ -1003,7 +1003,7 @@ function partnerLead(p, dt, t) {
   if (L.arrived || d > 6.5) {
     p.speed = damp(p.speed, 0, 6, dt); p.nav = null;
     p.yaw = angDamp(p.yaw, Math.atan2(PLAYER.x - p.x, PLAYER.z - p.z), 3, dt); p.lookAt = head(PLAYER);
-    if (L.waitT <= 0 && d > 3.5) { L.waitT = 8 + Math.random() * 5; bark(L.waitLines || ['Do keep up, Partner.', 'I’m waiting. Patiently. Mostly.', 'Your legs are longer than mine, you know.', 'Come along, {giant}.'], 2.6); }
+    if (L.waitT <= 0 && d > 3.5) { L.waitT = 8 + Math.random() * 5; bark(L.waitLines || ['Do keep up, Partner.', 'I’m waiting. Patiently. Mostly.', 'Your legs are longer than mine, you know.', 'Come along, slowcoach.'], 2.6); }
     if (!L.arrived && d > 6.5) return;
     if (L.arrived) return;
   }
@@ -1094,7 +1094,7 @@ const Story = (G.Story = {
     else if (G.S.flags.fairWish === 'snow') await G.say('partner', 'And not “snow every day”. …Somebody wished that once. I’m sure somebody did.', { shot: cakeShot });
     G.Audio.blow(); G.CAKE.lit = false;
     await G.say(null, '(You blow them out. All five, first try.)', { shot: cakeShot });
-    await G.say('partner', 'Happy first snow, {giant}.');
+    await G.say('partner', 'Happy first snow.');
     await G.say('player', 'Happy first snow.');
     STATE.cakeDone = true;
     if (G.EVE && G.EVE.showPhoto) { G.EVE.showPhoto(); wait(4).then(() => hint('Something’s different about the frame in the hall.', 6)); }
@@ -1113,7 +1113,7 @@ const Story = (G.Story = {
     await wait(1.2);
     PARTNER.tiltTarget = -0.32; PARTNER.leanTarget = 0.12; PARTNER.lidsClosed = true;
     await G.say(null, '(One blanket, two people, and the fire doing all the talking.)', { shot: 'keep' });
-    await G.say('partner', 'Please don’t move, {giant}. You are exactly the right height for this.', { shot: 'keep' });
+    await G.say('partner', 'Please don’t move. You are exactly the right height for this.', { shot: 'keep' });
     await G.say('player', 'I shall have to move eventually.', { shot: 'keep' });
     await G.say('partner', '“Eventually” is a very long way off.', { shot: 'keep' });
     await wait(1.5);
@@ -1147,7 +1147,7 @@ const Story = (G.Story = {
     await G.say(null, '(The sun goes, and then all at once there are more stars than sky.)', { shot: 'keep' });
     PARTNER.tiltTarget = -0.25;
     await G.say('partner', 'Pick a star. That one is yours. For this year.', { shot: 'keep' });
-    await G.say('player', 'Which one, {gremlin}?', { shot: 'keep' });
+    await G.say('player', 'Which one?', { shot: 'keep' });
     await G.say('partner', 'The bright one, naturally. I wouldn’t give you a dim one tonight.', { shot: 'keep' });
     await wait(1.5);
     // Something that should not be here in winter.
@@ -1225,7 +1225,7 @@ async function hug(kind = 'hug', line) {
   // Mostly side-on, a little to your side of the hug, so her face (turned against you) is the one in frame.
   const pick = [[1, -0.25, 1.25], [-1, -0.25, 1.25], [1, -0.1, 0.9], [-1, -0.1, 0.9]].find((o) => { const c = camAt(o); return !blocked(c.look, c.pos); });
   if (pick) setShot(() => camAt(pick));
-  bark(line || ['Mm. Hello, {giant}.', 'You’re so warm. It hardly seems fair.', 'A very good hug. Ten out of ten.', 'All right. One more second. Two.']);
+  bark(line || ['Mm. Hello, you.', 'You’re so warm. It hardly seems fair.', 'A very good hug. Ten out of ten.', 'All right. One more second. Two.']);
   await wait(kiss ? 1.7 : 2.6);
   STATE.hugging = false; STATE.hugIn = null; PARTNER.lidsClosed = false; PARTNER.tiltTarget = 0; STATE.busy = false;
   PLAYER.leanTarget = 0; PLAYER.tiltTarget = 0; PLAYER.lidsClosed = false; PARTNER.headDown = 0;

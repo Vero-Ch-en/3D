@@ -1031,7 +1031,7 @@ CH.morning = async () => {
     await P('Traitor.', { shot: 'keep' });
     await P('…Good morning, traitor.', { shot: 'keep' });
   }
-  await Y('Good morning, {gremlin}.', { shot: 'keep' });
+  await Y('Good morning, you.', { shot: 'keep' });
   await P('On snow days, whoever wakes first makes breakfast. I believe that’s the law.', { shot: 'keep' });
   await Y('You woke up first.', { shot: 'keep' });
   await P('I have no recollection of that. …Pancakes, please. I’ll be up in a minute.', { shot: 'keep' });

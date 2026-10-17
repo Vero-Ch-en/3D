@@ -87,12 +87,12 @@ CH.bedtime = async () => {
   else { addBond(0.6); await P('…Stop it. You can’t say things like that at night. I’ll cry on your good jumper.', K()); }
   const b = await choose(['Hold her', 'Look at her', 'Kiss her goodnight']);
   addBond(0.6);
-  if (b === 0) { PARTNER.lidsClosed = true; await N('(She fits into your side as though she were measured for it.)', K()); await P('Mm. Don’t let it go to your head, {giant}.', K()); PARTNER.lidsClosed = false; }
+  if (b === 0) { PARTNER.lidsClosed = true; await N('(She fits into your side as though she were measured for it.)', K()); await P('Mm. Don’t let it go to your head.', K()); PARTNER.lidsClosed = false; }
   else if (b === 1) { await P('You’re staring.', K()); await Y('I’m looking.', K()); await P('At me.', K()); await Y('Unfortunately.', K()); await P('You could simply admit I’m lovely.', K()); await Y('I could.', K()); await P('…Coward.', K()); }
   else { await P('Mm. A goodnight kiss. Very proper. Very old married couple.', K()); await Y('We’re not married.', K()); await P('Very old unmarried couple, then.', K()); }
   await P('If I get up for water, don’t steal my side.', K());
   await Y('You don’t recognise sides.', K());
-  await P('…Touché. Goodnight, {giant}.', K());
+  await P('…Touché. Goodnight.', K());
   for (const L of G.LAMPS) L.on = false;
   G.Audio.click && G.Audio.click();
   PARTNER.lidsClosed = true;
@@ -340,7 +340,7 @@ async function elsewhere() {
   G.gaze(PARTNER, [PLAYER.x, PLAYER.y + 1.5, PLAYER.z], 9); G.gaze(PLAYER, [PARTNER.x, PARTNER.y + 1.7, PARTNER.z], 9);
   await Y('Come back to bed, Partner.');
   await N('(He’s come all the way into the kitchen, in his bare feet.)');
-  const c = await choose(['“Did you call from the door?”', '“Two minutes.”', '“…Hello, {giant}.”']);
+  const c = await choose(['“Did you call from the door?”', '“Two minutes.”', '“…Hello, you.”']);
   if (c === 0) { await Y('No. I came for you.'); }
   else if (c === 1) { await Y('I’ll wait.'); }
   else { await Y('Hello.'); }
@@ -362,7 +362,7 @@ async function elsewhere() {
   S.flags.sign = ['pinecones', 'pancake', 'note'][s];
   if (s === 0) await N('(Seven pinecones, in a row along the sill, biggest to smallest. The contest. He won it, and you said you let him.)');
   else if (s === 1) await N('(Half a pancake on a plate, with one enormous bite out of it. He’ll know that bite anywhere.)');
-  else await N('(You write: “If it’s sure about the night we met, it isn’t me. — your {gremlin}”)');
+  else await N('(You write: “If it’s sure about the night we met, it isn’t me. — me”)');
   await N('(Then you walk out into the snow, towards wherever he is.)');
   STATE.busy = false; STATE.bounds = null; NIGHT.outside = true;
   G.hint('Out through the front door.', 6);

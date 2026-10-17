@@ -89,7 +89,7 @@ a queen up her sleeve), and photographs that end up on the fridge.
 
 ## Act III · Recognition — the night *(done: rebuilt to follow the 2D Entity rules)*
 
-**Bedtime (the real her).** In bed after the porch: "A good first snow?" (top three / apart from the firefly / every one with you is), then hold, look at or kiss her. The plant line: *"If I get up for water, don't steal my side." / "You don't recognise sides." / "…Touché. Goodnight, giant."* Lamps out.
+**Bedtime (the real her).** In bed after the porch: "A good first snow?" (top three / apart from the firefly / every one with you is), then hold, look at or kiss her. The plant line: *"If I get up for water, don't steal my side." / "You don't recognise sides." / "…Touché. Goodnight."* Lamps out.
 
 **The night (the imitation).** You wake cold; her side is empty. Footsteps. She comes back: "Couldn't sleep. Got water." She lies down exactly on her side. "Come back to sleep." Then you're free.
 - **Go back to sleep beside it**: corruption; you wake to the whistle very close and her eyes open.
