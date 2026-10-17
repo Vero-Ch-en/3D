@@ -64,7 +64,7 @@ const suspect = (n, why) => { S.vars.suspicion = (S.vars.suspicion || 0) + n; G.
 
 /* ---------- bedtime: the real one, warm, and the thing she says about water ---------- */
 CH.bedtime = async () => {
-  checkpoint('bedtime');
+  checkpoint('bedtime'); STATE.watchDoor = false;
   const f = G.$('fade');
   if (!f.classList.contains('on')) { f.style.background = '#000'; f.classList.add('on'); await wait(0.6); }
   quiet(); STATE.busy = true;

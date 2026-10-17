@@ -434,7 +434,7 @@ G.TICKERS.add(() => { const it = findInter('aSign'); if (it) { const p = SIGN.po
  * The endings
  * ===================================================================== */
 function home(lyingBoth) {
-  quiet(); STATE.busy = true; STATE.sceneShot = true; MUG3.visible = false;
+  quiet(); STATE.busy = true; STATE.sceneShot = true; MUG3.visible = false; STATE.watchDoor = false;
   if (G.NIGHT && G.NIGHT.swapped) G.swapBodies();
   G.WALK && G.WALK.showCircle(false); SIGN.g.visible = false; TRAIL.g.visible = false; EXD.g.visible = false; ENT.g.visible = false;
   G.useKids(false); G.setDressed(PLAYER, false); G.setDressed(PARTNER, false);

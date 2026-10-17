@@ -1020,8 +1020,16 @@ G.animate = (c, dt, t) => {
     let sx = swing * 0.42 * w - (0.1 + own) * idle + Math.sin(c.breath) * 0.018 * idle;
     let sz = s * (0.11 + 0.012 * Math.sin(c.breath)) * idle + s * 0.06 * w + s * shift * (i ? -0.035 : 0.035);
     let ex = -(0.3 + own) * idle - (0.3 + Math.max(0, -swing) * 0.45 + Math.max(0, swing) * 0.1) * w, sy = s * 0.12 * idle;
-    if (sit > 0.5) { sx = -0.42 + own; ex = -0.95; sz = s * 0.16; sy = s * 0.25; }   // hands resting on the thighs
+    if (sit > 0.5) {
+      // Seated hands don't stay glued to the thighs: they settle in different places now and then (on the thighs,
+      // clasped in the lap, one hand up on the knee), each person on their own slow clock, easing between them.
+      const rest = [[-0.42, 0.16, -0.95, 0.25], [-0.36, 0.24, -1.2, 0.38], i ? [-0.58, 0.18, -0.72, 0.2] : [-0.42, 0.16, -0.95, 0.25], [-0.48, 0.2, -0.85, 0.18]];
+      const cyc = (t * 0.045 + sd * 0.31) % rest.length, a0 = Math.floor(cyc), f = G.smooth(0.8, 1, cyc - a0), A0 = rest[a0], A1 = rest[(a0 + 1) % rest.length];
+      sx = L(A0[0], A1[0], f) + own; sz = s * L(A0[1], A1[1], f); ex = L(A0[2], A1[2], f); sy = s * L(A0[3], A1[3], f);
+    }
     // Standing and walking arms from the recording; seated, the hands stay in the lap (its seated arms are up at the face).
+    // Sitting and talking: the conversation recording's hands, from the elbows down mostly, over the resting pose.
+    if (mb && sit > 0.5 && c._talkW > 0.01 && c._mc.t && c._mc.t['sh' + i]) { const T = c._mc.t, kt = Math.min(1, c._talkW) * 0.4 * sit; sx = L(sx, Math.max(-1.1, T['sh' + i][0]), kt * 0.6); ex = L(ex, T['el' + i], kt); sz = L(sz, T['sh' + i][2] + s * 0.12, kt * 0.4); }
     if (mb) { const a = mb['sh' + i], ka = 1 - sit; sx = L(sx, a[0], ka); sy = L(sy, a[1] * 0.6, ka); sz = L(sz, a[2] + s * (c.dressed ? 0.1 : 0.06), ka); ex = L(ex, mb['el' + i], ka); }
     for (const name in ARM_POSES) {
       const wgt = pw[name] * (name === 'read' || name === 'cup' ? 1 : 1 - sit) * (name === 'warm' ? idle : 1);   // a book or a mug works sitting down too
