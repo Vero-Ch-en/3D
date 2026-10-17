@@ -185,3 +185,9 @@ It grows more **obsessive the more you've been convinced** (corruption, plus mem
 - **Elsewhere:** after he leaves, it **comes back hunting for her**, sooner and faster the more it convinced him earlier. She can hide behind the window-seat curtain or in the study. If caught, it takes her wrist ("There you are. Come back to bed."), takes a memory and she slips out again. **Caught three times, it keeps her:** she lies back down beside it, and in Act IV the real one is out on the frozen lake, blue-lipped, instead of in the summer circle.
 - **Act IV gate:** when it's obsessive, it grabs your arm the first time ("You don't get to leave me in the snow"). Going back with it twice while convinced leads to *Replaced*. If it kept her, sitting down to its breakfast leads to *Replaced* (nobody comes through the door).
 - **New ending, *Replaced*:** breakfast seen from outside through the kitchen window. It sits in your place, speaking in your voice. You can knock, whistle (she pauses, and it puts its hand over hers) or say nothing.
+
+## Two perspectives (build 47)
+- **Tab / the Switch button:** play as her in free time (morning, the walk, the evening, the endings). The two swap bodies where they stand and he follows you. Any scene, or the night chapters, puts you back as him, because the story is told from his side.
+- **Dawn, as her:** Act I opens "Earlier. Before it was light." You get up for a glass of water, and the real him calls from the bedroom doorway. He won't step onto the cold kitchen floor, says "Hello, you" back and waits in the doorway until you're past him. This sets up Elsewhere's tells (barefoot all the way into the kitchen, a flat "Hello.", not waiting).
+- **Their greeting:** "Hello, you." / "Hello, you." is now their morning ritual.
+- **Testing:** the pause menu has a "Story state" panel (bond, trust, corruption, suspicion, memories taken, keptHer, sleptBeside, fakeWithdrawn).

@@ -821,6 +821,7 @@ const keys = (G.keys = new Set()), pressed = new Set();
 addEventListener('keydown', (e) => {
   if (e.code === 'Escape' || e.code === 'KeyP') { setPaused(!STATE.paused); e.preventDefault(); return; }
   if (e.code === 'KeyM') { setMuted(!SETTINGS.muted); return; }
+  if (e.code === 'Tab' && !STATE.paused && STATE.started) { e.preventDefault(); if (G.switchPerspective) G.switchPerspective(); return; }
   if (e.code === 'KeyV' && !STATE.paused) { setView(SETTINGS.view === 'first' ? 'third' : 'first'); return; }
   if (STATE.paused) return;
   if (e.code === 'KeyT' && !e.repeat && STATE.started && G.takePhoto) { G.takePhoto(); return; }
@@ -887,7 +888,7 @@ function updateDialogue(dt) {
   }
 }
 $('subs').addEventListener('pointerdown', (e) => { e.preventDefault(); DLG.click = true; });
-function bark(text, dur = 2.6) { PARTNER.bark = { text: G.fmt(Array.isArray(text) ? text[Math.floor(Math.random() * text.length)] : text), t: dur }; }
+function bark(text, dur = 2.6) { if (STATE.asHer) return; PARTNER.bark = { text: G.fmt(Array.isArray(text) ? text[Math.floor(Math.random() * text.length)] : text), t: dur }; }
 G.bark = (t, d) => bark(t, d); G.hint = (t, d) => hint(G.fmt(t), d);
 function hint(text, dur = 5) { const h = $('hint'); h.textContent = text; h.classList.add('show'); clearTimeout(hint._t); hint._t = setTimeout(() => h.classList.remove('show'), dur * 1000); }
 // Waits run on the game clock, so a scene pauses with the tab instead of racing ahead of the dialogue.
@@ -1272,7 +1273,7 @@ function setPaused(on) {
   keys.clear(); pressed.clear(); drag = null;
   stick.on = false; stick.x = stick.y = 0;
   G.Audio.hold(on);
-  if (on) { syncPauseUI(); $('pResume').focus(); } else { G.needsRender = true; }
+  if (on) { syncPauseUI(); G.syncTest && G.syncTest(); $('pResume').focus(); } else { G.needsRender = true; }
 }
 function setView(v) { SETTINGS.view = v; saveSettings(); syncPauseUI(); CAM.cut = true; if (v === 'first') { CAM.fpPitch = 0.05; CAM.yaw = PLAYER.yaw + Math.PI; } hint(v === 'first' ? 'First person. V switches back.' : 'Third person. V for first person.', 3); }
 G.setView = setView;
@@ -1309,8 +1310,8 @@ function renderControls() {
 }
 function updateKeyHints() {
   const k = (a) => G.keyFor(a), mv = [k('forward'), k('left'), k('back'), k('right')].join('');
-  const t = $('titleKeys'); if (t) t.textContent = `${mv} walk · ${k('run')} run · drag to look · scroll to zoom · ${k('interact')} interact · ${k('together')} together · ${k('photo')} take a photo · ${k('view')} first person · N time of day · \` stats`;
-  const pk = $('pKeys'); if (pk) pk.textContent = `Esc pause · M mute · ${k('view')} first/third person · ${mv} walk · ${k('run')} run · ${k('interact')} interact · ${k('together')} together · ${k('photo')} photo`;
+  const t = $('titleKeys'); if (t) t.textContent = `${mv} walk · ${k('run')} run · drag to look · scroll to zoom · ${k('interact')} interact · ${k('together')} together · ${k('photo')} take a photo · ${k('view')} first person · Tab play as her · N time of day · \` stats`;
+  const pk = $('pKeys'); if (pk) pk.textContent = `Esc pause · M mute · ${k('view')} first/third person · Tab play as her/him · ${mv} walk · ${k('run')} run · ${k('interact')} interact · ${k('together')} together · ${k('photo')} photo`;
 }
 G.updateKeyHints = updateKeyHints;
 G.setPaused = setPaused;
@@ -1398,7 +1399,29 @@ function ambientBarks(dt) {
   const b = BARKS.find((x) => !AMBIENT.used.has(x.id) && x.when(o));
   if (b) { AMBIENT.used.add(b.id); bark(b.text, 4); AMBIENT.cd = 28 + Math.random() * 20; }
 }
+/* Playing as either of them in free time (Tab): the two swap bodies where they stand, so nothing moves on screen;
+ * you steer her and he follows. Any scene puts you back in his shoes first (the story is told from his side). */
+const FREE_CH = /^(morning|walk|evening|ending_)/;
+G.canSwitch = () => STATE.started && !busy() && G.S && FREE_CH.test(G.S.chapter || '') && !PARTNER.hidden && !PARTNER.lie && !PLAYER.lie && (PARTNER.sit || 0) < 0.05 && (PLAYER.sit || 0) < 0.05 && !PARTNER.task && !PLAYER.carry && !STATE.dancing && !PLAYER.hugWith;
+function swapPlaces() {
+  for (const k of ['x', 'z', 'y', 'yFloor', 'yaw', 'speed', 'phase']) { const v = PLAYER[k]; PLAYER[k] = PARTNER[k]; PARTNER[k] = v; }
+  const m = PLAYER.m; PLAYER.m = PARTNER.m; PARTNER.m = m;
+  const st = PLAYER.scarfTail; PLAYER.scarfTail = PARTNER.scarfTail; PARTNER.scarfTail = st;
+  const d = PLAYER.dressed; PLAYER.dressed = PARTNER.dressed; PARTNER.dressed = d;
+  for (const c of [PLAYER, PARTNER]) { c._hsp = null; c._ikOff = null; c.lookAt = null; c.script = null; c.nav = null; c._prevYaw = c.yaw; }
+  G.setHold(false); PARTNER.mode = 'follow';
+  STATE.asHer = !STATE.asHer;
+  CAM.yaw = PLAYER.yaw + Math.PI; CAM.cut = true;
+}
+G.switchPerspective = () => {
+  if (STATE.asHer) { swapPlaces(); hint('You again.', 2); return; }
+  if (!G.canSwitch()) { hint('Not right now.', 1.6); return; }
+  swapPlaces(); hint('Playing as her. Tab to switch back.', 3);
+};
+G.unswitch = () => { if (STATE.asHer) swapPlaces(); };
 function step(dt, t) {
+  // A scene starting (or a chapter that isn't free time) puts you back as him.
+  if (STATE.asHer && (busy() || !G.S || !FREE_CH.test(G.S.chapter || '') || PLAYER.lie || PARTNER.lie)) swapPlaces();
   updateDialogue(dt);
   let ix = (keys.has('KeyD') || keys.has('ArrowRight') ? 1 : 0) - (keys.has('KeyA') || keys.has('ArrowLeft') ? 1 : 0);
   let iy = (keys.has('KeyS') || keys.has('ArrowDown') ? 1 : 0) - (keys.has('KeyW') || keys.has('ArrowUp') ? 1 : 0);
@@ -1744,6 +1767,7 @@ function boot() {
     G.UI.reset && G.UI.reset();
     $('endcard').classList.remove('show'); document.body.classList.remove('ending');
     STATE.nightDone = false; STATE.ending = null; STATE.paused = false; STATE.watchDoor = false;
+    G.unswitch();
     PLAYER.script = PARTNER.script = null;
     if (G.NIGHT && G.NIGHT.swapped && G.swapBodies) G.swapBodies();
     G.setHold && G.setHold(false);
@@ -1756,6 +1780,17 @@ function boot() {
     // The chapter fades itself in; if it doesn't within a few seconds, lift the fade anyway.
     wait(4).then(() => { if (!document.getElementById('card').classList.contains('show')) { $('fade').classList.remove('on'); $('fade').style.background = ''; } });
   };
+  // Testing: the story's hidden numbers, readable and settable from the pause menu.
+  const TV = [['bond', 'vars'], ['trust', 'vars'], ['corruption', 'vars'], ['suspicion', 'vars'], ['taken', 'vars'], ['keptHer', 'flags'], ['sleptBeside', 'flags'], ['fakeWithdrawn', 'flags']];
+  const tbox = $('pTest');
+  const syncTest = () => { if (!tbox || !G.S) return; tbox.querySelectorAll('input').forEach((el) => { const [k, w] = TV.find((v) => v[0] === el.dataset.k); const v = G.S[w][k]; if (el.type === 'checkbox') el.checked = !!v; else el.value = +(v || 0).toFixed(2); }); };
+  if (tbox) {
+    tbox.innerHTML = TV.map(([k, w]) => `<label class="tv"><span>${k}</span><input data-k="${k}" ${w === 'flags' ? 'type="checkbox"' : 'type="number" step="0.5"'}></label>`).join('');
+    tbox.addEventListener('change', (e) => { const el = e.target, row = TV.find((v) => v[0] === el.dataset.k); if (!row || !G.S) return; G.S[row[1]][row[0]] = el.type === 'checkbox' ? el.checked : +el.value; });
+    $('pTestWrap').addEventListener('toggle', syncTest);
+    G.syncTest = syncTest;
+  }
+  if ($('switchBtn')) $('switchBtn').addEventListener('click', () => G.switchPerspective());
   for (const sel of [$('chapterSel'), $('pChapter')]) {
     if (!sel) continue;
     sel.innerHTML = '<option value="">Jump to…</option>' + G.CHAPTERS.map(([id, t]) => `<option value="${id}">${t}</option>`).join('');

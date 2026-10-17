@@ -504,6 +504,44 @@ const hideAct = (where) => async () => {
 inter('eHideNook', [10.05, 0.8, -1.3], 1.1, () => (NIGHT.hiding === 'nook' ? 'Come out' : 'Hide behind the curtain'), hideAct('nook'), () => S.chapter !== 'lastbirthday' && NIGHT.swapped && !NIGHT.left && !NIGHT.kept && (!NIGHT.hiding || NIGHT.hiding === 'nook'));
 inter('eHideStudy', [14.35, 0.8, 3.85], 1.0, () => (NIGHT.hiding === 'study' ? 'Come out' : 'Hide in the study'), hideAct('study'), () => S.chapter !== 'lastbirthday' && NIGHT.swapped && !NIGHT.left && !NIGHT.kept && (!NIGHT.hiding || NIGHT.hiding === 'study'));
 
+/* ---------- Dawn, as her (start of Act I): the real him, so you know what he's like ----------
+ * He calls from the bedroom door, won't set foot on the cold kitchen floor, says "Hello, you" back, and waits for you. */
+G.herDawn = async () => {
+  const f = G.$('fade');
+  f.style.background = '#000'; f.style.transition = 'opacity 0.8s'; f.classList.add('on'); await wait(1.0);
+  G.swapBodies();
+  G.lieDown(PARTNER, B().L, -0.14, 0.15, 0.35); PARTNER.mode = 'lying'; PARTNER.lidsClosed = true;
+  G.standAt(PLAYER, B().R + 0.6, 0.2, Math.PI / 2);
+  G.setTime({ day: 0.35, tod: 0.55, snow: 0.1 }, true);
+  STATE.sceneShot = false; G.releaseCamera(); G.CAM.cut = true;
+  f.classList.remove('on'); await wait(0.9); f.style.transition = ''; f.style.background = '';
+  await G.UI.card(['Earlier. Before it was light.'], { hold: 2.2 });
+  await N('(You are her, for a little while. He’s asleep on his front, taking up exactly half the bed. Not one inch more. He’s very fair about it.)');
+  STATE.busy = false; S.flags.dawnOn = true;
+  G.hint('A glass of water: the kitchen sink.', 6);
+  await until(() => S.flags.dawnWater && !G.busy());
+  STATE.busy = true;
+  PARTNER.lie = false; PARTNER.lidsClosed = false; G.placeChar(PARTNER, 5.15, 1.2, Math.PI / 2); PARTNER.mode = 'still';
+  G.gaze(PARTNER, [PLAYER.x, PLAYER.y + 1.5, PLAYER.z], 10);
+  await N('(From the bedroom doorway, sleepy: “Are you in the kitchen?”)');
+  await N('(“The floor’s freezing. I’m not coming in. I’ll stand here and complain.”)');
+  const c = await choose(['“Come and get me.”', '“Two minutes.”', '“Hello, you.”']);
+  if (c === 0) await N('(“Absolutely not. There’s a line. This is the line.” He points at the doorframe, toes curled on the rug.)');
+  else if (c === 1) await N('(“One. The floor is a crime.”)');
+  else await N('(“Hello, you,” he says back, through an enormous yawn.)');
+  STATE.busy = false;
+  G.hint('Back to bed.', 4);
+  await until(() => Math.hypot(PLAYER.x - PARTNER.x, PLAYER.z - PARTNER.z) < 1.4 && !G.busy());
+  STATE.busy = true;
+  await N('(He waits in the doorway, hopping from foot to foot, until you’re past him. Then he follows you back to bed, complaining about his feet the whole way.)');
+  f.style.background = '#000'; f.style.transition = 'opacity 1.2s'; f.classList.add('on'); await wait(1.4);
+  G.swapBodies(); S.flags.dawnOn = false; S.flags.dawnDone = true;
+  G.setTime({ day: 1, tod: 0, snow: 0.12 }, true);
+  f.classList.remove('on'); f.style.transition = 'opacity 2s'; wait(2.2).then(() => { f.style.transition = ''; f.style.background = ''; });
+};
+inter('dawnWater', [13.05, 1, -1.6], 1.1, 'Glass of water', async () => { await N('(A cold glass of water at the window. Snow everywhere, blue in the half-dark. Not a sound.)'); S.flags.dawnWater = true; }, () => S.flags.dawnOn && !S.flags.dawnWater);
+findInter('dawnWater').prio = 1;
+
 // Elsewhere on its own (for the chapter list): the night house, then straight through the door.
 CH.elsewhere = async () => {
   checkpoint('elsewhere');

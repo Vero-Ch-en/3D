@@ -999,6 +999,7 @@ CH.morning = async () => {
   await wait(0.4);
   f.style.transition = 'opacity 2.2s'; f.classList.remove('on'); wait(2.4).then(() => { f.style.transition = ''; f.style.background = ''; });
   await G.UI.act('I', 'Shared Life', { white: false });
+  if (G.herDawn && !S.flags.dawnDone && !window.SKIP_DAWN) { await G.herDawn(); G.lieDown(PLAYER, B.L, -0.14, 0.15, 0.35); G.lieDown(PARTNER, B.R, -0.40, -0.3, -0.4); PARTNER.mode = 'lying'; PARTNER.lidsClosed = true; STATE.sceneShot = true; G.setShot(bedShot()); STATE.busy = true; }
   G.setShot(bedCloseShot(), false);
   await N('(The first real snow of the winter came in the night. Morning. Warm. Someone is breathing, very softly, against your neck.)', { shot: 'keep' });
   await P('…Mm. Don’t move, Partner. You’re warm.', { shot: 'keep' });
@@ -1031,7 +1032,9 @@ CH.morning = async () => {
     await P('Traitor.', { shot: 'keep' });
     await P('…Good morning, traitor.', { shot: 'keep' });
   }
-  await Y('Good morning, you.', { shot: 'keep' });
+  await P('Hello, you.', { shot: 'keep' });
+  await Y('Hello, you.', { shot: 'keep' });
+  await P('Good. Now it’s officially morning.', { shot: 'keep' });
   await P('On snow days, whoever wakes first makes breakfast. I believe that’s the law.', { shot: 'keep' });
   await Y('You woke up first.', { shot: 'keep' });
   await P('I have no recollection of that. …Pancakes, please. I’ll be up in a minute.', { shot: 'keep' });
