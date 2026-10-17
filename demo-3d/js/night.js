@@ -370,10 +370,8 @@ async function elsewhere() {
   f.style.background = '#ffffff'; f.style.transition = 'opacity 2.2s'; f.classList.add('on'); await wait(2.4);
   G.swapBodies(); G.post.grade.uniforms.uMem.value = 0;
   addScrap('night', 'A door in the kitchen wall. The kitchen at night, from her side. Something left behind for the real one to find.');
-  await G.UI.card(['Act IV · The Same Day', 'To be continued.'], { hold: 3.2 });
-  f.classList.remove('on'); f.style.transition = ''; f.style.background = '';
-  STATE.nightDone = true; STATE.busy = false;
-  G.showEndcard();
+  STATE.busy = false;
+  return A.go('lastbirthday');
 }
 // Her whistle, at the kitchen window (only in Elsewhere).
 inter('eWhistle', [13.05, 1.3, -1.45], 0.8, 'Whistle', async () => {

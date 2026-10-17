@@ -98,9 +98,30 @@ a queen up her sleeve), and photographs that end up on the fridge.
 - **The whistle**: the real one's, from the kitchen, after 14 s and then every 18–26 s. The first time it says "…Pipes. Old house." After two whistles a **door** appears in the kitchen wall. There's a hint after 70 s.
 - **Optional, noticed if you look**: three mugs on the rack, the photo's third shape, snow inside the bedroom sill. The front door won't open.
 
-**Elsewhere (played as her).** Through the door (black if you slept beside it, pale blue if not), the bodies swap: "Earlier." She's up for water. Something in his shape walks all the way into the kitchen: "Come back to bed, Partner." (He never comes all the way into the kitchen.) Three replies, each with a tell. It leaves without waiting. You whistle at the window, leave a sign (pinecones / pancake bite / note), and walk out of the front door into the snow. Then the "Act IV · The Same Day" card and the end card.
+**Elsewhere (played as her).** Through the door (black if you slept beside it, pale blue if not), the bodies swap: "Earlier." She's up for water. Something in his shape walks all the way into the kitchen: "Come back to bed, Partner." (He never comes all the way into the kitchen.) Three replies, each with a tell. It leaves without waiting. You whistle at the window, leave a sign (pinecones / pancake bite / note), and walk out of the front door into the snow. Then Act IV.
 
 **The Entity's notes.** `G.observe` logs what it learns about how you play (its own voice, in the console) and keeps the last 80 in this browser under `snowed.entity.observations`. This is ready for Act IV.
+
+
+## Act IV · The Last Birthday — and the endings *(done: first version)*
+
+You wake in a house that's almost exactly right. It's dark outside, the lamps are on, and breakfast is laid: perfectly round pancakes, two mugs with their handles turned the same way. Snow hangs in the air. If the imitation is still there ("There you are. Weird dream, huh?"), it follows you around. Her sign from Elsewhere is in the kitchen (the pinecones on the sill, the bitten pancake, or the note). Her whistle comes from the **summer circle** past the meadow, louder the closer you get, with a hint every 55 s.
+
+- **Sit down to breakfast.** With bond ≥ 6 and not much accepted, she bursts in through the front door: "You were going to sit down to breakfast with it? On your BIRTHDAY?" (the rescue). Otherwise you get *The Perfect Partner*.
+- **At the bottom of the porch path** the imitation asks you to stay: "…You're still looking for them. I'm right here." Keep walking (it waits and fades out) or go back with it (counts as accepting).
+- **The circle.** She's sitting in the green, exactly where someone small once sat. "What did I say? The first time?" / "Found you." / walk over ("Say something only you would say"). Then a hug, "It was very polite," and "Did it get you? Even a bit?"
+- **The door in the meadow** stands on its own. It only opens while you're holding her hand, and she tells you off if you let go. The Entity appears as a pale, tall shape: "You could stay. … I would remember it for you." Stay leads to *Stay Here*. Go home leads to *I Know It's You* (accepted ≥ 2), *Uncertain Morning* (accepted ≥ 1 or trust < 2) or *You Found Me*.
+
+"Accepted" means corruption from the night, plus 0.5 for going back with it at the path and 0.5 for sitting down to its breakfast.
+
+**Endings** (each with a short playable epilogue; the end card's eyebrow names the ending, and endings seen are kept in `snowed.endings`):
+- *You Found Me*: an ordinary morning, squeezing, "I whistled PERFECTLY," free time, then two mugs on the rack.
+- *Uncertain Morning*: three mugs on the drying rack. "…Did you get a new mug?"
+- *I Know It's You*: the sofa, the scrapbook with pages neither of you is sure about. "I'm choosing it anyway." A page of disagreements.
+- *The Perfect Partner*: everything exactly right, every day. Then, somewhere else, she sits in the last of the summer circle and whistles.
+- *Stay Here*: the cake, still snow, "Day 1. Day 2. Day 41. Day 412." With low bond she leaves: "I can't live inside a photograph."
+
+The Echo cycle and *The First Snow* (the canonical ending, with the full birthday message) are still to come.
 
 ## Act IV · The Same Day
 
