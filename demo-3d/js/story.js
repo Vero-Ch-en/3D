@@ -217,8 +217,10 @@ const canHear = () => !PARTNER.hidden && !PARTNER.script && !PARTNER.slide && (s
 // Interactions that talk take the scene; the player can't walk off mid-sentence. Afterwards Partner may react.
 async function run(fn, id) {
   if (STATE.busy) return;
+  S.inInter = !!id && !!STATE.asHer;   // playing as her: she does the thing herself (see game.js)
   STATE.busy = true; S.pSpoke = false;
   try { await fn(); } catch (e) { console.error(e); }
+  S.inInter = false;
   STATE.busy = false;
   if (id) { S.lastUse = { id, t: G.simT, room: hereRoom() }; react(id); const it = findInter(id); if (it && canHear() && !PARTNER.task) G.gaze(PARTNER, it.pos, 2.4); }
 }

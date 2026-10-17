@@ -857,10 +857,10 @@ const stick = { x: 0, y: 0, on: false };
 const DLG = { q: [], cur: null, shown: 0, t: 0, auto: false };
 // Playing as Partner: in the chapters told around her (free time and the endings) the narration is her side of it,
 // and the speaker labels turn round ("You" is her, "Partner" is him).
-const HER_CH = /^(prologue|morning|walk|evening|ending_(foundme|uncertain|iknow|perfect|stay))$/;
+const HER_CH = /^(prologue|morning|walk|evening|firstsnow|ending_(foundme|uncertain|iknow|perfect|stay))$/;
 G.herSide = () => SETTINGS.playAs === 'partner' && !!G.S && HER_CH.test(G.S.chapter || '');
 const herLine = (who, text) => (who == null && G.herSide() && window.CBS_NARR_HER && window.CBS_NARR_HER[text]) || text;
-G.say = (who, text, o = {}) => new Promise((res) => DLG.q.push({ who, text: G.fmt(herLine(who, text)), res, o }));
+G.say = (who, text, o = {}) => (who != null && STATE.asHer && G.S && G.S.inInter ? Promise.resolve() : new Promise((res) => DLG.q.push({ who, text: G.fmt(herLine(who, text)), res, o })));
 const busy = () => !!DLG.cur || DLG.q.length > 0 || STATE.busy || !!(G.UI && G.UI.blocking());
 G.busy = busy; G.DLG = DLG;
 function pickShotFor(who, o) {
@@ -1195,13 +1195,14 @@ const Story = (G.Story = {
     }, 0.3);
   },
 });
-G.showEndcard = () => { showEndcard(); document.body.classList.remove('playing'); };
-function showEndcard() {
+G.showEndcard = (o = {}) => { showEndcard(o); document.body.classList.remove('playing'); };
+function showEndcard(o = {}) {
   const B = G.CFG.closing || {};
-  $('endHeading').textContent = G.fmt(B.heading || 'Here’s to another winter.');
+  $('endHeading').textContent = G.fmt(B.heading || 'Still here. Still us.');
   const msg = $('endMsg');
   msg.textContent = '';
-  const lines = (B.full && B.full.length ? B.full : [B.short || '']).filter(Boolean);
+  const lines = (o.full === false && B.short ? [B.short] : B.full && B.full.length ? B.full : [B.short || '']).filter(Boolean);
+  if ($('endMore')) $('endMore').hidden = !G.firstSnowOpen || !G.firstSnowOpen() || o.id === 'firstsnow';
   lines.forEach((t, i) => { const p = document.createElement('p'); p.textContent = G.fmt(t); p.style.animationDelay = (1.2 + i * 1.6) + 's'; msg.appendChild(p); });
   const sig = $('endSig');
   sig.textContent = G.fmt(B.signature || '');
@@ -1424,9 +1425,21 @@ G.switchPerspective = () => {
   swapPlaces(); hint('Playing as her. Tab to switch back.', 3);
 };
 G.unswitch = () => { if (STATE.asHer) swapPlaces(); };
+// Using something around the house as her is hers to do: no hand-back, her side of the narration, and the
+// conversation lines written for his version of the moment are skipped.
+const inInter = () => !!(G.S && G.S.inInter);
+// A scene must start with him back in his own body *before* it places anyone, or the two would trade the spots the
+// scene just gave them. So: going busy, speaking, cutting to a shot or offering a choice all hand control back first.
+{
+  let _busy = STATE.busy;
+  Object.defineProperty(STATE, 'busy', { get: () => _busy, set: (v) => { if (v && STATE.asHer && !inInter()) swapPlaces(); _busy = v; }, configurable: true });
+  const guard = (name) => { const f = G[name]; G[name] = function (...a) { if (STATE.asHer && !inInter()) swapPlaces(); return f.apply(this, a); }; };
+  ['say', 'cutTo', 'setShot'].forEach(guard);   // (not the placement helpers: the follow AI uses those every frame)
+  (G.afterBuild = G.afterBuild || []).push(() => { const ch = G.UI.choose; G.UI.choose = (o) => { if (STATE.asHer && !inInter()) swapPlaces(); return ch(o); }; });
+}
 function step(dt, t) {
   // A scene starting (or a chapter that isn't free time) puts you back as him; free time again, back to her.
-  if (STATE.asHer && (busy() || !G.S || !FREE_CH.test(G.S.chapter || '') || PLAYER.lie || PARTNER.lie)) swapPlaces();
+  if (STATE.asHer && ((busy() && !inInter()) || !G.S || !FREE_CH.test(G.S.chapter || '') || PLAYER.lie || PARTNER.lie)) swapPlaces();
   else if (!STATE.asHer && SETTINGS.playAs === 'partner' && !(G.NIGHT && G.NIGHT.swapped) && G.canSwitch() && (PARTNER.mode === 'follow' || PARTNER.mode === 'still') && Math.hypot(PARTNER.x - PLAYER.x, PARTNER.z - PLAYER.z) < 6) swapPlaces();
   updateDialogue(dt);
   let ix = (keys.has('KeyD') || keys.has('ArrowRight') ? 1 : 0) - (keys.has('KeyA') || keys.has('ArrowLeft') ? 1 : 0);
@@ -1737,6 +1750,7 @@ function boot() {
   $('timeBtn').addEventListener('click', () => G.cycleTime());
   $('statsBtn').addEventListener('click', toggleStats);
   $('endClose').addEventListener('click', () => Story.closeEnd());
+  if ($('endMore')) $('endMore').addEventListener('click', () => G.jumpTo('firstsnow'));
   initPauseUI();
   (G.afterBuild || []).forEach((f) => { try { f(); } catch (e) { console.error('[afterBuild]', e); } });
   G.applyQuality();
@@ -1762,7 +1776,7 @@ function boot() {
   };
   // Jumping to a chapter (testing, or replaying a part): from the title or the pause menu. Whatever scene was running
   // is left hanging where it was (its next line never comes), the screen is cleared, and the chapter starts fresh.
-  G.CHAPTERS = [['prologue', 'Prologue · The winter fair'], ['morning', 'Act I · Morning'], ['walk', 'Act I · The walk'], ['evening', 'Act II · Evening'], ['bedtime', 'Act III · Bedtime'], ['night', 'Act III · The night'], ['elsewhere', 'Act III · Elsewhere (as her)'], ['lastbirthday', 'Act IV · The last birthday'], ['ending_foundme', 'Ending · You Found Me'], ['ending_uncertain', 'Ending · Uncertain Morning'], ['ending_iknow', 'Ending · I Know It’s You'], ['ending_perfect', 'Ending · The Perfect {dear}'], ['ending_stay', 'Ending · Stay Here'], ['ending_replaced', 'Ending · Replaced']];
+  G.CHAPTERS = [['prologue', 'Prologue · The winter fair'], ['morning', 'Act I · Morning'], ['walk', 'Act I · The walk'], ['evening', 'Act II · Evening'], ['bedtime', 'Act III · Bedtime'], ['night', 'Act III · The night'], ['elsewhere', 'Act III · Elsewhere (as her)'], ['lastbirthday', 'Act IV · The last birthday'], ['ending_foundme', 'Ending · You Found Me'], ['ending_uncertain', 'Ending · Uncertain Morning'], ['ending_iknow', 'Ending · I Know It’s You'], ['ending_perfect', 'Ending · The Perfect Partner'], ['ending_stay', 'Ending · Stay Here'], ['ending_replaced', 'Ending · Replaced'], ['firstsnow', 'Ending · The First Snow']];
   G.jumpTo = async (id) => {
     if (!G.CH || !G.CH[id]) return;
     setPaused(false);

@@ -373,6 +373,7 @@ G.swapBodies = () => {
   NIGHT.swapped = !NIGHT.swapped;
 };
 async function elsewhere() {
+  if (S.chapter === 'night') { checkpoint('elsewhere'); S.chapter = 'night'; }   // a reload resumes here, not at bedtime
   const f = G.$('fade'); f.style.background = S.flags.sleptBeside ? '#000' : '#dfe9f5'; f.style.transition = 'opacity 1.6s'; f.classList.add('on'); await wait(1.8);
   STATE.busy = true; STATE.sceneShot = false; NIGHT.left = false; NIGHT.outside = false; NIGHT.kept = false; NIGHT.hiding = null; S.vars.caught = 0;
   NIGHT.door.visible = false; STATE.bounds = { zMin: -5, zMax: 4.3 };
@@ -541,6 +542,17 @@ G.herDawn = async () => {
 };
 inter('dawnWater', [13.05, 1, -1.6], 1.1, 'Glass of water', async () => { await N('(A cold glass of water at the window. Snow everywhere, blue in the half-dark. Not a sound.)'); S.flags.dawnWater = true; }, () => S.flags.dawnOn && !S.flags.dawnWater);
 findInter('dawnWater').prio = 1;
+
+/* ---------- the house shows it winning: the more it has convinced you and taken, the more drained the colour,
+ * the tidier everything gets (the bed made perfectly, the mugs lined up). ---------- */
+G.TICKERS.add(() => {
+  const ch = S.chapter;
+  if (ch !== 'night' && ch !== 'lastbirthday') return;
+  const w = Math.min(1, ((S.vars.corruption || 0) + (S.vars.taken || 0) * 0.7) / 4);
+  const u = G.post.grade.uniforms.uMem, base = ch === 'lastbirthday' ? 0.32 : (NIGHT.swapped ? 0.25 : 0);
+  u.value += (Math.max(base, base + w * 0.3) - u.value) * 0.02;
+  if (w > 0.5 && !NIGHT.tidied && ch === 'night' && !PLAYER.lie && !PARTNER.lie) { NIGHT.tidied = true; G.bedMade && G.bedMade(true); }
+});
 
 // Elsewhere on its own (for the chapter list): the night house, then straight through the door.
 CH.elsewhere = async () => {

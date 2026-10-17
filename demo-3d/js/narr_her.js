@@ -201,3 +201,10 @@ window.CBS_CHOICE_HER = {
 "“Yes.”": "Let him say: “Yes.”",
 "“I’m choosing it anyway.”": "Let him say: “I’m choosing it anyway.”"
 };
+Object.assign(window.CBS_NARR_HER, {
+  "(Morning. An ordinary one. Two people, one blanket, the window going slowly white.)": "(Morning. An ordinary one. Two people, one blanket (mostly yours), the window going slowly white.)",
+  "(The porch bench. Two mugs of tea going cold because neither of you wants to move.)": "(The porch bench. Two mugs of tea going cold because neither of you wants to move.)",
+  "(She whistles them, slightly flat on the last one. You whistle them back, badly. She laughs.)": "(You whistle them, slightly flat on the last one. He whistles them back, badly. You laugh.)",
+  "(The snow keeps coming down on the meadow, the hill, the lake, the little cabin with the light on. It will be there in the morning. So will you.)": "(The snow keeps coming down on the meadow, the hill, the lake, the little cabin with the light on. It will be there in the morning. So will he.)"
+});
+Object.assign(window.CBS_CHOICE_HER, { "“No.”": "Let him say: “No.”", "“Vaguely.”": "Let him say: “Vaguely.”", "“Does it matter?”": "Let him ask: “Does it matter?”" });

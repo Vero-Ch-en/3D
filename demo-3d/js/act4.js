@@ -81,6 +81,36 @@ G.take = () => {
   return p;
 };
 
+/* ---------- The First Snow: after any ending, one more morning. No Entity, nothing wrong. Just them. ---------- */
+G.firstSnowOpen = () => { try { return JSON.parse(localStorage.getItem('snowed.endings') || '[]').some((e) => e !== 'firstsnow'); } catch (e) { return false; } };
+CH.firstsnow = async () => {
+  checkpoint('firstsnow'); home(true); STATE.watchDoor = false;
+  G.setTime({ day: 1, tod: 0, snow: 0.0 }, true); G.WEATHER.hold = 'light';
+  await wait(0.3); fade(false, 2.4, '#fff'); await wait(1);
+  await N('(Morning. An ordinary one. Two people, one blanket, the window going slowly white.)', K());
+  await P('Hello, {dear}.', K());
+  await Y('Hello, {dear}.', K());
+  await P('Look. It’s starting.', K());
+  await N('(The first snow of the winter. Slow and soft and in no hurry at all.)', K());
+  const B = G.BENCH;
+  await G.cutTo(() => { PLAYER.lie = PARTNER.lie = false; G.setDressed(PLAYER, true); G.setDressed(PARTNER, true); for (const [c, dx] of [[PLAYER, 0.38], [PARTNER, -0.38]]) { c.x = B.x + dx; c.z = B.z + 0.02; c.y = c.yFloor = 0; c.yaw = 0; c.seatY = B.seatY; c.sitTarget = 1; c.sit = 1; c.speed = 0; } PARTNER.mode = 'seated'; G.setShot(fixed(V(B.x + 0.2, 1.3, B.z + 0.95), V(B.x, 0.95, B.z), 50, 0.012)); }, 0.6);
+  G.WEATHER.hold = 'snow';
+  await N('(The porch bench. Two mugs of tea going cold because neither of you wants to move.)', K());
+  await P('Do you remember how it started? Us?', K());
+  const c = await choose(['“No.”', '“Vaguely.”', '“Does it matter?”']);
+  if (c === 0) await P('Me neither. A log, I think. A lantern. Somebody gave somebody a scarf.', K());
+  else if (c === 1) await P('Vaguely is my favourite way to remember things. It leaves room.', K());
+  else await P('…No. I suppose it doesn’t. We keep starting it, every morning. That’s the bit that counts.', K());
+  await P('If one of us ever gets lost—', K());
+  await Y('Three notes.', K());
+  await wait(Math.min(1.8, G.Audio.whistle(1.12, 0.6) + 0.3));
+  await N('(She whistles them, slightly flat on the last one. You whistle them back, badly. She laughs.)', K());
+  await P('Perfect. Absolutely dreadful. Perfect.', K());
+  await N('(The snow keeps coming down on the meadow, the hill, the lake, the little cabin with the light on. It will be there in the morning. So will you.)', K());
+  addScrap('firstsnow', 'The first snow. Two mugs going cold. Three notes, slightly flat.');
+  showEnd('firstsnow', 'The First Snow');
+};
+
 /* ---------- Replaced: it takes your place. You watch from outside. ---------- */
 CH.ending_replaced = async () => {
   checkpoint('ending_replaced'); home(false); STATE.watchDoor = false;
@@ -111,11 +141,11 @@ CH.ending_replaced = async () => {
 G.endingName = null;
 const showEnd = (id, title) => {
   try { const k = 'snowed.endings', a = JSON.parse(localStorage.getItem(k) || '[]'); if (!a.includes(id)) a.push(id); localStorage.setItem(k, JSON.stringify(a)); } catch (e) { /* */ }
-  G.observe('ending_' + id, { foundme: 'It found the real one. I will remember how.', uncertain: 'It went home. It is not sure who with. Neither am I.', iknow: 'It does not know. It chose anyway. I did not plan for that.', perfect: 'It stayed with me. Every day is lovely.', replaced: 'I am him now. She hasn’t noticed. She will not.', stay: 'It stayed. I will remember it for both of us.' }[id]);
+  G.observe('ending_' + id, { foundme: 'It found the real one. I will remember how.', uncertain: 'It went home. It is not sure who with. Neither am I.', iknow: 'It does not know. It chose anyway. I did not plan for that.', perfect: 'It stayed with me. Every day is lovely.', firstsnow: 'They are still choosing each other. I could never copy that.', replaced: 'I am him now. She hasn’t noticed. She will not.', stay: 'It stayed. I will remember it for both of us.' }[id]);
   G.$('endEyebrow').textContent = title;
   STATE.nightDone = true; STATE.busy = false; STATE.ending = id;
   addScrap('end_' + id, title + '.');
-  G.showEndcard();
+  G.showEndcard({ full: id === 'firstsnow', id });
 };
 
 /* =====================================================================

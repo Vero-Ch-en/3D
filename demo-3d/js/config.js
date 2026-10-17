@@ -12,18 +12,20 @@
     playerLabel: 'You',
     partnerLabel: 'Partner',
     // What they call each other in the 3D game.
-    // She calls him “Charming Partner”; he calls her “Lovely Partner”; both say “Dearest Partner”.
-    callPlayer: 'Charming Partner',
-    callPartner: 'Lovely Partner',
-    callBoth: 'Dearest Partner',
+    // She calls him “my charming partner”; he calls her “my lovely partner”; both say “my dearest” / “my dearest partner”.
+    callPlayer: 'my charming partner',
+    callPartner: 'my lovely partner',
+    callBoth: ['my dearest', 'my dearest partner'],
     // The card at the end of the 3D game.
     closing: {
-      heading: 'Here’s to another winter.',
+      heading: 'Still here. Still us.',
+      // After most endings, one line. The whole thing only after The First Snow.
+      short: 'However it ended: somewhere, someone is still whistling three notes for you.',
       full: [
-        'A small world full of ordinary things, because the ordinary things are where they keep finding each other.',
-        'Stolen blankets. Disputed races. Pancakes that go missing when you look away for one second.',
-        'Neither of them remembers exactly how it started. They are still glad it did.',
-        'Here’s to another year of choosing each other on purpose.',
+        'Somewhere there is a cabin in the snow, with two mugs on the drying rack. Only two.',
+        'Someone always steals the blanket. Someone always stops at the kitchen door and complains about the floor.',
+        'Neither of them remembers exactly how it started. It doesn’t matter. They keep choosing it, one ordinary morning at a time.',
+        'If you ever get lost, whistle. Three notes, slightly flat on the last one. Someone will come and find you.',
       ],
       signature: '',
     },

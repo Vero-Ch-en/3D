@@ -477,7 +477,7 @@ function buildKitchen() {
   K.cupboard = { x: 11.42, z: 4.12 };
   box(0.6, 1.9, 0.42, paint, 11.42, 0.95, 4.26, { coll: true, cam: true, r: 0.01 });
   box(0.012, 1.7, 0.01, G.shared({ color: '#55604f', roughness: 0.8 }), 11.42, 0.95, 4.045, { cast: false });
-  const note = new THREE.Mesh(new THREE.PlaneGeometry(0.17, 0.17), G.std({ map: noteTex([{ t: 'Property', size: 30 }, { t: 'of me.', size: 30, gap: 44 }, { t: 'Not', size: 34, color: '#b8322a', gap: 56 }, { t: '{toHim}’s.', size: 36, color: '#b8322a', gap: 46 }]), roughness: 0.9 }));
+  const note = new THREE.Mesh(new THREE.PlaneGeometry(0.17, 0.17), G.std({ map: noteTex([{ t: 'Property', size: 30 }, { t: 'of me.', size: 30, gap: 44 }, { t: 'Not', size: 34, color: '#b8322a', gap: 56 }, { t: 'Partner’s.', size: 36, color: '#b8322a', gap: 46 }]), roughness: 0.9 }));
   note.position.set(11.52, 1.3, 4.044); note.rotation.set(0, Math.PI, -0.05); W.add(note);
   // A little radio on the window sill (story.js switches it on and off).
   K.radio = G.propSlot('radio', 13.58, 0.88, 4.42, Math.PI, (g) => {
