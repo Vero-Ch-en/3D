@@ -187,6 +187,13 @@ blinks, dozing, hugs. Hats and the snow on them are handed to the model's own he
   in Act IV. At its worst the bed gets made perfectly. Scrapbook pages go blank, and one child is painted out of the
   hall photograph (`G.take`).
 
+## Winter clothes fitted (build 54)
+
+- **Coats refitted in Blender** (`tools/coats.py`, `fit_coat`): each coat is drawn in to sit about 1.6 cm off the jumper and body (1.2 cm on the sleeves), relaxed like cloth, with the skirt's flare kept below the hips and the front seam welded. Same vertices, so the skin weights still hold. The fitted positions are patched into `js/models_real.js` and `models/real/*.glb`.
+- **Blender files** on the user's PC (CozyCharacters folder): `cozy_characters_coats_fit.blend` holds the fitted coats, with hidden `backup_coat_*` copies of the old ones; the exports are in `export_fit\`. The original `.blend` files are untouched (`cozy_characters_before_fit_session.blend` is the earlier state).
+- **Hair under the hat:** her bun is pressed inside the hat while it's on (`tuckUnderHat` in `js/life.js`) and restored when it comes off, instead of poking through.
+- **Scarf:** the loose tail now lies back against the coat instead of floating in front of it.
+
 ## Stand-ins to replace later
 
 These are deliberately cheap approximations, each in one place:

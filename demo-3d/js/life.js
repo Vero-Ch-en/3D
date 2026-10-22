@@ -173,6 +173,7 @@ function fitGear(c) {
     g.snow.forEach((s) => { if (s.parent === u.head) s.position.y += dyHat; else { s.position.x *= sT; s.position.z *= sT; } });
     out.boots = fitBoots(m, g.parts.filter((p) => foot(p.parent)));
     out.head = toHeadBone(m, g.parts.concat(g.snow));
+    out.bun = tuckUnderHat(m, g.hatParts);
     // The model's own long coat wears the same wool and colour as the built-on one did.
     // Over the long coat's own collar the scarf sits a little lower and wider, wrapped round it, not the chin.
     if ((u.realCoat || []).length) g.parts.forEach((p) => { if (p.parent === u.chest && p.material !== g.coatM && !p.userData.coatPiece) { p.position.y -= 0.035 * k; p.scale.x *= 1.08; p.scale.z *= 1.1; } });
@@ -256,6 +257,34 @@ function fitBoots(m, boots) {
 }
 /* Hand head-worn gear to the model's own head bone, so it stays on the head when the neck turns and nods
  * (the rig's head joint pivots at a different height from the model's neck). Call at rest, after fitting. */
+// Her bun is tall at the back of her head: under the winter hat it's pressed in, not poking out through the
+// knit. For each hair vertex outside the hat's shape (above the brim), find where it would sit just inside the
+// hat and keep that as a second set of positions, swapped in while the hat is on (setDressed).
+function tuckUnderHat(m, hatParts) {
+  const u = m.userData; if (!(u.realBun || []).length || !hatParts.length) return 0;
+  m.updateMatrixWorld(true);
+  const box = new THREE.Box3(); hatParts.forEach((p) => { if (p.isMesh) box.expandByObject(p); });
+  const c = box.getCenter(new THREE.Vector3()), r = box.getSize(new THREE.Vector3()).multiplyScalar(0.5);
+  const yBrim = box.min.y + (box.max.y - box.min.y) * 0.18;
+  let moved = 0;
+  u.realBun.forEach((mesh) => {
+    const P = mesh.geometry.attributes.position, orig = P.array.slice(), alt = P.array.slice();
+    const sk = mesh.isSkinnedMesh && mesh.boneTransform, w = new THREE.Vector3(), t = new THREE.Vector3(), lm = new THREE.Matrix3();
+    const world = (i, o) => { if (sk) { mesh.boneTransform(i, o); } else o.fromBufferAttribute(P, i); return o.applyMatrix4(mesh.matrixWorld); };
+    const inv = new THREE.Matrix4().copy(mesh.matrixWorld).invert();
+    for (let i = 0; i < P.count; i++) {
+      world(i, w); if (w.y < yBrim) continue;
+      const dx = (w.x - c.x) / r.x, dy = (w.y - c.y) / r.y, dz = (w.z - c.z) / r.z, e = Math.hypot(dx, dy, dz);
+      if (e <= 0.97) continue;
+      // onto 0.93 of the hat's shape, then the same shift in the mesh's own space (the head bone barely rotates it)
+      const f = 0.93 / e; t.set(c.x + (w.x - c.x) * f, c.y + (w.y - c.y) * f, c.z + (w.z - c.z) * f);
+      const ld = t.clone().sub(w).applyMatrix3(lm.setFromMatrix4(inv));
+      alt[i * 3] += ld.x; alt[i * 3 + 1] += ld.y; alt[i * 3 + 2] += ld.z; moved++;
+    }
+    mesh.userData.hairPos = { orig, alt };
+  });
+  return moved;
+}
 function toHeadBone(m, parts) {
   const u = m.userData, R = u.retarget; if (!R) return 0;
   const e = R.map.find((q) => q.group === u.head); if (!e) return 0;
@@ -314,7 +343,9 @@ G.simScarf = (c, dt) => {
       // Knit is a little stiff: each joint leans toward carrying on the line of the one above.
       for (let i = 2; i <= S.N; i++) { _scV.copy(S.P[i - 1]).sub(S.P[i - 2]).add(S.P[i - 1]); S.P[i].lerp(_scV, 0.16); }
       // Not through the chest.
-      for (let i = 1; i <= S.N; i++) { const l = S.P[i].clone().applyMatrix4(inv); if (l.z < zMin) { l.z = zMin; S.P[i].copy(l.applyMatrix4(ch.matrixWorld)); } }
+      // Kept on the front of the chest: never inside it, and the lower end lies back against the coat (which
+      // slopes away under the scarf) instead of hanging out in the air.
+      for (let i = 1; i <= S.N; i++) { const l = S.P[i].clone().applyMatrix4(inv), lie = zMin - 0.03 * k * (i / S.N); if (l.z < lie) l.z = lie; else if (l.z > lie + 0.01 * k) l.z += (lie + 0.01 * k - l.z) * 0.25; S.P[i].copy(l.applyMatrix4(ch.matrixWorld)); }
       S.P[0].copy(root);
     }
   }
@@ -373,6 +404,9 @@ function setDressed(c, on) {
   // A realistic body's own jumper would poke through the coat: it goes under it, out of sight.
   const mu = (c === PLAYER ? ADULT.player : ADULT.partner).userData;
   (mu.realTop || []).forEach((o) => { o.visible = !on; });
+  // Hair that would poke through the knitted hat (her bun and its loose strands) goes under it while it's on.
+  const hatOn = on && !(c === PLAYER && L.hatGiven);
+  (mu.realBun || []).forEach((o) => { const H = o.userData.hairPos; if (!H) return; const P = o.geometry.attributes.position; P.array.set(hatOn ? H.alt : H.orig); P.needsUpdate = true; });
   // A realistic body with its own long coat wears that instead of the built-on one (hat, scarf, boots stay).
   if (mu.realCoat && mu.realCoat.length) {
     mu.realCoat.forEach((o) => { o.visible = on; });

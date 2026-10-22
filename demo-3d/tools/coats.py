@@ -275,3 +275,71 @@ def skin_coat(name, spring=0.35, thigh=0.45):
         ob.modifiers.remove(m)
     md = ob.modifiers.new('Armature', 'ARMATURE'); md.object = arm
     return {'groups': len(ob.vertex_groups), 'zTop': zTop, 'zKnee': zKnee}
+
+
+def fit_coat(name, ease_body=0.016, ease_arm=0.012, iters=6):
+    """Tailor coat_<name> to the body under it (run after make_coat + skin_coat; same vertices, so the weights
+    still hold). Sleeves and the upper coat are drawn in to sit `ease` off the jumper/skin, relaxed like cloth;
+    the skirt keeps its flare (blended through the hips); the front seam is welded above the skirt opening.
+    Keeps a hidden, unparented copy as backup_coat_<name> (never exported). Used for build 54's fitted coats."""
+    from mathutils.bvhtree import BVHTree
+    from mathutils import kdtree
+    coat = bpy.data.objects['coat_' + name]; arm = rig(name); W = arm.matrix_world; B = arm.data.bones
+    P = lambda b: W @ B['mixamorig:' + b].head_local
+    hips = P('Hips'); zHip = hips.z; zTop = P('LeftUpLeg').z - 0.02; neck = P('Neck'); cx = hips.x
+    if 'backup_coat_' + name not in bpy.data.objects:
+        b = coat.copy(); b.data = coat.data.copy(); b.name = 'backup_coat_' + name
+        bpy.context.scene.collection.objects.link(b); b.parent = None; b.hide_set(True); b.hide_render = True
+    src = [bpy.data.objects[x] for x in ('sweater_' + name, 'human_' + name, 'cord_' + name + '_1') if x in bpy.data.objects]
+    verts, polys = [], []
+    for o in src:
+        mw = o.matrix_world; off = len(verts)
+        verts += [mw @ v.co for v in o.data.vertices]; polys += [[off + i for i in p.vertices] for p in o.data.polygons]
+    tree = BVHTree.FromPolygons(verts, polys)
+    me = coat.data; mw = coat.matrix_world; iw = mw.inverted()
+    nb = coat.get('body_verts', 0); nsl = coat.get('sleeve_verts', 0)
+    orig = [v.co.copy() for v in me.vertices]; pos = [mw @ c for c in orig]
+    sleeve = lambda i: nb <= i < nb + nsl
+    def wfit(i, p):
+        if sleeve(i) or p.z >= zHip + 0.06: return 1.0
+        if p.z <= zTop - 0.04: return 0.0
+        return (p.z - (zTop - 0.04)) / ((zHip + 0.06) - (zTop - 0.04))
+    w8 = [wfit(i, p) for i, p in enumerate(pos)]
+    nbrs = [[] for _ in pos]
+    for e in me.edges:
+        a, b = e.vertices; nbrs[a].append(b); nbrs[b].append(a)
+    def project():
+        for i, p in enumerate(pos):
+            if w8[i] <= 0: continue
+            loc, nor, _, _ = tree.find_nearest(p)
+            if loc is None: continue
+            ease = ease_arm if sleeve(i) else ease_body
+            s = (p - loc).length * (1 if (p - loc).dot(nor) >= 0 else -1)
+            if s > ease or s < ease * 0.6: pos[i] = p.lerp(loc + nor * ease, w8[i])
+    for _ in range(iters):
+        project()
+        new = [p.copy() for p in pos]
+        for i, p in enumerate(pos):
+            if w8[i] > 0 and nbrs[i]:
+                new[i] = p.lerp(sum((pos[j] for j in nbrs[i]), Vector()) / len(nbrs[i]), 0.5 * w8[i])
+        pos[:] = new
+    project()
+    for i, v in enumerate(me.vertices):
+        v.co = iw @ pos[i] if w8[i] > 0 else orig[i]
+    kd = kdtree.KDTree(len(orig))
+    for i, co in enumerate(orig): kd.insert(co, i)
+    kd.balance(); done = set()
+    for i, co in enumerate(orig):
+        if i in done or (mw @ co).z <= zTop: continue
+        grp = [j for (_, j, _) in kd.find_range(co, 0.0015)]
+        if len(grp) > 1:
+            avg = sum((me.vertices[j].co for j in grp), Vector()) / len(grp)
+            for j in grp: me.vertices[j].co = avg.copy(); done.add(j)
+    import bmesh
+    bm = bmesh.new(); bm.from_mesh(me)
+    for v in bm.verts:
+        p = mw @ v.co
+        if v.is_boundary and zTop + 0.01 < p.z < neck.z - 0.02 and abs(p.x - cx) < 0.08 and p.y < hips.y:
+            p.x = cx + (0.004 if p.x > cx else -0.004); v.co = iw @ p
+    bm.to_mesh(me); bm.free(); me.update()
+    return True
