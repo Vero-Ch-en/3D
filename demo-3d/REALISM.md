@@ -157,6 +157,36 @@ blinks, dozing, hugs. Hats and the snow on them are handed to the model's own he
 - Boot shafts ride the shin bone and flare for the calf; the coat's seams share skin weights so they don't open;
   the legs under the leggings are tucked a few millimetres so skin can't poke through.
 
+### Motion capture and body language
+
+- **Clips** (`js/mocap.js`, built by `tools/mocap/build_clips.js` from the CMU Motion Capture Database, free for any use):
+  idle (82_08, 40_10, 40_11, 77_02), walk (16_15), seated (86_09), and two newer ones:
+  - **talking** (18_08 + 19_08, a recorded conversation with hand gestures): eased in on whoever is speaking, at half
+    strength, and softer when walking or sitting;
+  - **laughing** (13_14): plays on lines like "Ha!" and when the narration mentions laughing.
+  The BVH sources go in `tools/mocap/bvh/` (not committed); the existing clips came out of the rebuild unchanged.
+- **Seated hands** no longer stay glued to the thighs: each person drifts between resting places (thighs, clasped in
+  the lap, a hand on the knee) on their own slow timing. When talking, the conversation recording moves the forearms
+  over that. The CMU sitting clips weren't used for the arms, because their hands are up at the face.
+- **Blinking stops** when the imitation drops its act (`noBlink`).
+
+### Camera and control
+
+- **Cutscenes:** you can always look around. Drag, or hold Z / C, to turn the view up to about 80° from where the
+  camera stands; it eases back a few seconds after you let go. You stay where the scene puts you.
+- **Conversations that aren't staged:** you can keep walking, and the camera follows you instead of cutting to
+  over-the-shoulder shots. Hugs, dances, minigames and the scrapbook still hold you in place.
+- **Lying in bed:** pushing a movement key gets you up when the story allows it (`G.lieMove`).
+- **Playing as Partner:** the two swap bodies where they stand (`swapPlaces`, game.js), so nothing moves on screen.
+  A scene hands control back to him *before* it places anyone (the guarded `STATE.busy`, `G.say`, `G.cutTo`,
+  `G.setShot` and `G.UI.choose`). Interactions in the house are done by her, where she stands.
+
+### The house as the Entity wins
+
+- The colour grading's memory tint (`uMem`) drains the colour as corruption and memories taken go up, in the night and
+  in Act IV. At its worst the bed gets made perfectly. Scrapbook pages go blank, and one child is painted out of the
+  hall photograph (`G.take`).
+
 ## Stand-ins to replace later
 
 These are deliberately cheap approximations, each in one place:
@@ -171,6 +201,8 @@ These are deliberately cheap approximations, each in one place:
 | Trees | near: spruces of separate drooping boughs with snow on their tops; far: low-poly cones; instanced | scanned or SpeedTree-style conifers with LODs |
 | Fire | seven flame tongues at different depths and a bright core, a glowing coal bed, logs lit from below, a light that moves | flipbook or simulated fire with a light probe |
 | Faces | procedural eyes, lids, lips | the model's own head with blend shapes |
+| The Entity at the door | a pale translucent column with a head (`act4.js`) | a figure of drifting snow, shaped like a person |
+| Hiding, the wrist grab | text only; hiding freezes you (`night.js`) | crouch and grip poses on the rigs |
 | Hair | alpha-tested cards | the model's hair cards or strands |
 | Radio music, humming, sound effects | synthesised in `game.js` (`G.Audio`) | recorded audio through the same placed sources |
 | Gerald (the bullfinch) | primitive shapes (`fx.js`) | a small rigged bird with a few animation clips |
