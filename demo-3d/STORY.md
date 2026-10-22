@@ -1,6 +1,6 @@
 # Snowed In: the story (3D version)
 
-This is the game as it stands (build 51). It keeps the shape of the 2D story: an ordinary shared day, something strange, an imitation, and a choice between a perfect day that never ends and real time that passes. It is not about a birthday. The anchor is **the first snow**, the night the two of them met.
+This is the game as it stands (build 52). It keeps the shape of the 2D story: an ordinary shared day, something strange, an imitation, and a choice between a perfect day that never ends and real time that passes. It is not about a birthday. The anchor is **the first snow**, the night the two of them met.
 
 ## Premise
 
@@ -21,6 +21,7 @@ You choose on the title screen ("Play as: Player / Partner"), and the game remem
   - The prologue, morning, walk, evening, endings and The First Snow are narrated from her side (`js/narr_her.js`). The speaker labels turn round, and the scene choices are worded from her side: she steers what happens ("Keep him a little longer", "Let him give you his scarf").
   - Story scenes hand control back to him for their length.
   - Using things in the house is hers to do, where she stands.
+  - She isn't handed control while the story is walking or leading her somewhere, and he doesn't take over her routines (the armchair, Basil) while you play as her.
 - **Some chapters decide who you are:** dawn and Elsewhere are played as her; the night and Act IV as him.
 
 ## Act I · Shared Life
@@ -60,12 +61,12 @@ Around the story the cabin is lived in. It has a deeper 15 × 7 m layout with a 
 
 **The Entity's notes.** It logs what it learns about how you play (`G.observe`), in its own voice in the browser console, and keeps the last 80 in this browser. Act IV uses them.
 
-## Act IV · The Last Birthday (played as him)
+## Act IV · The Same Day (played as him)
 
 You wake at night in a house that's almost exactly right: lamps on, perfectly round pancakes, two mugs with the handles turned the same way, snow hanging still in the air.
-- **The imitation's birthday for you.** It wakes you ("Weird dream, huh?"). You can talk to it and tease it: it turns its hat "the right way round" when it already was, offers to do yesterday again exactly the same, and answers the first-meeting question perfectly, which is the mistake. It explains the whistles away as "The kettle." Its present is a snow globe where the snow never settles.
+- **The imitation's version of the day.** It wakes you ("Weird dream, huh?"). You can talk to it and tease it: it turns its hat "the right way round" when it already was, offers to do yesterday again exactly the same, and answers the first-meeting question perfectly, which is the mistake. It explains the whistles away as "The kettle." Its present is a snow globe where the snow never settles.
 - **Her trail**, never pointed out: a red mitten on the bottom porch step, one pinecone on the contest stump, three flat stones pointing west by the lake. Her sign from Elsewhere is in the kitchen.
-- **Breakfast.** If your bond is high enough and you haven't given in much, she bursts in through the front door ("On your BIRTHDAY?"). Otherwise you reach *The Perfect Partner*. If it kept her, nobody comes, and you reach *Replaced*.
+- **Breakfast.** If your bond is high enough and you haven't given in much, she bursts in through the front door ("Today, of all days?"). Otherwise you reach *The Perfect Partner*. If it kept her, nobody comes, and you reach *Replaced*.
 - **The bottom of the porch path.** "…You're still looking for them. I'm right here." When it's obsessive, it grabs your arm the first time. Going back with it twice while convinced leads to *Replaced*.
 - **The reunion**, in the summer circle (or on the frozen lake if it kept her). You sit down together: how many of her things you found; "What was it like?"; "The floor is cold. That's when I knew."; the two sets of small footprints.
 - **The walk home**, holding hands, with three conversations along the way.
@@ -99,4 +100,4 @@ None of them is labelled good or bad. The end card names the ending you reached,
 - **Restart points:** add them within the night and Act IV.
 - **Poses:** proper poses for hiding and the wrist grab, and a snow figure for the Entity.
 - **Night and Act IV as Partner:** possibly a full Partner route for these chapters (she wakes beside the imitation of him).
-- **Playtest:** a full pass as both characters.
+- **Playtest:** finish a full pass as both characters. Build 52 played the whole day (morning, walk, evening), four endings and The First Snow as Partner without getting stuck, and every narration line had her version. The night and Act IV as Partner aren't tested yet.

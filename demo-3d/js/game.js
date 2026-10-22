@@ -957,7 +957,7 @@ function partnerAI(dt, t) {
     if (p.nav && p.nav.fail > 3 && d > 6) { const o = nearestOpen(...cellOf(PLAYER.x - Math.sin(PLAYER.yaw) * 1.2, PLAYER.z - Math.cos(PLAYER.yaw) * 1.2), 8); if (o) { const q = cellPos(o[0], o[1]); if (G.inside(q.x, q.z) === G.inside(PLAYER.x, PLAYER.z) && lineClear({ x: PLAYER.x, z: PLAYER.z }, q)) { placeChar(p, q.x, q.z, PLAYER.yaw); p.nav = null; } } }
     p.lookAt = head(PLAYER);
     // At home she has a life of her own: every so often she wanders off to something she likes.
-    if (STATE.autonomy && G.SMART && !busy() && !p.hold) {
+    if (STATE.autonomy && !STATE.asHer && G.SMART && !busy() && !p.hold) {
       p.curious = (p.curious || 0) + dt * (PLAYER.speed < 0.2 ? 1.4 : 1);
       if (p.curious > (p.curiousAt || (p.curiousAt = 18 + Math.random() * 16))) {
         p.curious = 0; p.curiousAt = 22 + Math.random() * 22;
@@ -1408,14 +1408,15 @@ function ambientBarks(dt) {
  * on screen, and you steer her while he follows. Scenes are told from his side, so a scene puts you back in his shoes
  * for its length, and the chapters that need a particular one (the night, Act IV as him; dawn and Elsewhere as her) decide. */
 const FREE_CH = /^(morning|walk|evening|ending_)/;
-G.canSwitch = () => STATE.started && !busy() && G.S && FREE_CH.test(G.S.chapter || '') && !PARTNER.hidden && !PARTNER.lie && !PLAYER.lie && (PARTNER.sit || 0) < 0.05 && (PLAYER.sit || 0) < 0.05 && !PARTNER.task && !PLAYER.carry && !STATE.dancing && !PLAYER.hugWith;
+G.canSwitch = () => STATE.started && !busy() && !PARTNER.script && !PLAYER.script && !PARTNER.lead && G.S && FREE_CH.test(G.S.chapter || '') && !PARTNER.hidden && !PARTNER.lie && !PLAYER.lie && (PARTNER.sit || 0) < 0.05 && (PLAYER.sit || 0) < 0.05 && !PARTNER.task && !PLAYER.carry && !STATE.dancing && !PLAYER.hugWith;
 function swapPlaces() {
   for (const k of ['x', 'z', 'y', 'yFloor', 'yaw', 'speed', 'phase']) { const v = PLAYER[k]; PLAYER[k] = PARTNER[k]; PARTNER[k] = v; }
   const m = PLAYER.m; PLAYER.m = PARTNER.m; PARTNER.m = m;
   const st = PLAYER.scarfTail; PLAYER.scarfTail = PARTNER.scarfTail; PARTNER.scarfTail = st;
   const d = PLAYER.dressed; PLAYER.dressed = PARTNER.dressed; PARTNER.dressed = d;
-  for (const c of [PLAYER, PARTNER]) { c._hsp = null; c._ikOff = null; c.lookAt = null; c.script = null; c.nav = null; c._prevYaw = c.yaw; }
-  G.setHold(false); PARTNER.mode = 'follow';
+  // Scripts stay with the role (the story's walkTo on PARTNER keeps going, now in the other body).
+  for (const c of [PLAYER, PARTNER]) { c._hsp = null; c._ikOff = null; c.lookAt = null; c.nav = null; c._prevYaw = c.yaw; }
+  G.setHold(false); if (!PARTNER.script) PARTNER.mode = 'follow';
   STATE.asHer = !STATE.asHer;
   CAM.yaw = PLAYER.yaw + Math.PI; CAM.cut = true;
 }
@@ -1776,7 +1777,7 @@ function boot() {
   };
   // Jumping to a chapter (testing, or replaying a part): from the title or the pause menu. Whatever scene was running
   // is left hanging where it was (its next line never comes), the screen is cleared, and the chapter starts fresh.
-  G.CHAPTERS = [['prologue', 'Prologue · The winter fair'], ['morning', 'Act I · Morning'], ['walk', 'Act I · The walk'], ['evening', 'Act II · Evening'], ['bedtime', 'Act III · Bedtime'], ['night', 'Act III · The night'], ['elsewhere', 'Act III · Elsewhere (as her)'], ['lastbirthday', 'Act IV · The last birthday'], ['ending_foundme', 'Ending · You Found Me'], ['ending_uncertain', 'Ending · Uncertain Morning'], ['ending_iknow', 'Ending · I Know It’s You'], ['ending_perfect', 'Ending · The Perfect Partner'], ['ending_stay', 'Ending · Stay Here'], ['ending_replaced', 'Ending · Replaced'], ['firstsnow', 'Ending · The First Snow']];
+  G.CHAPTERS = [['prologue', 'Prologue · The winter fair'], ['morning', 'Act I · Morning'], ['walk', 'Act I · The walk'], ['evening', 'Act II · Evening'], ['bedtime', 'Act III · Bedtime'], ['night', 'Act III · The night'], ['elsewhere', 'Act III · Elsewhere (as her)'], ['lastbirthday', 'Act IV · The same day'], ['ending_foundme', 'Ending · You Found Me'], ['ending_uncertain', 'Ending · Uncertain Morning'], ['ending_iknow', 'Ending · I Know It’s You'], ['ending_perfect', 'Ending · The Perfect Partner'], ['ending_stay', 'Ending · Stay Here'], ['ending_replaced', 'Ending · Replaced'], ['firstsnow', 'Ending · The First Snow']];
   G.jumpTo = async (id) => {
     if (!G.CH || !G.CH[id]) return;
     setPaused(false);

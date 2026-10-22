@@ -715,7 +715,7 @@ function pourSound() { for (let i = 0; i < 14; i++) G.Audio.tone(900 + Math.rand
 // Run off and leave her behind indoors, and she settles into something of her own.
 function updateSolo(dt) {
   const p = PARTNER;
-  if (!STATE.autonomy || p.mode !== 'follow' || p.task || p.lead || p.hold || p.hidden || p.lie || G.busy()) { L.leftT = 0; return; }
+  if (!STATE.autonomy || STATE.asHer || p.mode !== 'follow' || p.task || p.lead || p.hold || p.hidden || p.lie || G.busy()) { L.leftT = 0; return; }
   if (dist() > 7 && G.inside(p.x, p.z)) {
     L.leftT = (L.leftT || 0) + dt;
     if (L.leftT > 2.5) {

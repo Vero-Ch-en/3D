@@ -1,6 +1,6 @@
 'use strict';
 /* =========================================================================
- * Act IV · The Last Birthday, and the endings.
+ * Act IV · The Same Day, and the endings.
  * You wake in a house that is almost exactly right. The imitation has made
  * breakfast. Whatever she left behind in Elsewhere is in the kitchen. Her
  * whistle comes from the summer circle, out past the meadow, and the real
@@ -178,15 +178,15 @@ CH.lastbirthday = async () => {
   STATE.sceneShot = true; G.setShot(fixed(V(4.4, 1.9, 2.6), V(2.4, 0.6, -0.6), 44, 0.01));
   await wait(0.3);
   fade(false, 2.4, '#fff');
-  await G.UI.act('IV', 'The Last Birthday', { white: false });
+  await G.UI.act('IV', 'The Same Day', { white: false });
   await N('(You wake up warm. The lamps are on. It smells of pancakes.)', K());
   if (withFake) {
     await P('There you are. Weird dream, huh?', K());
     const c = await choose(['“What dream?”', '“How long have you been up?”', 'Pull her back under the blanket']);
     if (c === 0) await P('You were talking in your sleep. Something about a door.', K());
-    else if (c === 1) await P('Ages. I couldn’t wait. It’s your birthday.', K());
-    else await P('Ha— no, no, the pancakes will go cold. Up. It’s your birthday.', K());
-    await P('Happy birthday, Partner.', K());
+    else if (c === 1) await P('Ages. I couldn’t wait. It’s the first snow.', K());
+    else await P('Ha— no, no, the pancakes will go cold. Up. It’s the first snow.', K());
+    await P('Happy first snow, Partner. Again.', K());
   } else await N('(The house is quiet. Breakfast is laid for two.)', K());
   await G.cutTo(() => { G.standAt(PLAYER, G.BED.L - 0.6, 0.2, Math.PI / 2); if (PARTNER.lie) G.standAt(PARTNER, G.BED.R + 0.6, 0.2, -Math.PI / 2); G.releaseCamera(); G.CAM.cut = true; }, 0.4);
   if (withFake) { PARTNER.hidden = false; PARTNER.m.visible = true; PARTNER.mode = 'follow'; PARTNER.lidsClosed = false; }
@@ -307,10 +307,10 @@ inter('aGift', [8.2, 0.6, 1.1], 1.0, 'A present', async () => {
   addScrap('globe', 'A snow globe where the snow doesn’t come down.');
 }, () => here() && !S.flags.giftOpen && !S.flags.reunited);
 
-/* ---------- talking to it, on your birthday ---------- */
+/* ---------- talking to it, on its version of the day ---------- */
 inter('aHer', [0, 1.2, 0], 1.1, 'Partner', async () => {
   const left = [['night', '“About last night…”'], ['plan', '“What shall we do today?”'], ['tease', 'Tease her'], ['who', '“What did I say? The first time we met?”']].filter(([k]) => !(A4.talk || (A4.talk = new Set())).has(k));
-  if (!left.length) { await P(cyc('aHerIdle', ['Breakfast’s getting cold, birthday boy.', 'I’m right here, Partner.', 'Everything’s ready whenever you are.'])); return; }
+  if (!left.length) { await P(cyc('aHerIdle', ['Breakfast’s getting cold, sleepyhead.', 'I’m right here, Partner.', 'Everything’s ready whenever you are.'])); return; }
   const c = await choose(left.map((o) => o[1]).concat(['Never mind']));
   if (c >= left.length) return;
   const k = left[c][0]; A4.talk.add(k);
@@ -325,7 +325,7 @@ G.TICKERS.add(() => { const it = findInter('aHer'); if (it) { it.pos[0] = PARTNE
 inter('aBreakfast', [13.0, 0.9, 3.1], 1.1, 'Breakfast', async () => {
   const fake = !PARTNER.hidden && !S.flags.reunited;
   await N('(Pancakes, perfectly round. Two mugs, the handles turned the same way. Nobody has stolen anything.)');
-  if (fake) await P('Sit down. It’s your birthday. Everything’s ready.');
+  if (fake) await P('Sit down. It’s the first snow. Everything’s ready.');
   const c = await choose(['Sit down', 'Not yet']);
   if (c === 1) { if (fake) { await N('(The humming stops, very briefly, and then starts again.)'); } return; }
   S.flags.ateBreakfast = true;
@@ -350,7 +350,7 @@ async function rescue() {
   G.placeChar(PARTNER, 6.5, 4.0, Math.PI);
   await G.cutTo(() => { PLAYER.sitTarget = PLAYER.sit = 0; G.standAt(PLAYER, 12.4, 2.6, -Math.PI / 2); G.standAt(PARTNER, 11.6, 2.6, Math.PI / 2); G.setShot(fixed(V(12.0, 1.6, 0.6), V(12.0, 1.2, 2.6), 46, 0.01)); }, 0.3);
   await P('Nope. No. Absolutely not.', K());
-  await P('You were going to sit down to breakfast with it? On your BIRTHDAY?', K());
+  await P('You were going to sit down to breakfast with it? Today, of all days?', K());
   await Y('…It smelled like pancakes.', K());
   await P('EVERYTHING smells like pancakes to you!', K());
   await P('…Hi.', K());
@@ -422,7 +422,7 @@ async function reunion() {
   STATE.sceneShot = false; G.releaseCamera(); G.CAM.cut = true; STATE.busy = false;
   if (G.hug) { await G.hug('hug'); await until(() => !G.busy()); }
   STATE.busy = true;
-  await P('You spent all night with that thing? On your birthday?');
+  await P('You spent all night with that thing? On the first snow?');
   await Y('It was very polite.');
   await P('“It was very polite.” Listen to yourself.');
   await P('I’m never letting you live this down. Never. When we’re ninety.');
