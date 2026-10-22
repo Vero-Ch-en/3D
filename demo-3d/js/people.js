@@ -813,7 +813,7 @@ function measureFit(model, u) {
     if (!key) return;
     cat[key] = cat[key] || [];
     if (key === 'top') u.realTop = (u.realTop || []).concat(o);
-    if (key === 'hair' && /ponytail|bun|strand/.test(n)) u.realBun = (u.realBun || []).concat(o);   // tucked under the winter hat (life.js)
+    if (key === 'hair') u.realBun = (u.realBun || []).concat(o);   // tucked under the winter hat (life.js)
     const p = o.geometry.attributes.position;
     for (let i = 0; i < p.count; i++) { v.fromBufferAttribute(p, i).applyMatrix4(o.matrixWorld); cat[key].push(v.x, v.y, v.z); }
   });

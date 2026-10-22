@@ -150,7 +150,7 @@ function fitGear(c) {
       m.updateMatrixWorld(true);
       const W = (o) => o.getWorldPosition(new THREE.Vector3());
       // the brim's lowest edge (its front: it's tilted) just above the brows
-      const brim = hp[1], bb = new THREE.Box3().setFromObject(brim), dy2 = W(lid).y + 0.036 * k - bb.min.y;
+      const brim = hp[1], bb = new THREE.Box3().setFromObject(brim), dy2 = W(lid).y + 0.026 * k - bb.min.y;
       hp.forEach((p) => { p.position.y += dy2; }); g.snow.forEach((s2) => { if (s2.parent === u.head) s2.position.y += dy2; });
       m.updateMatrixWorld(true);
       const dc = W(hat), hTop = f.hair.reduce((mx, _, i) => (i % 3 === 1 && Math.hypot(f.hair[i - 1] - dc.x, f.hair[i + 1] - dc.z) < 0.06 ? Math.max(mx, f.hair[i]) : mx), f.skinTop);
@@ -263,7 +263,7 @@ function fitBoots(m, boots) {
 function tuckUnderHat(m, hatParts) {
   const u = m.userData; if (!(u.realBun || []).length || !hatParts.length) return 0;
   m.updateMatrixWorld(true);
-  const box = new THREE.Box3(); hatParts.forEach((p) => { if (p.isMesh) box.expandByObject(p); });
+  const box = new THREE.Box3(); hatParts.slice(0, 2).forEach((p) => { if (p.isMesh) box.expandByObject(p); });   // the crown and brim, not the bobble
   const c = box.getCenter(new THREE.Vector3()), r = box.getSize(new THREE.Vector3()).multiplyScalar(0.5);
   const yBrim = box.min.y + (box.max.y - box.min.y) * 0.18;
   let moved = 0;
@@ -295,7 +295,7 @@ function toHeadBone(m, parts) {
 /* The scarf's hanging end as a chain of knitted segments with verlet physics: gravity, inertia from the body's
  * motion, a little wind, kept in front of the chest. The built box stays as the fitted anchor (and the dressed
  * flag); it draws nothing itself. Run after each character's pose (people.js, G.animate). */
-const _scV = new THREE.Vector3(), _scM = new THREE.Matrix4(), _scDown = new THREE.Vector3(0, -1, 0);
+const _scW = new THREE.Vector3(), _scV = new THREE.Vector3(), _scM = new THREE.Matrix4(), _scDown = new THREE.Vector3(0, -1, 0);
 G.simScarf = (c, dt) => {
   const box = c.scarfTail; if (!box) return;
   const u = c.m.userData, ch = u.chest;
@@ -321,7 +321,11 @@ G.simScarf = (c, dt) => {
     for (let i = 0; i <= S.N; i++) { const q = toW(rootL.clone().addScaledVector(dirL, L * i)); S.P.push(q); S.Q.push(q.clone()); }
   }
   const inv = _scM.copy(ch.matrixWorld).invert(), k = u.k || 1;
-  const zMin = box.position.z - 0.012 * k;   // the chest's front, under the scarf
+  // The body's forward, measured from the chest bone out to the scarf root (bone axes differ between rigs, so
+  // no fixed local axis); the tail is kept on that side of the chest and lies back against the coat.
+  const cpos = new THREE.Vector3().setFromMatrixPosition(ch.matrixWorld), fwd = root.clone().sub(cpos); fwd.y = 0;
+  if (fwd.lengthSq() < 1e-6) fwd.set(Math.sin(c.yaw || 0), 0, Math.cos(c.yaw || 0)); fwd.normalize();
+  const dRoot = root.clone().sub(cpos).dot(fwd);
   const W = G.WIND || { gust: 0, drift: 0 }, t = G.simT || 0;
   const n = Math.max(1, Math.ceil(dt / (1 / 90))), h = dt / n;
   for (let s = 0; s < n; s++) {
@@ -345,7 +349,7 @@ G.simScarf = (c, dt) => {
       // Not through the chest.
       // Kept on the front of the chest: never inside it, and the lower end lies back against the coat (which
       // slopes away under the scarf) instead of hanging out in the air.
-      for (let i = 1; i <= S.N; i++) { const l = S.P[i].clone().applyMatrix4(inv), lie = zMin - 0.03 * k * (i / S.N); if (l.z < lie) l.z = lie; else if (l.z > lie + 0.01 * k) l.z += (lie + 0.01 * k - l.z) * 0.25; S.P[i].copy(l.applyMatrix4(ch.matrixWorld)); }
+      for (let i = 1; i <= S.N; i++) { const P = S.P[i], d = _scW.copy(P).sub(cpos).dot(fwd), lie = dRoot - 0.004 * k - 0.025 * k * (i / S.N); if (d < lie) P.addScaledVector(fwd, lie - d); else if (d > lie + 0.012 * k) P.addScaledVector(fwd, (lie + 0.012 * k - d) * 0.3); }
       S.P[0].copy(root);
     }
   }
