@@ -208,3 +208,38 @@ Object.assign(window.CBS_NARR_HER, {
   "(The snow keeps coming down on the meadow, the hill, the lake, the little cabin with the light on. It will be there in the morning. So will you.)": "(The snow keeps coming down on the meadow, the hill, the lake, the little cabin with the light on. It will be there in the morning. So will he.)"
 });
 Object.assign(window.CBS_CHOICE_HER, { "“No.”": "Let him say: “No.”", "“Vaguely.”": "Let him say: “Vaguely.”", "“Does it matter?”": "Let him ask: “Does it matter?”" });
+
+/* Her own lead-ins for the moments where his line was the choice: she says hers, then he says his. */
+window.CBS_CHOICE_HER_LEAD = {
+"“What’s in there?”": "“Go on. Ask.”",
+"“I wasn’t.”": "“Don’t deny it.”",
+"“I’ll wait.”": "“You’ll just have to wait.”",
+"“Pancakes.”": "“Let me guess. Pancakes.”",
+"“You.”": "“And don’t you dare say ‘me’.”",
+"“To know what’s in the study.”": "“Anything but the study.”",
+"“Are you lost?”": "Look up as he comes over",
+"“Is this seat taken?”": "Pretend you haven’t seen him",
+"“I’ll be here.”": "Wait for his answer",
+"“Every day.”": "“Promise?”",
+"“I thought you did.”": "“…Or did you?”",
+"“I found it in the study.”": "“Tell me the truth.”",
+"“Is that us?”": "Look closer at the two children",
+"“It was red.”": "“…Wasn’t it?”",
+"“It was blue.”": "“Agree with me, for once.”",
+"“There wasn’t a scarf.”": "“Was there even a scarf?”",
+"“Two.”": "“Or was it two?”",
+"“A whole forest.”": "“Count them for me.”",
+"“I don’t remember any trees.”": "“Do you remember them at all?”",
+"“Nothing. I just sat down.”": "“Or did you not say anything at all?”",
+"“How many trees are there?”": "“Count the trees.”",
+"“It’s perfect.”": "“Do you like it? Honestly?”",
+"“No. Better.”": "“Be honest.”",
+"“Mostly. You still cheat.”": "“Be kind.”",
+"“I hope we keep changing.”": "“Be hopeful.”",
+"“Look at the footprints.”": "Ask what he’s looking at",
+"“It’s warm in here. Come and feel it.”": "Ask if he’s all right",
+"“{toHer}.”": "Look terribly innocent"
+};
+Object.assign(window.CBS_CHOICE_HER, { 'Just sit down next to her': 'Keep watching the snow', 'Hold out your little finger': 'Hold out your little finger first', 'Shake it': 'Hand it to him to shake', 'Come out': 'Hold out your hand to him' });
+/* When she's the one doing it (an interaction while playing as her), the options are simply hers. */
+window.CBS_CHOICE_HER_DO = { 'Leave her a snack on the counter': 'Leave him a snack on the counter', 'Steal a biscuit': 'Steal one of his biscuits', 'Close it': 'Close it', 'Higher': 'Higher', 'Lower': 'Lower', 'Look at the table': 'Look at the table', 'Read something together': 'Read something together', 'Just browse': 'Just browse', 'Play cards with {P}': 'Play cards with him' };

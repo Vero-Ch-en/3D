@@ -23,8 +23,10 @@ addEventListener('keydown', (e) => {
 /* A vertical list of options. opts: strings or { t, v }. Resolves to the index (or v). */
 UI.choose = (opts) => new Promise((res) => {
   const box = $('choices');
-  const herC = G.herSide && G.herSide() && window.CBS_CHOICE_HER;
-  const list = opts.map((o) => (typeof o === 'string' ? { t: (herC && herC[o]) || o } : o));
+  const doing = G.S && G.S.inInter && window.CBS_CHOICE_HER_DO;
+  const herC = G.herSide && G.herSide() && (doing ? Object.assign({}, window.CBS_CHOICE_HER, doing) : window.CBS_CHOICE_HER), lead = herC && !doing && window.CBS_CHOICE_HER_LEAD;
+  // Playing as her: where the option was a line of his, she says her own lead-in, then he says his line.
+  const list = opts.map((o) => (typeof o !== 'string' ? o : lead && lead[o] ? { t: lead[o], his: o } : { t: (herC && herC[o]) || o }));
   box.innerHTML = list.map((o, i) => `<button type="button" style="animation-delay:${i * 0.06}s"><span class="n">${i + 1}</span><span>${esc(G.fmt(o.t))}</span></button>`).join('');
   box.hidden = false;
   const btns = [...box.querySelectorAll('button')];
@@ -34,7 +36,9 @@ UI.choose = (opts) => new Promise((res) => {
     if (performance.now() - opened < 250) return;   // a held key from the last line shouldn't choose
     modal = null; box.hidden = true; box.innerHTML = '';
     G.Audio.chime && G.Audio.click();
-    res(list[i].v != null ? list[i].v : i);
+    const out = list[i].v != null ? list[i].v : i;
+    if (list[i].his) { const said = /^“/.test(list[i].t) ? G.say('partner', list[i].t.replace(/^“|”$/g, '')) : Promise.resolve(); said.then(() => G.say('player', list[i].his.replace(/^“|”$/g, ''))).then(() => res(out)); }
+    else res(out);
   };
   btns.forEach((b, i) => { b.addEventListener('click', () => pick(i)); b.addEventListener('pointerenter', () => { sel = i; mark(); }); });
   mark();

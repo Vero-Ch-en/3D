@@ -1,6 +1,6 @@
 # Snowed In: the story (3D version)
 
-This is the game as it stands (build 52). It keeps the shape of the 2D story: an ordinary shared day, something strange, an imitation, and a choice between a perfect day that never ends and real time that passes. It is not about a birthday. The anchor is **the first snow**, the night the two of them met.
+This is the game as it stands (build 53). It keeps the shape of the 2D story: an ordinary shared day, something strange, an imitation, and a choice between a perfect day that never ends and real time that passes. It is not about a birthday. The anchor is **the first snow**, the night the two of them met.
 
 ## Premise
 
@@ -18,7 +18,7 @@ The question underneath it all: they have forgotten almost everything about how 
 
 You choose on the title screen ("Play as: Player / Partner"), and the game remembers it.
 - **As Partner:** you control her in free time, and he follows you.
-  - The prologue, morning, walk, evening, endings and The First Snow are narrated from her side (`js/narr_her.js`). The speaker labels turn round, and the scene choices are worded from her side: she steers what happens ("Keep him a little longer", "Let him give you his scarf").
+  - The prologue, morning, walk, evening, endings and The First Snow are narrated from her side (`js/narr_her.js`). The speaker labels turn round, and the scene choices are hers. Where the choice used to be one of his lines, she now says her own lead-in and he answers with his line ("Let me guess. Pancakes." → "Pancakes." / "Be honest." → "No. Better."). Things she does herself in the house have plain options ("Leave him a snack on the counter").
   - Story scenes hand control back to him for their length.
   - Using things in the house is hers to do, where she stands.
   - She isn't handed control while the story is walking or leading her somewhere, and he doesn't take over her routines (the armchair, Basil) while you play as her.
@@ -96,7 +96,6 @@ None of them is labelled good or bad. The end card names the ending you reached,
 
 ## Still to do
 
-- **Partner conversations:** rewrite the "Let him…" choices so that she says the line and he answers.
 - **Restart points:** add them within the night and Act IV.
 - **Poses:** proper poses for hiding and the wrist grab, and a snow figure for the Entity.
 - **Night and Act IV as Partner:** possibly a full Partner route for these chapters (she wakes beside the imitation of him).
