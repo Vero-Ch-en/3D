@@ -387,7 +387,9 @@ async function attachBody(root, name, spec, bin) {
           const nm = (o.material.name || '').split('.')[0];
           const src = { skin: u.skinM, top: u.topM, legs: u.legM, socks: u.sockM }[nm] || u.skinM;
           const m = src.clone(); m.skinning = true; G.MATS.push(m); o.material = m;
-          // Cylindrical UVs so knit and jersey textures wrap the body.
+          // Cylindrical UVs so knit and jersey textures wrap the body (not on the clothes made in Blender, which
+          // carry their own).
+          if (/^(coat|hat|scarf|gloves|boots)_/i.test(o.name) && o.geometry.attributes.uv) return;
           const p = o.geometry.attributes.position, uv = new Float32Array(p.count * 2);
           for (let i = 0; i < p.count; i++) { const x = p.getX(i), y = p.getY(i), z = p.getZ(i); const cx = Math.abs(x) > 0.15 && y > 0.75 && y < 1.5 ? Math.sign(x) * 0.18 : Math.abs(x) > 0.03 && y < 0.95 ? Math.sign(x) * 0.087 : 0; uv[i * 2] = (Math.atan2(z, x - cx) / (2 * Math.PI) + 0.5) * 2; uv[i * 2 + 1] = y * 3; }
           o.geometry.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
@@ -808,6 +810,10 @@ function measureFit(model, u) {
       o.visible = false; o.userData.warm = true; o.userData.gear = true;
       return;
     }
+    // Winter clothes made in Blender (tools/winter_gear.py): knitted hat, scarf and gloves, and boots. Shown with
+    // the coat (life.js, setDressed), in the game's own knit and leather.
+    const gk = /^(hat|scarf|gloves|boots)_/.exec(n);
+    if (gk) { u.realGear = u.realGear || {}; (u.realGear[gk[1]] = u.realGear[gk[1]] || []).push(o); o.visible = false; o.userData.warm = true; o.userData.gear = true; o.frustumCulled = false; return; }
     const key = /sweater|hood|cord|pocket/.test(n) ? 'top' : /sock/.test(n) ? 'socks' : /^human_(kid_)?(partner|player)$/.test(n) ? 'skin'
       : /legging|trouser|jean/.test(n) ? 'legs' : /hair|ponytail|fringe|short|bun|braid/.test(n) ? 'hair' : null;
     if (!key) return;

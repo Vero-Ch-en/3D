@@ -62,9 +62,9 @@ function buildGear(m, o) {
   const bootM = G.std({ color: o.boots, roughness: 0.62, env: 0.4 });
   const fl = 0.152 * 1.75, ank = 0.039 * 1.75;
   u.legs.forEach((lg) => {
-    add(new THREE.Mesh(new THREE.CylinderGeometry(0.043 * k, 0.046 * k, 0.15 * k, 16), bootM), lg.ft, 0, 0.03, -0.004);
-    add(new THREE.Mesh(new THREE.SphereGeometry(1, 20, 12), bootM), lg.ft, 0, -ank + 0.034, fl * 0.5 - 0.058).scale.set(0.049 * k, 0.039 * k, fl * 0.53 * k);
-    add(new THREE.Mesh(new THREE.BoxGeometry(0.094 * k, 0.022 * k, fl * 1.06 * k), G.shared({ color: '#221c18', roughness: 0.9 })), lg.ft, 0, -ank + 0.008, fl * 0.5 - 0.058);
+    add(new THREE.Mesh(new THREE.CylinderGeometry(0.043 * k, 0.046 * k, 0.15 * k, 16), bootM), lg.ft, 0, 0.03, -0.004).userData.boot = true;
+    const toe = add(new THREE.Mesh(new THREE.SphereGeometry(1, 20, 12), bootM), lg.ft, 0, -ank + 0.034, fl * 0.5 - 0.058); toe.scale.set(0.049 * k, 0.039 * k, fl * 0.53 * k); toe.userData.boot = true;
+    add(new THREE.Mesh(new THREE.BoxGeometry(0.094 * k, 0.022 * k, fl * 1.06 * k), G.shared({ color: '#221c18', roughness: 0.9 })), lg.ft, 0, -ank + 0.008, fl * 0.5 - 0.058).userData.boot = true;
   });
   // Snow that settles on the shoulders (and the hat) while you stand about in it.
   const snow = [];
@@ -214,6 +214,22 @@ function fitGear(c) {
     // The overcoat (tools/overcoat.py) carries its own UVs (30 cm a tile) and vertex colours (dark horn buttons,
     // a touch lighter on the cuffs and pocket flaps); older coats fall back to the jersey.
     (u.realCoat || []).forEach((o) => { const mt = g.coatM.clone(); mt.skinning = true; mt.side = THREE.DoubleSide; const wool = !!o.geometry.attributes.color; mt.map = wool ? G.TX.wool : G.rep(G.TX.jersey, 4, 4); if (wool) { mt.vertexColors = true; mt.bumpMap = G.TX.woolB; mt.bumpScale = 0.0025; mt.roughness = 0.97; } G.MATS && G.MATS.push(mt); o.material = mt; });
+    // The hat, scarf, gloves and boots made in Blender replace the built-on ones (which stay hidden), in the same
+    // knit (their own UVs, so the texture isn't repeated again) and, for the boots, leather in their own colours.
+    const RG = u.realGear;
+    if (RG) {
+      const hatM0 = g.hatParts[0].material, ring0 = g.parts.find((p) => p.parent === u.chest && p.geometry.type === 'TorusGeometry' && p.material !== g.coatM), tail0 = g.parts.find((p) => p.userData.scarfTail);
+      const knitOf = (m0) => { const mt = m0.clone(); mt.skinning = true; mt.map = G.TX.knitCream; mt.bumpMap = G.TX.knitB; mt.bumpScale = 0.003; mt.side = THREE.DoubleSide; G.MATS && G.MATS.push(mt); return mt; };
+      const set = (list, mt) => (list || []).forEach((o) => { o.material = mt; o.castShadow = true; o.receiveShadow = true; });
+      if (RG.hat) { set(RG.hat, knitOf(hatM0)); g.hatParts.forEach((p) => (p.userData.replaced = true)); }
+      if (RG.gloves) set(RG.gloves, knitOf(hatM0));
+      if (RG.scarf && ring0) { set(RG.scarf, knitOf(ring0.material)); ring0.userData.replaced = true; if (tail0) tail0.userData.replaced = true; }
+      if (RG.boots) {
+        const bm = G.std({ color: '#ffffff', roughness: 0.68, env: 0.35, bumpMap: G.TX.jerseyB, bumpScale: 0.0015 }); bm.skinning = true; bm.vertexColors = true; G.MATS && G.MATS.push(bm);
+        set(RG.boots, bm); g.parts.forEach((p) => { if (p.userData.boot) p.userData.replaced = true; });
+      }
+      out.realGear = Object.keys(RG).join(',');
+    }
     out.flare = +(torso.userData.flare || 1).toFixed(3);
     need.forEach((s, p) => { out[p.parent === u.spine ? 'coat' : (out.sl = (out.sl || 0) + 1, 'sleeve' + out.sl)] = +s.toFixed(3); });
     return Object.assign(out, { sH: +sH.toFixed(3), dyHat: +dyHat.toFixed(3), dyScarf: +dyScarf.toFixed(3), sB: +sB.toFixed(3) });
@@ -267,7 +283,14 @@ function fitBoots(m, boots) {
 function tuckUnderHat(m, hatParts) {
   const u = m.userData; if (!(u.realBun || []).length || !hatParts.length) return 0;
   m.updateMatrixWorld(true);
-  const box = new THREE.Box3(); hatParts.slice(0, 2).forEach((p) => { if (p.isMesh) box.expandByObject(p); });   // the crown and brim, not the bobble
+  const box = new THREE.Box3(), RH = u.realGear && u.realGear.hat && u.realGear.hat[0];
+  if (RH) {
+    // the Blender hat (skinned to the head): its shape as worn, up to the crown (not the bobble: no higher than
+    // just over the skull)
+    RH.updateMatrixWorld(true); const P = RH.geometry.attributes.position, v = new THREE.Vector3();
+    for (let i = 0; i < P.count; i++) { RH.boneTransform(i, v); box.expandByPoint(v.applyMatrix4(RH.matrixWorld)); }
+    if (u.fit && u.fit.skinTop) box.max.y = Math.min(box.max.y, u.fit.skinTop + 0.032 * (u.k || 1));
+  } else hatParts.slice(0, 2).forEach((p) => { if (p.isMesh) box.expandByObject(p); });   // the crown and brim, not the bobble
   const c = box.getCenter(new THREE.Vector3()), r = box.getSize(new THREE.Vector3()).multiplyScalar(0.5);
   const yBrim = box.min.y + (box.max.y - box.min.y) * 0.18;
   let moved = 0;
@@ -399,6 +422,12 @@ function fitKid(m) {
 }
 (G.onBodies = G.onBodies || []).push(() => {
   G.GEAR_FIT = { player: fitGear(PLAYER), partner: fitGear(PARTNER) };
+  // A body that was still loading when the game started (the loading screen gives up after 8 s): fitted the
+  // moment it's measured, and dressed again if it should be.
+  [PLAYER, PARTNER].forEach((c) => {
+    const key = c === PLAYER ? 'player' : 'partner'; if (G.GEAR_FIT[key]) return;
+    const t = setInterval(() => { const r = fitGear(c); if (r) { clearInterval(t); G.GEAR_FIT[key] = r; setDressed(c, !!c.dressed); } }, 400);
+  });
   if (G.KIDS) { G.GEAR_FIT.kidPlayer = fitKid(G.KIDS.player); G.GEAR_FIT.kidPartner = fitKid(G.KIDS.partner); }
   // Already dressed when the bodies arrived (a save outdoors): put the jumper under the coat now.
   [PLAYER, PARTNER].forEach((c) => { if (c.dressed) setDressed(c, true); });
@@ -406,7 +435,7 @@ function fitKid(m) {
 function setDressed(c, on) {
   c.dressed = on;
   const g = gearOf(c);
-  g.parts.forEach((p) => { p.visible = on && !(c === PLAYER && L.hatGiven && g.hatParts.includes(p)); });   // the snowman has his hat
+  g.parts.forEach((p) => { p.visible = on && !p.userData.replaced && !(c === PLAYER && L.hatGiven && g.hatParts.includes(p)); });   // the snowman has his hat
   if (G.HOOK_COATS) G.HOOK_COATS[c === PLAYER ? 0 : 1].visible = !on;
   BOOTS[c === PLAYER ? 0 : 1].visible = !on;
   // A realistic body's own jumper would poke through the coat: it goes under it, out of sight.
@@ -415,6 +444,8 @@ function setDressed(c, on) {
   // Hair that would poke through the knitted hat (her bun and its loose strands) goes under it while it's on.
   const hatOn = on && !(c === PLAYER && L.hatGiven);
   (mu.realBun || []).forEach((o) => { const H = o.userData.hairPos; if (!H) return; const P = o.geometry.attributes.position; P.array.set(hatOn ? H.alt : H.orig); P.needsUpdate = true; });
+  const RG = mu.realGear;
+  if (RG) Object.keys(RG).forEach((kind) => RG[kind].forEach((o) => { o.visible = on && !(kind === 'hat' && c === PLAYER && L.hatGiven); }));
   // A realistic body with its own long coat wears that instead of the built-on one (hat, scarf, boots stay).
   if (mu.realCoat && mu.realCoat.length) {
     mu.realCoat.forEach((o) => { o.visible = on; });
@@ -479,7 +510,7 @@ function updateCold(dt) {
     const snowing = outside(c) && STATE.snow > 0.25;
     c.snowAcc = clamp((c.snowAcc || 0) + dt * (snowing ? STATE.snow * 0.012 * (c.speed > 0.3 ? 0.6 : 1) : G.inside(c.x, c.z) ? -0.03 : -0.004), 0, 1);
     const g = gearOf(c), show = c.snowAcc > 0.06;
-    g.snow.forEach((s, i) => { const onHat = i === g.snow.length - 1; s.visible = show && (!onHat || (c.dressed && !(c === PLAYER && L.hatGiven))); if (s.visible) { const b = s.userData.base, f = 0.35 + 0.65 * c.snowAcc, k = c.m.userData.k; s.scale.set(b[0] * k * f, b[1] * k * (0.4 + c.snowAcc), b[2] * k * f); if (s.userData.ys) s.position.y = s.userData.ys[c.dressed ? 0 : 1] * k; } });
+    g.snow.forEach((s, i) => { const onHat = i === g.snow.length - 1; s.visible = show && (!onHat || (c.dressed && !(c === PLAYER && L.hatGiven) && !(c.m.userData.realGear && c.m.userData.realGear.hat))); if (s.visible) { const b = s.userData.base, f = 0.35 + 0.65 * c.snowAcc, k = c.m.userData.k; s.scale.set(b[0] * k * f, b[1] * k * (0.4 + c.snowAcc), b[2] * k * f); if (s.userData.ys) s.position.y = s.userData.ys[c.dressed ? 0 : 1] * k; } });
   }
   if (frostEl) { const f = smooth(0.38, 1, PLAYER.cold) * 0.92; if (Math.abs((frostEl._o || 0) - f) > 0.004) { frostEl._o = f; frostEl.style.opacity = f.toFixed(3); } }
   // Her side of it.

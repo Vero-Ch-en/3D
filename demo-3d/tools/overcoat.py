@@ -61,7 +61,6 @@ def world_mesh(o):
 
 
 def targets(n):
-    """The jumper (and his hoodie cord) split into arm and torso surfaces, with its own skin weights."""
     V = []; Wt = []; FA = []; FT = []
     for o in [bpy.data.objects[x] for x in ('sweater_' + n, 'cord_' + n + '_1') if x in bpy.data.objects]:
         v, f, w = world_mesh(o); off = len(V); V += v; Wt += w
@@ -87,7 +86,6 @@ def set_weights(c, i, new, CG):
         if x / t > 1e-3: (c.vertex_groups.get(k) or c.vertex_groups.new(name=k)).add([i], x / t, 'REPLACE')
 
 
-# ------------------------------------------------------------------ 1. tailoring
 def refit(n, eb=0.015, ea=0.012, iters=8, relax=0.5, pit=0.07):
     rest(n); T = targets(n); L = land(n)
     c = coat(n); b = bpy.data.objects['backup_coat_' + n]; me = c.data
@@ -123,7 +121,6 @@ def refit(n, eb=0.015, ea=0.012, iters=8, relax=0.5, pit=0.07):
     project()
     for i, v in enumerate(me.vertices): v.co = iw @ pos[i] if w8[i] > 0 else orig[i]
     me.update()
-    # weights above the hips: the jumper's own (sleeves from its arms, body from its torso; over the shoulder both)
     CG = {g.index: g.name for g in c.vertex_groups}
     for i, v in enumerate(me.vertices):
         p = mw @ v.co
@@ -144,7 +141,6 @@ def refit(n, eb=0.015, ea=0.012, iters=8, relax=0.5, pit=0.07):
 
 
 def close_front(n, cross=0.006, lift=0.004, band=0.10):
-    """Front edges overlap by 1.2 cm (the right-hand flap on top) instead of leaving a gap."""
     L = land(n); c = coat(n); me = c.data; mw = c.matrix_world; iw = mw.inverted(); cx = L['cx']
     nb, ns = c['body_verts'], c['sleeve_verts']
     bm = bmesh.new(); bm.from_mesh(me); bm.verts.ensure_lookup_table()
@@ -166,7 +162,6 @@ def close_front(n, cross=0.006, lift=0.004, band=0.10):
 
 
 def collar(n, rise=0.006, ease=0.012):
-    """The coat's neckline up over the jumper's neckline, smoothed."""
     L = land(n); c = coat(n); me = c.data; mw = c.matrix_world; iw = mw.inverted(); neck = L['neck']; A = L['arm']
     nb, ns = c['body_verts'], c['sleeve_verts']
     SV, _, _ = world_mesh(bpy.data.objects['sweater_' + n])
@@ -205,7 +200,6 @@ def along(S, E, H, p):
 
 
 def sleeves(n, past=0.006, ea=0.012, cap_ease=0.007, cap_len=0.05):
-    """Cuffs to just past the wrist, tapered onto the jumper's cuff; sleeve heads a little closer in."""
     rest(n); T = targets(n); c = coat(n); me = c.data; mw = c.matrix_world; iw = mw.inverted()
     nb, ns = c['body_verts'], c['sleeve_verts']
     for side in ('Left', 'Right'):
@@ -228,7 +222,6 @@ def sleeves(n, past=0.006, ea=0.012, cap_ease=0.007, cap_len=0.05):
 
 
 def caps(n, lift=0.03, cap_len=0.07, ease=0.007):
-    """Sleeve heads raised up under the coat's shoulders, so no jumper shows at the shoulder point."""
     rest(n); T = targets(n); c = coat(n); me = c.data; mw = c.matrix_world; iw = mw.inverted()
     nb, ns = c['body_verts'], c['sleeve_verts']
     for side in ('Left', 'Right'):
@@ -264,7 +257,6 @@ def legs_tree(n):
 
 
 def skirt(n, flare=0.20, clear=0.03):
-    """From the hips down: an even A-line from the fitted hips to the hem, clear of the legs."""
     rest(n); L = land(n); zTop = L['zTop']
     c = coat(n); me = c.data; mw = c.matrix_world; iw = mw.inverted(); b = bpy.data.objects['backup_coat_' + n]
     nb, ns = c['body_verts'], c['sleeve_verts']
@@ -300,7 +292,6 @@ def skirt(n, flare=0.20, clear=0.03):
 
 
 def drape(n, NB=40):
-    """Below the waist a coat hangs: no surface curving back in under the seat or the tummy."""
     rest(n); L = land(n); c = coat(n); me = c.data; mw = c.matrix_world; iw = mw.inverted()
     nb, ns = c['body_verts'], c['sleeve_verts']
     body = [(i, mw @ v.co) for i, v in enumerate(me.vertices) if not (nb <= i < nb + ns)]
@@ -319,8 +310,6 @@ def drape(n, NB=40):
 
 
 def weight_skirt(n, front_follow=0.95, back_follow=0.3, ramp=0.10, top_blend=0.05, e0=-0.55, e1=0.15):
-    """Front and sides follow the thighs (so they lie on the lap when sitting), the back mostly the hips and the
-    coat-tail spring bones; under the knee the hem drapes with the shin."""
     rest(n); L = land(n); c = coat(n); me = c.data; mw = c.matrix_world
     hips = L['hips']; zTop = L['zTop']; Lx = J(n, 'LeftUpLeg').x; knee = (J(n, 'LeftLeg').z + J(n, 'RightLeg').z) / 2
     sgn = 1 if Lx > hips.x else -1
@@ -348,7 +337,6 @@ def weight_skirt(n, front_follow=0.95, back_follow=0.3, ramp=0.10, top_blend=0.0
 
 
 def weld(n, r=0.0015):
-    """The back seam (and any other doubled vertices above the vent) joined again, weights averaged."""
     rest(n); L = land(n); c = coat(n); b = bpy.data.objects['backup_coat_' + n]; me = c.data; mw = c.matrix_world
     orig = [v.co.copy() for v in b.data.vertices]; kd = kdtree.KDTree(len(orig))
     for i, co in enumerate(orig): kd.insert(co, i)
@@ -371,7 +359,6 @@ def mark_parts(n):
 
 
 def fix_normals(n):
-    """Consistent winding, facing outward (the original coat's right half was inside out)."""
     rest(n); c = coat(n); me = c.data; mw = c.matrix_world
     bm = bmesh.new(); bm.from_mesh(me); bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     segs = [(J(n, 'Hips'), J(n, 'Neck')), (J(n, 'LeftArm'), J(n, 'LeftHand')), (J(n, 'RightArm'), J(n, 'RightHand')),
@@ -397,7 +384,6 @@ def fix_normals(n):
 
 
 def cut_v(n):
-    """The V opening between the lapels, cut on exact lines (bisect), down to the top button."""
     rest(n); L = land(n); c = coat(n); me = c.data; mw = c.matrix_world; iw = mw.inverted()
     cx, zB, zN, e = L['cx'], L['zB'], L['zN'], L['e']; fy = L['hips'].y
     bm = bmesh.new(); bm.from_mesh(me); part = bm.verts.layers.int.get('part')
@@ -419,22 +405,12 @@ def cut_v(n):
     bmesh.ops.delete(bm, geom=kill, context='FACES'); bm.to_mesh(me); bm.free(); me.update()
 
 
-def reset_topology(n):
-    """A fresh copy of the original coat mesh: every step assumes its vertex numbering (the V cut adds vertices)."""
-    c = coat(n); b = bpy.data.objects['backup_coat_' + n]
-    old = c.data; c.data = b.data.copy(); c.data.name = 'coat_' + n
-    if old.users == 0: bpy.data.meshes.remove(old)
-    for g in list(c.vertex_groups): c.vertex_groups.remove(g)
-    for g in b.vertex_groups: c.vertex_groups.new(name=g.name)
-
-
 def build(n):
-    reset_topology(n); refit(n); close_front(n); collar(n); sleeves(n); caps(n); skirt(n); drape(n); weight_skirt(n); weld(n)
+    refit(n); close_front(n); collar(n); sleeves(n); caps(n); skirt(n); drape(n); weight_skirt(n); weld(n)
     mark_parts(n); fix_normals(n); cut_v(n)
     for p in coat(n).data.polygons: p.use_smooth = True
 
 
-# ------------------------------------------------------------------ 3. the overcoat's details
 def surf(n):
     c = coat(n); me = c.data; mw = c.matrix_world; part = me.attributes['part'].data
     V = [mw @ v.co for v in me.vertices]
@@ -442,7 +418,6 @@ def surf(n):
 
 
 def walk(tree, p, d, dist, step=0.004):
-    """Slide `dist` metres over the coat's surface from p, starting in direction d."""
     loc, nor, _, _ = tree.find_nearest(p); p = loc; dd = d.copy()
     k = int(max(1, round(dist / step))); st = dist / k if dist > 0 else 0
     for _ in range(k):
@@ -455,7 +430,7 @@ def front_point(tree, x, z, fy):
     h = tree.ray_cast(Vector((x, fy - 1.0, z)), Vector((0, 1, 0))); return h[0], h[1]
 
 
-BUTTON = (0.22, 0.17, 0.13)   # horn buttons (vertex colour; multiplies the coat colour in the game)
+BUTTON = (0.22, 0.17, 0.13)
 
 
 def details(n, wmax=0.078, tN=0.86, depth=0.058, nrow=16, ncol=5):
@@ -468,7 +443,6 @@ def details(n, wmax=0.078, tN=0.86, depth=0.058, nrow=16, ncol=5):
             for j in range(nc - 1):
                 a = i * nc + j; fs.append((a, a + 1, a + nc + 1, a + nc))
         pieces.append((vs, fs, col))
-    # notched lapels, folded back from the edges of the V
     for side in (1, -1):
         d = Vector((side * e, 0, zN - zB)).normalized(); perp = d.cross(Vector((0, 1, 0))).normalized()
         if perp.x * side < 0: perp = -perp
@@ -482,7 +456,6 @@ def details(n, wmax=0.078, tN=0.86, depth=0.058, nrow=16, ncol=5):
                 q, nor = walk(tree, p0, perp, w * j / (ncol - 1)); row.append(q + nor * (0.006 - 0.0025 * j / (ncol - 1)))
             rows.append(row)
         grid(rows)
-    # turned-down collar round the back of the neck, from one notch to the other
     nk = L['neck']; part = me.attributes['part'].data
     bm = bmesh.new(); bm.from_mesh(me)
     ring = [mw @ v.co for v in bm.verts if v.is_boundary and part[v.index].value == 0 and (mw @ v.co).z > zN - 0.03
@@ -501,7 +474,6 @@ def details(n, wmax=0.078, tN=0.86, depth=0.058, nrow=16, ncol=5):
             q, nor = walk(tree, st, Vector((0, 0, -1)), dep * j / 3); row.append(q + nor * (0.008 - 0.0035 * j / 3))
         rows.append(row)
     grid(rows)
-    # three buttons down the closing flap
     def disc(p, nor, rad, h, col):
         nor = nor.normalized(); t1 = nor.orthogonal().normalized(); t2 = nor.cross(t1); seg = 14; vs = []; fs = []
         for rr, hh in ((rad, 0.0), (rad, h * 0.7), (rad * 0.7, h)):
@@ -526,9 +498,8 @@ def details(n, wmax=0.078, tN=0.86, depth=0.058, nrow=16, ncol=5):
                 q, nor = front_point(tree, x, z, fy)
                 if q is None: q, nor = tree.find_nearest(Vector((x, fy - 0.2, z)))[:2]
                 row.append(q + nor * 0.0045)
-            rows.append(row)
+            rows.append(row if side > 0 else row)
         grid(rows, (0.93, 0.93, 0.93))
-    # turn-back cuffs: a band over the last 6.5 cm of each sleeve
     bm = bmesh.new(); bm.from_mesh(me); bm.verts.ensure_lookup_table(); bm.normal_update()
     for side in ('Left', 'Right'):
         S, E, H = J(n, side + 'Arm'), J(n, side + 'ForeArm'), J(n, side + 'Hand')
@@ -561,7 +532,6 @@ def details(n, wmax=0.078, tN=0.86, depth=0.058, nrow=16, ncol=5):
 
 
 def outermost(n, o, off_min=0.004):
-    """Every detail vertex on the outside of the outermost coat layer under it."""
     rest(n); tree, _ = surf(n); mw = o.matrix_world; iw = mw.inverted()
     for v in o.data.vertices:
         p = mw @ v.co; loc, nor, _, _ = tree.find_nearest(p)
@@ -584,7 +554,6 @@ def orient(n, o):
 
 
 def finish(n, coat_thick=0.006, detail_thick=0.0035):
-    """Details skinned like the coat under them; wool thickness on both; white vertex colour on the coat."""
     rest(n); c = coat(n); o = bpy.data.objects['coatdetail_' + n]
     me = c.data; mw = c.matrix_world; V = [mw @ v.co for v in me.vertices]
     kd = kdtree.KDTree(len(V))
@@ -603,9 +572,7 @@ def finish(n, coat_thick=0.006, detail_thick=0.0035):
         for d in ca.data: d.color = (1, 1, 1, 1)
     for ob, th in ((c, coat_thick), (o, detail_thick)):
         m = ob.modifiers.get('Wool') or ob.modifiers.new('Wool', 'SOLIDIFY')
-        m.thickness = th; m.offset = -1; m.use_rim = True
-        m.use_even_offset = False; m.use_quality_normals = True; m.thickness_clamp = 0.5   # 'even' spiked on thin slivers
-        # thickness before the armature, so it bends with the coat
+        m.thickness = th; m.offset = -1; m.use_rim = True; m.use_even_offset = True
         if ob.modifiers.find('Wool') > 0: ob.modifiers.move(ob.modifiers.find('Wool'), 0)
 
 
@@ -614,14 +581,57 @@ def build_all():
         build(n); details(n); finish(n)
 
 
-# ------------------------------------------------------------------ 4. export for the game
+def weight_details(n):
+    """Details bend with the coat under them: weights blended from the nearest coat face (not one vertex), and
+    pocket flaps and buttons move as one piece with the weights at their middle, so a flap at the hip crease
+    can't be torn when the legs fold."""
+    rest(n); c = coat(n); o = bpy.data.objects['coatdetail_' + n]; me = c.data; mw = c.matrix_world
+    V = [mw @ v.co for v in me.vertices]; part = me.attributes['part'].data
+    F = [list(p.vertices) for p in me.polygons]; tree = BVHTree.FromPolygons(V, F)
+    FS = [f for f in F if part[f[0]].value == 1]; treeS = BVHTree.FromPolygons(V, FS)   # sleeves only (for the cuffs)
+    CG = {g.index: g.name for g in c.vertex_groups}
+    W = [{CG[g.group]: g.weight for g in v.groups} for v in me.vertices]
+    def at(p, sleeve=False):
+        tr, FF = (treeS, FS) if sleeve else (tree, F)
+        loc, nor, fi, d = tr.find_nearest(p); ids = FF[fi]; bw = poly_3d_calc([V[i] for i in ids], loc); acc = {}
+        for i, b in zip(ids, bw):
+            for k, x in W[i].items(): acc[k] = acc.get(k, 0) + x * b
+        return acc
+    for g in list(o.vertex_groups): o.vertex_groups.remove(g)
+    for k in CG.values(): o.vertex_groups.new(name=k)
+    om = o.matrix_world; dm = o.data; col = dm.color_attributes.get('Col')
+    bm = bmesh.new(); bm.from_mesh(dm); bm.verts.ensure_lookup_table()
+    seen = set(); comps = []
+    for v0 in bm.verts:
+        if v0.index in seen: continue
+        st = [v0]; seen.add(v0.index); comp = []
+        while st:
+            v = st.pop(); comp.append(v.index)
+            for e in v.link_edges:
+                u = e.other_vert(v)
+                if u.index not in seen: seen.add(u.index); st.append(u)
+        comps.append(comp)
+    bm.free()
+    for comp in comps:
+        c0 = col.data[comp[0]].color if col else (1, 1, 1, 1)
+        rigid = abs(c0[0] - 0.93) < 0.01 or c0[0] < 0.5      # pocket flaps and buttons
+        if rigid:
+            mid = sum((om @ dm.vertices[i].co for i in comp), Vector()) / len(comp); ws = at(mid)
+            for i in comp:
+                for k, x in ws.items():
+                    if x > 1e-3: o.vertex_groups[k].add([i], x, 'REPLACE')
+        else:
+            cuff = abs(c0[0] - 0.95) < 0.01      # turn-back cuffs: weighted from the sleeve only (the skirt is right beside the hands)
+            for i in comp:
+                for k, x in at(om @ dm.vertices[i].co, cuff).items():
+                    if x > 1e-3: o.vertex_groups[k].add([i], x, 'REPLACE')
+    return len(comps)
+
+
 EXPORT = {}
 
 
 def export(n, tile=0.30):
-    """Coat + details, evaluated at rest without the armature (so with the wool thickness), triangulated and
-    split where normals/UVs differ. Binary: float32 pos(3) nrm(3) uv(2), uint8 rgb, 4 x (uint8 joint, float32
-    weight), uint16 indices. Joint names listed separately. UVs: box projection, one texture tile per `tile` m."""
     rest(n); dg = bpy.context.evaluated_depsgraph_get(); verts = []; key = {}; idx = []; names = []
     def jid(k):
         k = k.replace('mixamorig:', '')
@@ -655,6 +665,43 @@ def export(n, tile=0.30):
     ib = struct.pack('<%dH' % len(idx), *idx) if nv < 65536 else struct.pack('<%dI' % len(idx), *idx)
     EXPORT[n] = dict(meta=dict(n=n, nv=nv, ni=len(idx), names=names, stride=8 * 4 + 3 + 4 * 5), data=base64.b64encode(bytes(b) + ib).decode())
     return EXPORT[n]['meta']
+
+
+
+def export_obj(key, n, objs, tile=0.30):
+    """Like export(), for any list of objects (merged), using their own UV map when they have one."""
+    rest(n); dg = bpy.context.evaluated_depsgraph_get(); verts = []; kmap = {}; idx = []; names = []
+    def jid(k):
+        k = k.replace('mixamorig:', '')
+        if k not in names: names.append(k)
+        return names.index(k)
+    for ob in objs:
+        arm = ob.modifiers.get('Armature'); arm.show_viewport = False; dg.update()
+        e = ob.evaluated_get(dg); m = e.to_mesh(); m.calc_loop_triangles()
+        mw = ob.matrix_world; nm = mw.to_3x3(); G = {g.index: g.name for g in ob.vertex_groups}
+        col = m.color_attributes.get('Col'); cn = m.corner_normals; uvl = m.uv_layers.get('UVMap')
+        for tri in m.loop_triangles:
+            for li in tri.loops:
+                vi = m.loops[li].vertex_index; p = mw @ m.vertices[vi].co; nr = (nm @ cn[li].vector).normalized()
+                if uvl: uv = tuple(uvl.data[li].uv); ax = -1
+                else:
+                    ax = max(range(3), key=lambda a: abs(nr[a])); u, v = [(p.y, p.z), (p.x, p.z), (p.x, p.y)][ax]; uv = (u / tile, v / tile)
+                c3 = tuple(col.data[vi].color[:3]) if col else (1, 1, 1)
+                kk = (ob.name, vi, round(nr.x, 2), round(nr.y, 2), round(nr.z, 2), ax, round(uv[0], 3), round(uv[1], 3))
+                if kk not in kmap:
+                    ws = sorted(((jid(G[g.group]), g.weight) for g in m.vertices[vi].groups if g.weight > 1e-3 and g.group in G), key=lambda x: -x[1])[:4]
+                    kmap[kk] = len(verts); verts.append((p, nr, uv, c3, ws))
+                idx.append(kmap[kk])
+        e.to_mesh_clear(); arm.show_viewport = True
+    b = bytearray()
+    for p, nr, uv, c3, ws in verts:
+        b += struct.pack('<8f', p.x, p.y, p.z, nr.x, nr.y, nr.z, uv[0], uv[1])
+        b += bytes(int(max(0, min(1, x)) * 255 + 0.5) for x in c3)
+        ws = ws + [(0, 0.0)] * (4 - len(ws)); t = sum(w for _, w in ws) or 1
+        for j, w in ws: b += struct.pack('<Bf', j, w / t)
+    ib = struct.pack('<%dH' % len(idx), *idx)
+    EXPORT[key] = dict(meta=dict(n=n, nv=len(verts), ni=len(idx), names=names), data=base64.b64encode(bytes(b) + ib).decode())
+    return EXPORT[key]['meta']
 
 
 def export_chunk(n, i, size=200000):
