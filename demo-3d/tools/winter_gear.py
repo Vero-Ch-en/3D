@@ -16,7 +16,7 @@ from mathutils import Vector, noise
 from mathutils.bvhtree import BVHTree
 from mathutils.interpolate import poly_3d_calc
 
-HAT_STYLE = {'player': dict(bobble=False, cuff=0.048, slouch=0.008), 'partner': dict(bobble=True, cuff=0.05, slouch=0.014)}
+HAT_STYLE = {'player': dict(bobble=False, cuff=0.044, slouch=0.008, lift=0.012, back=0.035), 'partner': dict(bobble=True, cuff=0.05, slouch=0.014, lift=0.0, back=0.0)}
 
 
 def head_info(n):
@@ -44,7 +44,7 @@ def radius(tree, C, d, far=0.4):
 
 def build_hat(n, NT=48, NR=14):
     st = HAT_STYLE[n]; I = head_info(n); C = I['C']; s = land(n)['s']
-    zf = I['brow'] + 0.016 * s; zb = I['hb'].z + 0.03 * s
+    zf = I['brow'] + (0.016 + st.get('lift', 0)) * s; zb = I['hb'].z + (0.03 + st.get('back', 0)) * s   # his sits higher: over the tops of the ears, not down over them
     def zbrim(th):
         return zb + (zf - zb) * (0.5 + 0.5 * math.cos(th))
     def dirn(th, e): return Vector((math.sin(th) * math.cos(e), -math.cos(th) * math.cos(e), math.sin(e)))
@@ -302,7 +302,8 @@ def build_gloves(n):
             a = (p - H).dot(up)
             return handish(ws) > 0.5 or (-0.01 < a < 0.075 and sum(w for k, w in ws.items() if side + 'ForeArm' in k or side + 'Hand' in k) > 0.6)
         def off(p, ws, H=H, up=up):
-            a = (p - H).dot(up); return 0.003 + 0.004 * max(0.0, min(1.0, (a + 0.005) / 0.03))
+            a = (p - H).dot(up); th = sum(w for k, w in ws.items() if 'Thumb1' in k or 'Thumb2' in k)
+            return 0.003 + 0.004 * max(0.0, min(1.0, (a + 0.005) / 0.03)) + 0.003 * min(1.0, th * 2)   # a little more round the base of the thumb, which bulges when it bends
         tip = H - up * 0.09
         def centre(p, H=H, tip=tip):
             from mathutils.geometry import intersect_point_line

@@ -760,7 +760,7 @@ G.swingCoat = (c, dt) => {
   const wf = Math.sin(c.yaw) * gst, ws = Math.cos(c.yaw) * gst;   // the wind against your front, and across you
   for (const S of u.springs) {
     // back (trailing) with speed, forward when slowing; out on the outside of a turn; tucked when sitting
-    const ta = (-0.07 * Math.min(sp, 2.2) + 0.025 * Math.max(-3, Math.min(3, acc))) * (1 - sit) + sit * -0.25;
+    const ta = (-0.07 * Math.min(sp, 2.2) + 0.025 * Math.max(-3, Math.min(3, acc))) * (1 - sit);   // sitting: the skirt lies on the lap with the thighs (weights), no swing of its own
     const flut = (Math.sin(tt * 7.3 + S.side * 1.7) * 0.6 + Math.sin(tt * 12.1 + S.side) * 0.4) * gst * 0.035 * (1 - sit);
     const ta2 = ta + wf * 0.1 * (1 - sit) + flut;   // facing downwind, the hem is blown forward
     const tb = turn * 1.6 + ws * 0.07 * (1 - sit);
