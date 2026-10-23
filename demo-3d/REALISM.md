@@ -194,7 +194,7 @@ All made in Blender round each character's own body (`tools/winter_gear.py`, run
 - **Scarves:** wrapped twice round the neck on the coat's collar, with two flat ends hanging down the chest (one longer), laid over the coat and clear of the lapels and buttons. The wraps follow the neck and chest; the ends take the coat's own weights.
 - **Gloves:** knitted, a layer over each hand with the hand's own finger weights (so they curl with the fingers), and a ribbed cuff that goes up under the sleeve.
 - **Boots:** built in slices round the foot and lower leg to mid-calf, with a flat sole a little wider than the foot. His are dark leather; hers are tan suede with a fleece cuff (vertex colours, converted to linear in the patch).
-- **Build 60:** his beanie sits higher, over the tops of his ears instead of down over them; the gloves have a little more room round the base of the thumb; and when sitting, the coat-tail springs no longer swing the skirt (it lies on the lap with the thighs).
+- **Build 60:** his beanie sits higher, over the tops of his ears instead of down over them; the gloves have a little more room round the base of the thumb; and when sitting only the front of the coat lies on the lap (with the thighs) while the sides hang from the hips, and the coat-tail springs no longer swing the skirt; before, the whole skirt lifted into a dome over the lap.
 - **Coat fixes:** pocket flaps and buttons move as one piece (no spike at the hip when sitting), and the turn-back cuffs are weighted from the sleeve only.
 - **Loading:** a body that arrives after the loading screen gives up is now fitted and dressed as soon as it's measured (before, his outdoor clothes could stay unfitted).
 

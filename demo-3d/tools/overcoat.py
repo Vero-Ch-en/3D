@@ -309,7 +309,7 @@ def drape(n, NB=40):
     me.update()
 
 
-def weight_skirt(n, front_follow=0.95, back_follow=0.3, ramp=0.10, top_blend=0.05, e0=-0.55, e1=0.15):
+def weight_skirt(n, front_follow=0.95, back_follow=0.15, ramp=0.10, top_blend=0.05, e0=0.15, e1=0.75):   # only the front lies on the lap; the sides hang
     rest(n); L = land(n); c = coat(n); me = c.data; mw = c.matrix_world
     hips = L['hips']; zTop = L['zTop']; Lx = J(n, 'LeftUpLeg').x; knee = (J(n, 'LeftLeg').z + J(n, 'RightLeg').z) / 2
     sgn = 1 if Lx > hips.x else -1
