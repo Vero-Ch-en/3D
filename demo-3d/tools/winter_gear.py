@@ -300,10 +300,10 @@ def build_gloves(n):
         def handish(ws): return sum(w for k, w in ws.items() if side + 'Hand' in k) / (sum(ws.values()) or 1)
         def pick(p, ws, H=H, up=up):
             a = (p - H).dot(up)
-            return handish(ws) > 0.5 or (-0.01 < a < 0.075 and sum(w for k, w in ws.items() if side + 'ForeArm' in k or side + 'Hand' in k) > 0.6)
+            return handish(ws) > 0.5 or (-0.01 < a < 0.13 and sum(w for k, w in ws.items() if side + 'ForeArm' in k or side + 'Hand' in k) > 0.6)
         def off(p, ws, H=H, up=up):
             a = (p - H).dot(up); th = sum(w for k, w in ws.items() if 'Thumb1' in k or 'Thumb2' in k)
-            return 0.003 + 0.004 * max(0.0, min(1.0, (a + 0.005) / 0.03)) + 0.003 * min(1.0, th * 2)   # a little more round the base of the thumb, which bulges when it bends
+            return 0.003 + 0.005 * max(0.0, min(1.0, (a + 0.005) / 0.03)) + 0.003 * min(1.0, th * 2)   # a little more round the base of the thumb, which bulges when it bends
         tip = H - up * 0.09
         def centre(p, H=H, tip=tip):
             from mathutils.geometry import intersect_point_line
