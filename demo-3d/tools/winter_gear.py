@@ -415,6 +415,57 @@ def build_boots(n, NA=36, NZ=16):
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     return finish_shell(n, 'boots_' + n, bm, per, cols, smooth=0)
 
+
+def glove_cuffs(n, length=0.11, NA=20, NZ=7):
+    """A ribbed knitted cuff on each glove: a tube round the jumper's sleeve from the wrist 11 cm up the forearm
+    (under the coat sleeve), so no wrist shows between glove and sleeve however the arm bends."""
+    rest(n); from mathutils.geometry import intersect_point_line
+    SV, SF, SW = world_mesh(bpy.data.objects['sweater_' + n])
+    SV = SV + world_mesh(bpy.data.objects['human_' + n])[0]   # the wrist bones stand proud of the jumper
+    bm = bmesh.new(); uvl = bm.loops.layers.uv.new('UVMap'); per = []; cols = []
+    for side in ('Left', 'Right'):
+        H = J(n, side + 'Hand'); E = J(n, side + 'ForeArm'); ax = (E - H).normalized()
+        t1 = ax.orthogonal().normalized(); t2 = ax.cross(t1)
+        near = [p for p in SV if -0.005 <= (p - H).dot(ax) <= length + 0.02 and (intersect_point_line(p, H, E)[0] - p).length < 0.07]
+        rows = []
+        for k in range(NZ):
+            a = -0.035 + (length + 0.035) * k / (NZ - 1); c = H + ax * a   # starts over the back of the hand, overlapping the glove
+            band = [p for p in near if abs((p - H).dot(ax) - max(a, 0.005)) < 0.02] or near
+            ring = []
+            for i in range(NA):
+                ang = 2 * math.pi * i / NA; d = t1 * math.cos(ang) + t2 * math.sin(ang)
+                r = max([(p - c - ax * (p - c).dot(ax)).dot(d) for p in band] + [0.025])
+                rib = 0.0012 * (1 if i % 2 else -1)
+                ring.append(bm.verts.new(c + d * (r + 0.005 + rib)))
+                f = max(0.0, min(1.0, (a + 0.005) / 0.04))
+                per.append({'mixamorig:' + side + 'Hand': 1 - f, 'mixamorig:' + side + 'ForeArm': f}); cols.append((1, 1, 1))
+            rows.append(ring)
+        for k in range(NZ - 1):
+            for i in range(NA):
+                i2 = (i + 1) % NA
+                f = bm.faces.new([rows[k][i], rows[k][i2], rows[k + 1][i2], rows[k + 1][i]])
+                for l, uv in zip(f.loops, [(i / NA * 4, k / (NZ - 1)), ((i + 1) / NA * 4, k / (NZ - 1)), ((i + 1) / NA * 4, (k + 1) / (NZ - 1)), (i / NA * 4, (k + 1) / (NZ - 1))]): l[uvl].uv = uv
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    return bm, per, cols
+
+
+def build_gloves_with_cuffs(n):
+    g = build_gloves(n)
+    bm, per, cols = glove_cuffs(n)
+    me = bpy.data.meshes.new('_cuff'); bm.to_mesh(me); bm.free()
+    for p in me.polygons: p.use_smooth = True
+    co = bpy.data.objects.new('_cuff', me); bpy.context.scene.collection.objects.link(co)
+    for i, ws in enumerate(per):
+        for k, w in ws.items():
+            if w > 1e-3: (co.vertex_groups.get(k) or co.vertex_groups.new(name=k)).add([i], w, 'REPLACE')
+    ca = me.color_attributes.new('Col', 'FLOAT_COLOR', 'POINT')
+    for d in ca.data: d.color = (1, 1, 1, 1)
+    co.matrix_world = g.matrix_world.copy()
+    bpy.ops.object.select_all(action='DESELECT'); g.select_set(True); co.select_set(True); bpy.context.view_layer.objects.active = g
+    bpy.ops.object.join()
+    return g
+
+
 def build_gear():
     for n in NAMES:
-        build_hat(n); build_scarf(n); build_gloves(n); build_boots(n)
+        build_hat(n); build_scarf(n); build_gloves_with_cuffs(n); build_boots(n)

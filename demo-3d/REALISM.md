@@ -187,11 +187,12 @@ blinks, dozing, hugs. Hats and the snow on them are handed to the model's own he
   in Act IV. At its worst the bed gets made perfectly. Scrapbook pages go blank, and one child is painted out of the
   hall photograph (`G.take`).
 
-## Hats, scarves, gloves and boots (builds 59–60)
+## Hats, scarves, gloves and boots (builds 59–62)
 
 All made in Blender round each character's own body (`tools/winter_gear.py`, run after `tools/overcoat.py` on `cozy_characters_overcoats.blend`), skinned to the same skeleton, and added to `models/real/*.glb` by `tools/patch_gear.js` (which also replaces the coat). The old built-in hat, scarf ring and boots stay in the game but hidden (`userData.replaced`).
 - **Beanies:** shaped on the skull with room for the hair, the brim just above the brows and low at the back, a turned-up cuff; hers has a bobble. Knit ribs run round the head. Her hair is tucked to the new hat's real shape.
 - **Scarves:** wrapped twice round the neck on the coat's collar, with two flat ends hanging down the chest (one longer), laid over the coat and clear of the lapels and buttons. The wraps follow the neck and chest; the ends take the coat's own weights.
+- **Glove cuffs (62):** each glove has its own ribbed cuff tube, sized round the jumper sleeve and the wrist bones, from over the back of the hand 11 cm up the forearm under the coat sleeve, so no wrist shows when the arms bend (the body has no skin under the jumper to extend the glove along).
 - **Gloves:** knitted, a layer over each hand with the hand's own finger weights (so they curl with the fingers), and a ribbed cuff that goes up under the sleeve.
 - **Boots:** built in slices round the foot and lower leg to mid-calf, with a flat sole a little wider than the foot. His are dark leather; hers are tan suede with a fleece cuff (vertex colours, converted to linear in the patch).
 - **Build 60:** his beanie sits higher, over the tops of his ears instead of down over them; the gloves have a little more room round the base of the thumb; and when sitting only the front of the coat lies on the lap (with the thighs) while the sides hang from the hips, and the coat-tail springs no longer swing the skirt; before, the whole skirt lifted into a dome over the lap.
