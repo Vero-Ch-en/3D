@@ -1,6 +1,6 @@
 # Snowed In: the story (3D version)
 
-This is the game as it stands (build 56). It keeps the shape of the 2D story: an ordinary shared day, something strange, an imitation, and a choice between a perfect day that never ends and real time that passes. It is not about a birthday. The anchor is **the first snow**, the night the two of them met.
+This is the game as it stands (build 57). It keeps the shape of the 2D story: an ordinary shared day, something strange, an imitation, and a choice between a perfect day that never ends and real time that passes. It is not about a birthday. The anchor is **the first snow**, the night the two of them met.
 
 ## Premise
 
