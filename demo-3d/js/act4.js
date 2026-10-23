@@ -151,8 +151,8 @@ const showEnd = (id, title) => {
 /* =====================================================================
  * Act IV
  * ===================================================================== */
-CH.lastbirthday = async () => {
-  checkpoint('lastbirthday');
+// The house and the world as Act IV has them (also for resuming on the way home).
+async function setupAct4() {
   const f = G.$('fade');
   if (!f.classList.contains('on')) { f.style.background = '#fff'; f.classList.add('on'); await wait(0.6); }
   quiet(); STATE.busy = true;
@@ -171,6 +171,10 @@ CH.lastbirthday = async () => {
   EXD.g.visible = true; EXD.hinge.rotation.y = 0; EXD.glow.material.opacity = 0.0; EXD.light.intensity = 0; ENT.g.visible = false;
   Object.assign(S.flags, { reunited: false, rescued: false, fakeLeftBehind: false, wentBack: false, ateBreakfast: false, foundSign: false, offerDone: false, ending: null, gateN: 0 });
   STATE.bounds = null;
+}
+CH.lastbirthday = async () => {
+  checkpoint('lastbirthday');
+  await setupAct4();
   const withFake = !S.flags.fakeWithdrawn;
   G.lieDown(PLAYER, G.BED.L, -0.14, 0.15, 0.35);
   if (S.flags.sleptBeside && withFake) { G.lieDown(PARTNER, G.BED.R, -0.40, 0, 0); PARTNER.mode = 'lying'; PARTNER.lidsClosed = false; }
@@ -437,6 +441,7 @@ async function reunion() {
 }
 async function afterReunion() {
   S.flags.reunited = true; S.flags.reuniting = false;
+  checkpoint('act4_home'); S.chapter = 'lastbirthday';   // a reload resumes here: together, on the way home
   STATE.sceneShot = false; G.releaseCamera(); G.CAM.cut = true;
   await P('There’s a door. In the meadow, on its own. I saw it on the way. Come on — and don’t you dare let go.');
   PARTNER.mode = 'follow'; G.setHold(true);
@@ -444,6 +449,25 @@ async function afterReunion() {
   walkTalk(S.run);
   addScrap('lastbday', 'A ring of summer in the snow, and her in it, whistling like an idiot.');
 }
+
+// Resuming Act IV after finding her: the same day, the two of you together, heading for the door in the meadow.
+CH.act4_home = async () => {
+  checkpoint('act4_home'); S.chapter = 'lastbirthday';
+  const keep = { rescued: !!S.flags.rescued, fakeWithdrawn: !!S.flags.fakeWithdrawn, sign: S.flags.sign };
+  await setupAct4();
+  Object.assign(S.flags, keep, { reunited: true, foundSign: true });
+  G.WEATHER.hold = 'snow'; G.setDressed(PLAYER, true); G.setDressed(PARTNER, true);
+  PARTNER.hidden = false; PARTNER.m.visible = true; PARTNER.lidsClosed = false;
+  if (keep.rescued) { G.standAt(PLAYER, 6.4, 5.6, 0); G.standAt(PARTNER, 7.0, 5.6, 0); }
+  else { G.standAt(PLAYER, CIRCLE.x + 0.4, CIRCLE.z - 1.2, Math.PI); G.standAt(PARTNER, CIRCLE.x - 0.3, CIRCLE.z - 1.2, Math.PI); }
+  G.releaseCamera(); G.CAM.cut = true;
+  fade(false, 1.6, '#fff');
+  await N('(Together. Her hand in yours. Somewhere out in the meadow, a door.)');
+  PARTNER.mode = 'follow'; G.setHold(true);
+  STATE.busy = false; S.flags.noTogether = true; S.flags.noBarks = true;
+  loops(S.run); walkTalk(S.run);
+};
+
 inter('aExit', [EXIT.x, 1.0, EXIT.z + 0.6], 1.3, 'The door', async () => {
   if (!S.flags.reunited) { await N('(A door, standing on its own in the snow. Warm light round the edges. It won’t open. Not for one person.)'); return; }
   if (!PARTNER.hold || dist() > 1.6) { await N('(It won’t open. Not for one person.)'); return; }

@@ -34,9 +34,13 @@ const addScrap = (art, caption) => { if (!S.scrap.some((p) => p.art === art)) S.
 const cyc = (id, lines) => { S.n[id] = (S.n[id] || 0) + 1; return lines[Math.min(S.n[id] - 1, lines.length - 1)]; };
 
 const SAVE_KEY = 'cbs.base.save';
+// Every story flag is kept in a save (what the night and Act IV remember: whether it kept her, the sign she
+// left, whether it withdrew...), except the ones that only mean something while a scene is playing.
+const PASSING = new Set(['inInter', 'inBedScene', 'reuniting', 'noTogether', 'noBarks', 'gateArmed0', 'ending']);
+function saveFlags() { const o = {}; for (const [k, v] of Object.entries(S.flags)) if (!PASSING.has(k) && (v === null || ['boolean', 'number', 'string'].includes(typeof v))) o[k] = v; return o; }
 function checkpoint(chapter) {
   S.chapter = chapter;
-  const data = { v: 1, chapter, vars: S.vars, mem: S.mem, scrap: S.scrap, talked: S.talked, flags: { pancakeQuality: S.flags.pancakeQuality, teaMade: S.flags.teaMade }, life: S.life, photos: S.photos };
+  const data = { v: 1, chapter, vars: S.vars, mem: S.mem, scrap: S.scrap, talked: S.talked, flags: saveFlags(), life: S.life, photos: S.photos };
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(data)); } catch (e) {
     // Photographs are the big part; if storage is full, keep the story and drop the oldest pictures.
     try { data.photos = S.photos.slice(-3); localStorage.setItem(SAVE_KEY, JSON.stringify(data)); } catch (e2) { /* private mode */ }

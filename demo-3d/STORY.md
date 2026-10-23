@@ -89,14 +89,17 @@ None of them is labelled good or bad. The end card names the ending you reached,
 > Neither of them remembers exactly how it started. It doesn't matter. They keep choosing it, one ordinary morning at a time.
 > If you ever get lost, whistle. Three notes, slightly flat on the last one. Someone will come and find you.
 
+## Saving and restart points
+
+The game saves at the start of each chapter, at the Elsewhere door in the night, and in Act IV once you've found her (so a reload puts you back together on the way home, `act4_home`). Every lasting story flag is saved (whether it kept her, the sign she left, whether it withdrew, whether you slept beside it...); only flags that matter mid-scene are left out.
+
 ## Testing aids
 
-- **Chapter list:** on the title screen and in the pause menu. It covers every act, Elsewhere on its own, and each ending.
+- **Chapter list:** on the title screen and in the pause menu. It covers every act, Elsewhere on its own, Act IV on the way home, and each ending.
 - **Story state panel:** in the pause menu. It shows bond, trust, corruption, suspicion, memories taken, whether it kept her, whether you slept beside it, and whether it withdrew.
 
 ## Still to do
 
-- **Restart points:** add them within the night and Act IV.
 - **Poses:** proper poses for hiding and the wrist grab, and a snow figure for the Entity.
 - **Night and Act IV as Partner:** possibly a full Partner route for these chapters (she wakes beside the imitation of him).
 - **Playtest:** finish a full pass as both characters. Build 52 played the whole day (morning, walk, evening), four endings and The First Snow as Partner without getting stuck, and every narration line had her version. The night and Act IV as Partner aren't tested yet.

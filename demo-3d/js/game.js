@@ -1777,7 +1777,7 @@ function boot() {
   };
   // Jumping to a chapter (testing, or replaying a part): from the title or the pause menu. Whatever scene was running
   // is left hanging where it was (its next line never comes), the screen is cleared, and the chapter starts fresh.
-  G.CHAPTERS = [['prologue', 'Prologue · The winter fair'], ['morning', 'Act I · Morning'], ['walk', 'Act I · The walk'], ['evening', 'Act II · Evening'], ['bedtime', 'Act III · Bedtime'], ['night', 'Act III · The night'], ['elsewhere', 'Act III · Elsewhere (as her)'], ['lastbirthday', 'Act IV · The same day'], ['ending_foundme', 'Ending · You Found Me'], ['ending_uncertain', 'Ending · Uncertain Morning'], ['ending_iknow', 'Ending · I Know It’s You'], ['ending_perfect', 'Ending · The Perfect Partner'], ['ending_stay', 'Ending · Stay Here'], ['ending_replaced', 'Ending · Replaced'], ['firstsnow', 'Ending · The First Snow']];
+  G.CHAPTERS = [['prologue', 'Prologue · The winter fair'], ['morning', 'Act I · Morning'], ['walk', 'Act I · The walk'], ['evening', 'Act II · Evening'], ['bedtime', 'Act III · Bedtime'], ['night', 'Act III · The night'], ['elsewhere', 'Act III · Elsewhere (as her)'], ['lastbirthday', 'Act IV · The same day'], ['act4_home', 'Act IV · Together, on the way home'], ['ending_foundme', 'Ending · You Found Me'], ['ending_uncertain', 'Ending · Uncertain Morning'], ['ending_iknow', 'Ending · I Know It’s You'], ['ending_perfect', 'Ending · The Perfect Partner'], ['ending_stay', 'Ending · Stay Here'], ['ending_replaced', 'Ending · Replaced'], ['firstsnow', 'Ending · The First Snow']];
   G.jumpTo = async (id) => {
     if (!G.CH || !G.CH[id]) return;
     setPaused(false);
