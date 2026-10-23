@@ -187,13 +187,14 @@ blinks, dozing, hugs. Hats and the snow on them are handed to the model's own he
   in Act IV. At its worst the bed gets made perfectly. Scrapbook pages go blank, and one child is painted out of the
   hall photograph (`G.take`).
 
-## Tailored coats and the wool overcoat (build 57, in progress)
+## Wool overcoats (builds 57–58)
 
-- **Tailored in Blender** (`tools/overcoat.py`, run on `CozyCharacters\cozy_characters_coats_tailored.blend`; it always starts again from the original coats kept as `backup_coat_*`). The coat body is fitted to the jumper's torso and the sleeves to its arms (1.5 / 1.2 cm ease), so the body no longer wraps round the arms. The front closes with a 1.2 cm overlap, the back seam is welded, the collar sits over the jumper's neckline, the cuffs reach just past the wrist, and the sleeve heads tuck under the shoulders.
-- **Skirt:** an even A-line from the hips (no step at the hip, no curving in under the seat), clear of the legs. Weighted so the front and sides follow the thighs (it lies on the lap when sitting, opens with the stride) and the back hangs from the hips and the coat-tail springs; under the knee it drapes with the shin.
-- **Skin weights** above the hips copy the jumper's own, so coat and jumper bend together. Normals now face outward on both halves (the right half used to be inside out).
-- **In the game (build 57):** the tailored coats replace the old ones in `models/real/*.glb` and `js/models_real.js` (shape, weights and normals). The old runtime shoulder fold in `life.js` is off (`window.COAT_FOLD` brings it back).
-- **Wool overcoat (modelled, not yet in the game):** a V opening with notched lapels, a turned-down collar, three horn buttons, two flap pockets, turn-back cuffs and wool thickness. The Blender link dropped before export; `tools/overcoat.py` rebuilds all of it (`build_all()`, then `export()`), and the game side needs the coat primitive rebuilt with the new vertex count (plus vertex colours for the buttons) and a wool texture in place of jersey.
+- **Tailored** (build 57, `tools/overcoat.py`, always starting again from the original coats kept as `backup_coat_*`): the coat body is fitted to the jumper's torso and the sleeves to its arms (1.5 / 1.2 cm ease), so the body no longer wraps round the arms. The front closes with an overlap, the back seam is welded, the collar sits over the jumper's neckline, the cuffs reach just past the wrist and the sleeve heads tuck under the shoulders. Weights above the hips copy the jumper's own, so coat and jumper bend together.
+- **Skirt:** an even A-line from the hips (no ledge, no curving in under the seat), clear of the legs. The front and sides follow the thighs (it lies on the lap when sitting, opens with the stride); the back hangs from the hips and the coat-tail springs; under the knee it drapes with the shin.
+- **Overcoat details** (build 58): a V opening with notched lapels, a turned-down collar, three dark horn buttons, two flap pockets at the hips, turn-back cuffs, and 6 mm of wool thickness (3.5 mm on the details), all skinned like the coat under them. Each coat is now about 4,800 vertices / 9,600 triangles.
+- **In the game:** `tools/patch_overcoat.js` swaps the coat mesh in `models/real/*.glb` (and the embedded copies in `js/models_real.js`) for the export, with UVs (30 cm a tile) and vertex colours. The coat material uses a new wool texture (`TX.wool`, a fine melton with a faint twill; `TX.woolB` for the bump) instead of the jersey, with vertex colours on for the buttons. The old runtime shoulder fold in `life.js` is off (`window.COAT_FOLD` brings it back).
+- **Blender files** (CozyCharacters folder on the user's Desktop): `cozy_characters_overcoats.blend` has the finished overcoats; `cozy_characters_coats_tailored.blend` the tailored stage. Earlier files and the originals are untouched.
+- **Hair under the hat:** pressed further in (to 84% of the crown), so her bun no longer shows through the back.
 
 ## Winter clothes fitted (builds 54–56)
 

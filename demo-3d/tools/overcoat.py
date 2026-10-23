@@ -11,7 +11,8 @@ build 57). Starts from the original coats (backup_coat_<name>, the coats tools/c
   4. exports the whole coat (positions, normals, box-projected UVs, vertex colours, four bone weights) for
      tools/patch_overcoat.js, which rebuilds the coat in models/real/<name>.glb and js/models_real.js.
 
-Usage in Blender:  exec(open(path).read()); build_all(); export(name, chunk) ...
+Usage in Blender: load this as a text block in pieces of under ~10 kB (one big call froze the link), exec it,
+then build_all(), export(name) and export_chunk(name, i). Result kept in cozy_characters_overcoats.blend.
 Everything is in world space at the rig's rest pose."""
 import bpy, bmesh, math, json, base64, struct
 from mathutils import Vector
@@ -418,8 +419,17 @@ def cut_v(n):
     bmesh.ops.delete(bm, geom=kill, context='FACES'); bm.to_mesh(me); bm.free(); me.update()
 
 
+def reset_topology(n):
+    """A fresh copy of the original coat mesh: every step assumes its vertex numbering (the V cut adds vertices)."""
+    c = coat(n); b = bpy.data.objects['backup_coat_' + n]
+    old = c.data; c.data = b.data.copy(); c.data.name = 'coat_' + n
+    if old.users == 0: bpy.data.meshes.remove(old)
+    for g in list(c.vertex_groups): c.vertex_groups.remove(g)
+    for g in b.vertex_groups: c.vertex_groups.new(name=g.name)
+
+
 def build(n):
-    refit(n); close_front(n); collar(n); sleeves(n); caps(n); skirt(n); drape(n); weight_skirt(n); weld(n)
+    reset_topology(n); refit(n); close_front(n); collar(n); sleeves(n); caps(n); skirt(n); drape(n); weight_skirt(n); weld(n)
     mark_parts(n); fix_normals(n); cut_v(n)
     for p in coat(n).data.polygons: p.use_smooth = True
 
@@ -506,14 +516,16 @@ def details(n, wmax=0.078, tN=0.86, depth=0.058, nrow=16, ncol=5):
     for k in range(3):
         p, nor = front_point(tree, cx + 0.014 * s, zB - 0.012 * s - k * 0.115 * s, fy)
         if p is not None: disc(p + nor * 0.002, nor, 0.0115 * s, 0.0045, BUTTON)
-    # flap pockets at the hips, out toward the sides
+    # flap pockets on the hips: aimed straight at the coat front (walking over the front overlap twisted them)
     for side in (1, -1):
-        p0, _ = front_point(tree, cx, L['hips'].z + 0.015 * s, fy); lat = Vector((side, 0, 0))
-        mid, _ = walk(tree, p0, lat, 0.205 * s); corner, _ = walk(tree, mid, -lat, 0.075 * s); rows = []
+        rows = []; z0 = L['hips'].z + 0.015 * s
         for i in range(4):
-            top_i, _ = walk(tree, corner, Vector((0, 0, -1)), 0.055 * s * i / 3); row = []
+            row = []
             for j in range(7):
-                q, nor = walk(tree, top_i, lat, 0.15 * s * j / 6); row.append(q + nor * 0.0045)
+                x = cx + side * (0.075 + 0.15 * j / 6) * s; z = z0 - 0.055 * s * i / 3 - 0.006 * s * (j / 6)
+                q, nor = front_point(tree, x, z, fy)
+                if q is None: q, nor = tree.find_nearest(Vector((x, fy - 0.2, z)))[:2]
+                row.append(q + nor * 0.0045)
             rows.append(row)
         grid(rows, (0.93, 0.93, 0.93))
     # turn-back cuffs: a band over the last 6.5 cm of each sleeve
@@ -591,7 +603,8 @@ def finish(n, coat_thick=0.006, detail_thick=0.0035):
         for d in ca.data: d.color = (1, 1, 1, 1)
     for ob, th in ((c, coat_thick), (o, detail_thick)):
         m = ob.modifiers.get('Wool') or ob.modifiers.new('Wool', 'SOLIDIFY')
-        m.thickness = th; m.offset = -1; m.use_rim = True; m.use_even_offset = True
+        m.thickness = th; m.offset = -1; m.use_rim = True
+        m.use_even_offset = False; m.use_quality_normals = True; m.thickness_clamp = 0.5   # 'even' spiked on thin slivers
         # thickness before the armature, so it bends with the coat
         if ob.modifiers.find('Wool') > 0: ob.modifiers.move(ob.modifiers.find('Wool'), 0)
 

@@ -167,6 +167,10 @@ G.buildTextures = () => {
   // Jersey (hoodie).
   TX.jersey = canvasTex(256, (u, v) => { const t = 0.9 + G.fbm(u * 60, v * 60, 2) * 0.08 + Math.sin(v * 400) * 0.015; return [255 * t, 255 * t, 255 * t]; });
   TX.jerseyB = canvasTex(128, (u, v) => { const g = 128 + G.fbm(u * 50, v * 50, 2) * 60; return [g, g, g]; }, { srgb: false });
+  // Wool coating (the overcoats): a dense, slightly fuzzy melton with a faint twill running across it.
+  // One tile is 30 cm of coat (tools/overcoat.py lays the UVs out at that scale).
+  TX.wool = canvasTex(256, (u, v) => { const tw = Math.sin((u + v) * 96 * Math.PI) * 0.018, t = 0.9 + G.fbm(u * 90, v * 90, 3) * 0.07 + G.fbm(u * 12, v * 12, 2) * 0.03 + tw; return [255 * t, 255 * t, 255 * t]; });
+  TX.woolB = canvasTex(256, (u, v) => { const g = 128 + Math.sin((u + v) * 96 * Math.PI) * 26 + G.fbm(u * 120, v * 120, 2) * 50; return [g, g, g]; }, { srgb: false });
   // Plaid throw.
   TX.plaid = canvasTex(512, (u, v) => {
     const band = (t, w) => (Math.abs(((t * 4) % 1) - 0.5) < w ? 1 : 0);

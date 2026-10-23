@@ -211,7 +211,9 @@ function fitGear(c) {
         out.collar = [+fTop.toFixed(3), +bTop.toFixed(3), +rx.toFixed(3), +rz.toFixed(3), +(want - at.y).toFixed(3)];
       }
     }
-    (u.realCoat || []).forEach((o) => { const mt = g.coatM.clone(); mt.skinning = true; mt.side = THREE.DoubleSide; mt.map = G.rep(G.TX.jersey, 4, 4); G.MATS && G.MATS.push(mt); o.material = mt; });
+    // The overcoat (tools/overcoat.py) carries its own UVs (30 cm a tile) and vertex colours (dark horn buttons,
+    // a touch lighter on the cuffs and pocket flaps); older coats fall back to the jersey.
+    (u.realCoat || []).forEach((o) => { const mt = g.coatM.clone(); mt.skinning = true; mt.side = THREE.DoubleSide; const wool = !!o.geometry.attributes.color; mt.map = wool ? G.TX.wool : G.rep(G.TX.jersey, 4, 4); if (wool) { mt.vertexColors = true; mt.bumpMap = G.TX.woolB; mt.bumpScale = 0.0025; mt.roughness = 0.97; } G.MATS && G.MATS.push(mt); o.material = mt; });
     out.flare = +(torso.userData.flare || 1).toFixed(3);
     need.forEach((s, p) => { out[p.parent === u.spine ? 'coat' : (out.sl = (out.sl || 0) + 1, 'sleeve' + out.sl)] = +s.toFixed(3); });
     return Object.assign(out, { sH: +sH.toFixed(3), dyHat: +dyHat.toFixed(3), dyScarf: +dyScarf.toFixed(3), sB: +sB.toFixed(3) });
@@ -277,9 +279,9 @@ function tuckUnderHat(m, hatParts) {
     for (let i = 0; i < P.count; i++) {
       world(i, w); if (w.y < yBrim) continue;
       const dx = (w.x - c.x) / r.x, dy = (w.y - c.y) / r.y, dz = (w.z - c.z) / r.z, e = Math.hypot(dx, dy, dz);
-      if (e <= 0.97) continue;
-      // onto 0.93 of the hat's shape, then the same shift in the mesh's own space (the head bone barely rotates it)
-      const f = 0.93 / e; t.set(c.x + (w.x - c.x) * f, c.y + (w.y - c.y) * f, c.z + (w.z - c.z) * f);
+      if (e <= 0.88) continue;
+      // onto 0.84 of the hat's shape, then the same shift in the mesh's own space (the head bone barely rotates it)
+      const f = 0.84 / e; t.set(c.x + (w.x - c.x) * f, c.y + (w.y - c.y) * f, c.z + (w.z - c.z) * f);
       const ld = t.clone().sub(w).applyMatrix3(lm.setFromMatrix4(inv));
       alt[i * 3] += ld.x; alt[i * 3 + 1] += ld.y; alt[i * 3 + 2] += ld.z; moved++;
     }
