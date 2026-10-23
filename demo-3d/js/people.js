@@ -676,6 +676,16 @@ function holdIK(c, u, wgt) {
   T.addScaledVector(fw, 0.05 + Math.sin(c.phase || 0) * 0.07 * sw);
   solveArm(c, u, A, i, T, wgt, 0.2);
 }
+// Taking someone by the wrist: arm 0 reaches for the other one's arm-1 hand, wherever their pose has put it
+// (they're facing each other, so that's the hand straight across).
+function grabIK(c, u) {
+  const o = c.grabWith, OA = o.m.userData.arms[1], A = u.arms[0];
+  if (!A || !OA) return;
+  c.m.updateMatrixWorld(true); o.m.updateMatrixWorld(true);
+  const T = (OA.hand || OA.el).getWorldPosition(new THREE.Vector3());
+  T.y += 0.02;
+  solveArm(c, u, A, 0, T, 1, 0.1);
+}
 /* Two-bone IK for one arm onto a world point: on the model's own arm bones when it has them (its rest arm
  * directions), else on the rig's. The elbow goes out and down. handTurn turns the wrist toward the body. */
 function solveArm(c, u, A, i, T, wgt, handTurn) {
@@ -774,7 +784,7 @@ const CURL = { Thumb: [0.1, 0.15, 0.15], Index: [0.18, 0.28, 0.2], Middle: [0.24
 G.curlFingers = (c, dt) => {
   const u = c.m.userData; if (!u.fingers || !u.fingers.length || window.NOCURL) return;
   const pz = c.forcePose || c.pose;
-  const grip = c.carry || pz === 'carry' ? 1 : (c.holdPose || pz === 'cup' || pz === 'read') ? 0.75 : pz === 'cold' ? 0.85 : pz === 'pockets' || pz === 'coatPockets' ? 0.6 : c.holdOn ? 0.45 : (c.hug || 0) > 0.3 ? 0.4 : 0;
+  const grip = c.carry || pz === 'carry' || pz === 'grab' ? 1 : pz === 'hide' ? 0.9 : (c.holdPose || pz === 'cup' || pz === 'read') ? 0.75 : pz === 'cold' ? 0.85 : pz === 'pockets' || pz === 'coatPockets' ? 0.6 : c.holdOn ? 0.45 : (c.hug || 0) > 0.3 ? 0.4 : 0;
   c.grip = G.damp(c.grip || 0, grip, 6, dt);
   const fid = Math.sin((c.breath || 0) * 0.5) * 0.04;   // the smallest restlessness, so hands never look carved
   for (const F of u.fingers) {
@@ -881,8 +891,11 @@ const ARM_POSES = (G.ARM_POSES = {
   wave: [-2.7, -0.3, -0.7, 0.1],        // one hand up (arm 1 only): hello, and a pose for photographs
   cup: [-0.55, 0.28, -1.3, -0.7],      // a mug cradled in both hands
   coatPockets: [-0.16, 0.06, -0.5, -0.35], // hands in the coat's side pockets
+  grab: [-1.2, 0.12, -0.32, 0.15],      // one arm out, hand closed round someone's wrist (arm 0 only)
+  held: [-0.95, 0.02, -0.12, 0.1],      // one arm pulled out straight by the wrist (arm 1 only)
+  hide: [-0.62, 0.34, -1.75, -0.9],     // hugging yourself small, elbows in (hiding)
 });
-const ONE_ARM = { throw: 0, water: 0, wave: 1 };
+const ONE_ARM = { throw: 0, water: 0, wave: 1, grab: 0, held: 1 };
 /* Motion capture (js/mocap.js, from the CMU motion capture database): looping idle, walk and seated clips,
  * already in this rig's joint angles. Sampled with linear interpolation; mixed by walk speed and sitting. */
 const MC_KEYS = ['hips', 'hipsPos', 'spine', 'spineW', 'chest', 'neck', 'head', 'sh0', 'sh1', 'el0', 'el1', 'th0', 'th1', 'kn0', 'kn1', 'ft0', 'ft1'];
@@ -1066,6 +1079,7 @@ G.animate = (c, dt, t) => {
   // instead of through it. The taller one wraps over the shoulders, the shorter one round the back, under the arms.
   if ((c.hug || 0) > 0.01 && c.hugWith && c.hugWith.m) hugIK(c, u, c.hug);
   else if ((c.holdW || 0) > 0.01 && c.holdWith && c.holdWith.m && c.holdArm != null && c.holdWith.holdArm != null) holdIK(c, u, c.holdW);
+  else if (c.grabWith && c.grabWith.m && c.grabWith.m.userData.arms) grabIK(c, u);
   // Blinks on a natural, irregular rhythm (sometimes a double blink).
   c.blinkT = (c.blinkT == null ? Math.random() * 3 : c.blinkT) - dt;
   if (c.noBlink) c.blinkT = Math.max(c.blinkT, 1);   // the imitation, when it stops pretending

@@ -59,13 +59,41 @@ const EXD = (() => {
 })();
 // The Entity, when it finally stands in front of you: tall, pale, not quite a person, mostly snow.
 const ENT = (() => {
+  // "Like snow that has decided to stand": a person's shape in packed, glittering snow, no face, slightly too
+  // tall, flakes lifting off it and drifting round. One material, so the scene fades it in and out with opacity.
   const g = new THREE.Group(); g.visible = false; W.add(g);
-  const mat = new THREE.MeshBasicMaterial({ color: '#dfe6f2', transparent: true, opacity: 0, depthWrite: false });
-  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.26, 1.9, 16, 1, true), mat); body.position.y = 0.95; g.add(body);
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.15, 16, 12), mat); head.position.y = 2.06; head.scale.y = 1.2; g.add(head);
+  const mat = new THREE.MeshStandardMaterial({ color: '#eef3fb', emissive: '#9fb4d6', emissiveIntensity: 0.35, roughness: 0.95, transparent: true, opacity: 0, depthWrite: false, bumpMap: G.TX.snowN, bumpScale: 0.02 });
+  const lathe = (pts, seg = 28) => new THREE.LatheGeometry(pts.map(([r, y]) => new THREE.Vector2(r, y)), seg);
+  // body: feet to shoulders, one soft shape (a long coat of snow), and the neck
+  const body = new THREE.Mesh(lathe([[0.001, 0], [0.2, 0.02], [0.24, 0.35], [0.22, 0.8], [0.19, 1.05], [0.21, 1.3], [0.24, 1.52], [0.2, 1.62], [0.08, 1.7], [0.06, 1.78], [0.001, 1.8]]), mat);
+  body.scale.z = 0.62; g.add(body);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.115, 20, 14), mat); head.position.y = 1.93; head.scale.set(0.9, 1.15, 1.0); g.add(head);
+  for (const s of [-1, 1]) {   // arms, hanging a little away from the body
+    const arm = new THREE.Mesh(lathe([[0.001, -0.36], [0.04, -0.35], [0.05, -0.3], [0.055, 0.2], [0.06, 0.33], [0.001, 0.37]], 12), mat);   // (r128 has no capsule)
+    arm.position.set(s * 0.27, 1.2, 0); arm.rotation.z = s * 0.1; g.add(arm);
+  }
+  // flakes coming off it and drifting about
+  const N = 220, pos = new Float32Array(N * 3), seed = new Float32Array(N);
+  for (let i = 0; i < N; i++) { seed[i] = Math.random(); pos[i * 3] = (Math.random() - 0.5) * 0.6; pos[i * 3 + 1] = Math.random() * 2.1; pos[i * 3 + 2] = (Math.random() - 0.5) * 0.4; }
+  const pg = new THREE.BufferGeometry(); pg.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const pmat = new THREE.PointsMaterial({ color: '#ffffff', size: 0.025, transparent: true, opacity: 0, depthWrite: false });
+  const flakes = new THREE.Points(pg, pmat); g.add(flakes);
+  G.TICKERS.add((dt) => {
+    if (!g.visible) return;
+    pmat.opacity = mat.opacity * 1.4;
+    const t = G.simT || 0;
+    for (let i = 0; i < N; i++) {
+      let y = pos[i * 3 + 1] + dt * (0.08 + seed[i] * 0.12); if (y > 2.4) y = Math.random() * 0.4;
+      pos[i * 3 + 1] = y; pos[i * 3] += Math.sin(t * 0.7 + seed[i] * 40) * dt * 0.05 + dt * 0.02; pos[i * 3 + 2] += Math.cos(t * 0.6 + seed[i] * 30) * dt * 0.04;
+      if (Math.abs(pos[i * 3]) > 0.7) pos[i * 3] *= 0.3;
+    }
+    pg.attributes.position.needsUpdate = true;
+    g.rotation.y += Math.sin(t * 0.3) * dt * 0.02;   // it never quite stands still
+  });
   return { g, mat };
 })();
 
+G.ENT = ENT;   // (tests)
 const MUG3 = (() => { const m = G.cyl(0.04, 0.035, 0.09, G.shared({ color: '#e8e2d6', roughness: 0.4 }), 13.42, 0.97, -1.98, { seg: 14 }); m.rotation.x = Math.PI; m.visible = false; return m; })();
 (G.onJump = G.onJump || []).push(() => { SIGN.g.visible = false; TRAIL.g.visible = false; EXD.g.visible = false; ENT.g.visible = false; MUG3.visible = false; G.WALK && G.WALK.showCircle(false); });
 /* ---------- what it takes: a memory at a time. A scrapbook page goes blank; the photograph loses one of them. ---------- */

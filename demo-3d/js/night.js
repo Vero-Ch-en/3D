@@ -465,16 +465,23 @@ function hunt(run) {
     }
   })();
 }
+NIGHT.caught = () => caught();   // (tests)
 async function caught() {
-  STATE.busy = true; NIGHT.hiding = null;
+  STATE.busy = true; NIGHT.hiding = null; STATE.noControl = false;
   S.vars.caught = (S.vars.caught || 0) + 1;
   const n = S.vars.caught;
   PARTNER.script = null; PARTNER.mode = 'still';
+  // It takes her by the wrist: face to face, an arm's length apart, his hand round hers.
+  PLAYER.sitTarget = PLAYER.sit = 0; PLAYER.forcePose = null;
+  const ang = Math.atan2(PARTNER.x - PLAYER.x, PARTNER.z - PLAYER.z);
+  G.standAt(PARTNER, PLAYER.x + Math.sin(ang) * 0.58, PLAYER.z + Math.cos(ang) * 0.58, ang + Math.PI);
+  PLAYER.yaw = ang; PARTNER.grabWith = PLAYER; PLAYER.forcePose = 'held';
   G.gaze(PARTNER, [PLAYER.x, PLAYER.y + 1.5, PLAYER.z], 6); G.gaze(PLAYER, [PARTNER.x, PARTNER.y + 1.7, PARTNER.z], 6);
   await N('(His hand closes round your wrist. A little too hard.)');
   await Y(['There you are. Come back to bed.', 'You keep wandering off. I don’t like it when you wander off.', 'Stay.'][Math.min(2, n - 1)]);
   G.observe('caught', ['I found her in the kitchen. I brought her back.', 'She wandered again. I brought her back again.', 'She stays now.'][Math.min(2, n - 1)]);
   const f = G.$('fade'); f.style.background = '#000'; f.style.transition = 'opacity 0.8s'; f.classList.add('on'); await wait(1.6);
+  PARTNER.grabWith = null; PARTNER.forcePose = PLAYER.forcePose = null;
   if (n >= 3) {
     NIGHT.kept = true; S.flags.keptHer = true; NIGHT.canWhistle = false;
     G.lieDown(PLAYER, B().R, -0.40, 0, 0); G.lieDown(PARTNER, B().L, -0.14, 0, 0); PARTNER.mode = 'lying';
@@ -496,11 +503,36 @@ async function caught() {
   await N(lost ? '(Later. The kitchen again. You slipped away when he fell asleep. Something is missing; you can’t think what.)' : '(Later. The kitchen again. You slipped away when he fell asleep.)');
   STATE.busy = false;
 }
-// Somewhere to hide from it in the dark house: the curtains of the window seat, and the study.
+// Somewhere to hide from it in the dark house: the curtains of the window seat, and the study (the lean-to through
+// the locked door; at night it isn't locked). In the study she's actually inside, behind the door, and the camera
+// stays in the kitchen on the closed door.
+const HIDE = { nook: () => ({ x: G.NOOK.x, z: G.NOOK.z, yaw: 0, y: G.NOOK.seatY }), study: () => ({ x: G.ANNEX.x0 + 0.42, z: 4.3, yaw: -Math.PI * 0.5 }) };
+const STUDY_OUT = { x: 14.35, z: 3.85, yaw: -Math.PI * 0.5 };
 const hideAct = (where) => async () => {
-  if (NIGHT.hiding) { NIGHT.hiding = null; STATE.noControl = false; await N('(You come out.)'); return; }
+  if (NIGHT.hiding) {
+    const was = NIGHT.hiding;
+    NIGHT.hiding = null; PLAYER.forcePose = null;
+    if (was === 'study') {
+      await G.cutTo(() => { G.standAt(PLAYER, STUDY_OUT.x, STUDY_OUT.z, STUDY_OUT.yaw); STATE.sceneShot = false; G.releaseCamera(); G.CAM.cut = true; }, 0.2);
+    }
+    STATE.noControl = false;
+    if (PLAYER.sitTarget) { PLAYER.sitTarget = 0; await wait(0.5); }
+    await N('(You come out.)'); return;
+  }
   NIGHT.hiding = where; STATE.noControl = true;
-  await N(where === 'nook' ? '(You fold yourself into the window seat behind the curtain, knees up, and keep very still.)' : '(You slip into the study and stand behind the door, in the dark.)');
+  const h = HIDE[where]();
+  if (where === 'nook') {
+    // knees up on the window seat behind the curtain
+    G.sitDown(PLAYER, h.x, h.z, h.yaw, h.y, 0.5); PLAYER.forcePose = 'hide';
+    await N('(You fold yourself into the window seat behind the curtain, knees up, and keep very still.)');
+  } else {
+    // through the door and flat against the wall behind it, in the dark
+    await G.cutTo(() => {
+      G.standAt(PLAYER, h.x, h.z, h.yaw); PLAYER.forcePose = 'hide';
+      STATE.sceneShot = true; G.setShot(fixed(V(12.9, 1.55, 2.2), V(14.9, 1.15, 3.85), 46, 0.004));
+    }, 0.3);
+    await N('(You slip into the study and stand behind the door, in the dark. It smells of pencil shavings and old paper.)');
+  }
 };
 inter('eHideNook', [10.05, 0.8, -1.3], 1.1, () => (NIGHT.hiding === 'nook' ? 'Come out' : 'Hide behind the curtain'), hideAct('nook'), () => S.chapter !== 'lastbirthday' && NIGHT.swapped && !NIGHT.left && !NIGHT.kept && (!NIGHT.hiding || NIGHT.hiding === 'nook'));
 inter('eHideStudy', [14.35, 0.8, 3.85], 1.0, () => (NIGHT.hiding === 'study' ? 'Come out' : 'Hide in the study'), hideAct('study'), () => S.chapter !== 'lastbirthday' && NIGHT.swapped && !NIGHT.left && !NIGHT.kept && (!NIGHT.hiding || NIGHT.hiding === 'study'));

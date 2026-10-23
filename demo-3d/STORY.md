@@ -93,6 +93,13 @@ None of them is labelled good or bad. The end card names the ending you reached,
 
 The game saves at the start of each chapter, at the Elsewhere door in the night, and in Act IV once you've found her (so a reload puts you back together on the way home, `act4_home`). Every lasting story flag is saved (whether it kept her, the sign she left, whether it withdrew, whether you slept beside it...); only flags that matter mid-scene are left out.
 
+## Hiding and being caught (build 64)
+
+- **Behind the curtain:** she folds herself onto the window seat, knees up, arms wrapped round herself, half hidden by the curtain.
+- **In the study:** at night the study door isn't locked. She slips through and stands flat against the wall behind it, in the dark (it smells of pencil shavings and old paper). The camera stays in the kitchen on the closed door with its PRIVATE sign. Coming out brings her back into the kitchen.
+- **Caught:** they stand face to face. Her arm is pulled out, and his hand reaches across and closes round her wrist (his arm goes to wherever her hand actually is).
+- **The Entity:** when it finally stands in front of you, it's a person's shape in packed, glittering snow. It's a little too tall and has no face, and flakes keep lifting off it and drifting round.
+
 ## Testing aids
 
 - **Chapter list:** on the title screen and in the pause menu. It covers every act, Elsewhere on its own, Act IV on the way home, and each ending.
@@ -100,6 +107,5 @@ The game saves at the start of each chapter, at the Elsewhere door in the night,
 
 ## Still to do
 
-- **Poses:** proper poses for hiding and the wrist grab, and a snow figure for the Entity.
 - **Night and Act IV as Partner:** possibly a full Partner route for these chapters (she wakes beside the imitation of him).
 - **Playtest:** finish a full pass as both characters. Build 52 played the whole day (morning, walk, evening), four endings and The First Snow as Partner without getting stuck, and every narration line had her version. The night and Act IV as Partner aren't tested yet.

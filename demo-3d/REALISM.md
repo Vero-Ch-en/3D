@@ -187,6 +187,12 @@ blinks, dozing, hugs. Hats and the snow on them are handed to the model's own he
   in Act IV. At its worst the bed gets made perfectly. Scrapbook pages go blank, and one child is painted out of the
   hall photograph (`G.take`).
 
+## Poses: hiding, the wrist grab, the Entity (build 64)
+
+- **Wrist grab:** this uses IK (`grabIK` in people.js, set with `c.grabWith`). His arm 0 solves onto her arm-1 hand, wherever her `held` pose has put it, so the hands meet between them. A fixed `grab` arm pose is still there, but it read as an arm stuck out sideways on his rig.
+- **Study hiding:** she's actually inside the lean-to (`G.ANNEX`), behind the door, and the camera holds a shot of the door from the kitchen. There are cuts in and out.
+- **Entity:** the snow figure's arms are lathe shapes. r128 has no `CapsuleGeometry`, and the error stopped the rest of Act IV's setup in build 63.
+
 ## Hats, scarves, gloves and boots (builds 59–62)
 
 All made in Blender round each character's own body (`tools/winter_gear.py`, run after `tools/overcoat.py` on `cozy_characters_overcoats.blend`), skinned to the same skeleton, and added to `models/real/*.glb` by `tools/patch_gear.js` (which also replaces the coat). The old built-in hat, scarf ring and boots stay in the game but hidden (`userData.replaced`).
