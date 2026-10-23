@@ -343,3 +343,31 @@ def fit_coat(name, ease_body=0.016, ease_arm=0.012, iters=6):
             p.x = cx + (0.004 if p.x > cx else -0.004); v.co = iw @ p
     bm.to_mesh(me); bm.free(); me.update()
     return True
+
+
+def weight_sleeves(name):
+    """Re-skin coat_<name>'s sleeves from the arm bones themselves (the body mesh has no skin under the clothes to
+    copy from): upper arm, a smooth hand-over to the forearm across the elbow, a little hand at the cuff, and the
+    sleeve head shared with the shoulder and chest. Fixes sleeves that stayed behind with the torso (build 56)."""
+    from mathutils.geometry import intersect_point_line
+    def ss(e0, e1, x):
+        t = max(0, min(1, (x - e0) / (e1 - e0))); return t * t * (3 - 2 * t)
+    c = bpy.data.objects['coat_' + name]; r = rig(name); W = r.matrix_world; me = c.data; mw = c.matrix_world
+    nb, ns = c['body_verts'], c['sleeve_verts']
+    J = lambda b: W @ r.data.bones['mixamorig:' + b].head_local
+    sides = {s: (J(s + 'Arm'), J(s + 'ForeArm'), J(s + 'Hand')) for s in ('Left', 'Right')}
+    for i in range(nb, nb + ns):
+        p = mw @ me.vertices[i].co
+        s = min(sides, key=lambda s: (intersect_point_line(p, sides[s][0], sides[s][2])[0] - p).length)
+        S, E, H = sides[s]; up = (E - S).length; lo = (H - E).length
+        _, t1 = intersect_point_line(p, S, E)
+        d = t1 * up if t1 <= 1 else up + max(0, intersect_point_line(p, E, H)[1]) * lo
+        fore = ss(up - 0.05, up + 0.05, d); hand = 0.3 * ss(up + lo - 0.06, up + lo, d); sh = 1 - ss(-0.02, 0.08, d)
+        w = {s + 'Arm': (1 - fore) * (1 - sh), s + 'ForeArm': fore * (1 - hand), s + 'Hand': fore * hand,
+             s + 'Shoulder': sh * 0.6, 'Spine2': sh * 0.4}
+        for g in list(me.vertices[i].groups): c.vertex_groups[g.group].remove([i])
+        t = sum(w.values()) or 1
+        for k, x in w.items():
+            if x / t > 1e-3:
+                k = 'mixamorig:' + k
+                (c.vertex_groups.get(k) or c.vertex_groups.new(name=k)).add([i], x / t, 'REPLACE')
