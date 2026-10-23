@@ -188,7 +188,9 @@ function fitGear(c) {
       // Square, peaked sleeve heads: anything above a natural shoulder line (sloping ~20° down from the neck)
       // is brought most of the way down onto it, so the shoulders read round.
       const yMax = (ax) => fTop - 0.025 * k - Math.max(0, ax - 0.07 * k) * 0.36;
-      u.realCoat.forEach((o) => {
+      // (The coats are tailored in Blender now, sleeve heads included: tools/overcoat.py. The old fold for square,
+      // peaked shoulders is only for an untailored coat.)
+      if (window.COAT_FOLD) u.realCoat.forEach((o) => {
         const P = o.geometry.attributes.position, iw = new THREE.Matrix4().copy(o.matrixWorld).invert(); let n = 0;
         for (let i = 0; i < P.count; i++) { vv.fromBufferAttribute(P, i).applyMatrix4(o.matrixWorld); const ax = Math.abs(vv.x); if (ax > 0.07 * k && ax < 0.3 * k) { const ym = yMax(ax); if (vv.y > ym) { vv.y = ym + (vv.y - ym) * 0.3; vv.applyMatrix4(iw); P.setXYZ(i, vv.x, vv.y, vv.z); n++; } } }
         P.needsUpdate = true; o.geometry.computeVertexNormals(); out.folded = (out.folded || 0) + n;
