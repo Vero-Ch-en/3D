@@ -351,6 +351,7 @@ async function cocoa() {
   if (c === 0) { await P('One. And a second one that doesn’t count.', { shot }); NIGHT.seen.add('verbatim'); }
   else if (c === 1) { await P('That’s my line.', { shot }); await Y('I know. I’m stealing it.', { shot }); await P('That’s fair. You can have it.', { shot }); NIGHT.seen.add('gaveup'); }
   else await P('That’s not true, Partner. You’re an ordinary amount of sweet.', { shot });
+  if (S.flags.eveCocoa) await N('(This evening she burned her tongue on hers and blew on every mouthful after. This one drinks it straight off the heat, and doesn’t blink.)', { shot });
   const t = await choose(['“Toast with it?”', '“Don’t burn it this time.”', 'Just stir']);
   if (t === 0) { await P('The toaster? Of course. It works perfectly well.', { shot }); NIGHT.seen.add('toaster'); }
   else if (t === 1) { await P('I won’t.', { shot }); await N('(She doesn’t. Not even a little at the bottom.)', { shot }); }
@@ -378,6 +379,7 @@ async function seat() {
   const shot = fixed(V(Nk.x + 0.2, 1.35, Nk.z + 2.0), V(Nk.x, 0.95, Nk.z), 38, 0.012);
   await N('(Snow going past the window behind you, slow and fat and silent.)', { shot });
   await P('We’re exactly the same people we were when we were seven. Nothing has changed at all.', { shot });
+  if (S.flags.eveRead) await N('(This evening, right here, she said she wanted to always be halfway through something.)', { shot });
   const c = await choose(['“Exactly the same.”', '“You asked me that on the hill. You weren’t sure.”', '“Taller.”']);
   if (c === 0) corrupt(1, 'agree');
   else if (c === 1) { await P('I’m sure now.', { shot }); NIGHT.seen.add('certain'); }

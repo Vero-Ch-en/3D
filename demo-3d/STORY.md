@@ -36,6 +36,22 @@ You choose on the title screen ("Play as: Player / Partner"), and the game remem
 
 Around the story the cabin is lived in. It has a deeper 15 × 7 m layout with a window-seat nook. There are coats and boots by the door, cold if you stay out too long, a fire that burns down, and weather. She has her own routines: reading until she dozes, Basil the plant, the radio. Things to do together: snowball fights, a snowman, snow angels, cocoa, reading aloud, cards (there's a queen up her sleeve), and photographs on the fridge.
 
+## Small moments (build 76)
+
+- **On the walk, between the set pieces:**
+  - Half-way down the path she ambushes you with a snowball ("That one was for the blanket."). You can throw one back (a timing throw), surrender (you carry her gloves and say she's the best at snow), or charge her into a hug.
+  - A young pine by the path has one low branch heavy with snow. Get her to stand under it ("I am going to remember this. On your birthday. At your wedding. On your deathbed."), or walk under it yourself and let her shake it down your neck.
+  - Small tracks run off into the trees. She whispers ("A fox. Has to be a fox."). You can follow them a little way (they go round a fallen branch twice: "A fox with opinions"), or leave the fox in peace.
+- **In the evening, before the porch:**
+  - **Cocoa at the hob:** she says one sugar, puts in a second ("That one doesn't count. It fell."), burns her tongue, and blows on every mouthful after.
+  - **Reading in the window seat:** she does the voices and makes you do the lighthouse keeper. Then she reads ahead with her head on your shoulder, and says "Let's never finish it. Let's always be halfway through something."
+  - **The frost on the kitchen window:** draw a heart, a snowman or the pinecone score, and she adds to it (a second, lopsided heart; a very tall hat; "recount").
+  - If you stand about, she suggests the ones you haven't done yet.
+- **They come back wrong in the night:**
+  - At the cocoa, the imitation drinks it straight off the heat without blinking.
+  - In the window seat, its "nothing has changed at all" comes with a reminder of "always halfway through something".
+  - The kitchen window you drew on has been wiped clean, right to the corners.
+
 ## Act II · Something Strange: the evening
 
 - She hadn't forgotten what day it is: the cake, five candles, a wish.
