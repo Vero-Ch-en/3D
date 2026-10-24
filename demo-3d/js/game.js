@@ -1005,6 +1005,7 @@ function partnerTask(p, dt, t) {
       if (o.lines && Math.random() < 0.8 && !o.hide) bark(o.lines, 3);
       else if (!o.hide && Math.random() < 0.6) G.Audio.hum();   // or she hums to herself
       if (o.onArrive) o.onArrive(p);
+      if (!o.hide && !o.seatAt && o.look && G.startReach) G.startReach(p, { pos: [o.look.x, o.look.y, o.look.z] }, 1.6);   // she reaches for it
     }
     p.lookAt = null;
     return true;
@@ -1604,7 +1605,7 @@ function step(dt, t) {
   if (it && lab) html += `<span class="key">${G.MOBILE ? 'Use' : G.keyFor('interact')}</span>${lab}`;
   if (nearP) html += `${html ? '<span class="sep"></span>' : ''}<span class="key">${G.MOBILE ? '♥' : G.keyFor('together')}</span>${together ? 'Together' : 'Hug'}`;
   const pr = $('prompt'); if (pr._h !== html) { pr._h = html; pr.innerHTML = html; pr.classList.toggle('hidden', !html); }
-  if (it && lab && hit('KeyE', 'Space', 'Enter')) { pressed.clear(); it.act(); }
+  if (it && lab && hit('KeyE', 'Space', 'Enter')) { pressed.clear(); G.startReach && G.startReach(PLAYER, it); it.act(); }
   else if (nearP && hit('KeyQ', 'KeyF')) { pressed.clear(); if (together) G.Story.together(); else hug(); }
   if (hit('KeyN')) G.cycleTime();
   if (STATE.watchDoor && G.inside(PLAYER.x, PLAYER.z)) { STATE.watchDoor = false; bark('Close your eyes. …No, open them. Look at the table.', 4); }

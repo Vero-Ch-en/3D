@@ -192,6 +192,11 @@ blinks, dozing, hugs. Hats and the snow on them are handed to the model's own he
 - **Gentle nights:** `SETTINGS.nights` (`G.gentle()`). It skips `hunt()`, the night heartbeat, `slip()`, the obsessive walk-ups and the Act IV glimpses.
 - **Endings dialog:** `#endings` on the title screen. It reads `snowed.endings`, and `showEnd` refreshes the count through `G.syncEndings`.
 
+## Character animation (build 70)
+
+- **Reaching for things:** using something (the kettle, a door, the radio...) starts `G.startReach`. They turn to face it, and the nearer hand goes out to just short of it (two-bone IK through `solveArm`), holds, and comes back over about 1.1 s. There's a little lean for low things. It skips people, things out of reach, and anything while sitting or lying, and lets go if you walk off or a scene moves you. When she busies herself with something (her smart tasks), she reaches for it too.
+- **Sitting down and getting up:** besides the existing forward lean, the hands now come forward onto the knees to brace or push off, peaking halfway.
+
 ## Interface (build 69)
 
 - **Direction: frosted window glass at night.** Surfaces are cool and translucent (`--frost`, blurred and saturated). Text is a cool white (`--ink`). The warm lamplight colour (`--lamp`, #f3b76e) is kept for what you press (Begin, Resume), and for the choice you're on, which gets a lamp-coloured bar down its left edge.

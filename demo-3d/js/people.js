@@ -676,6 +676,37 @@ function holdIK(c, u, wgt) {
   T.addScaledVector(fw, 0.05 + Math.sin(c.phase || 0) * 0.07 * sw);
   solveArm(c, u, A, i, T, wgt, 0.2);
 }
+// Reaching for a thing you're using (the kettle, a door, the radio): turn to it, the nearer hand goes out, touches,
+// and comes back. Started by G.startReach; it lets go if you walk off or sit down, or a scene moves you.
+const _rv = new THREE.Vector3();
+G.startReach = (c, it, dur = 1.15) => {
+  if (!it || !it.pos || c.lie || (c.sit || 0) > 0.2 || c.freeSit || it.noReach) return;
+  const [x, y, z] = it.pos, d = Math.hypot(x - c.x, z - c.z);
+  if (d > 1.7 || d < 0.2 || y < 0.55 || y > 1.85) return;
+  const o = c === G.PLAYER ? G.PARTNER : G.PLAYER;
+  if (!o.hidden && Math.hypot(x - o.x, z - o.z) < 0.7) return;   // that's a person, not a thing
+  c.reach = { x, y, z, t: 0, dur, x0: c.x, z0: c.z, yaw: Math.atan2(x - c.x, z - c.z), arm: null };
+};
+function reachIK(c, u, dt) {
+  const R = c.reach; R.t += dt;
+  if (R.t >= R.dur || (c.sit || 0) > 0.2 || c.lie || Math.hypot(c.x - R.x0, c.z - R.z0) > 0.45 || (c.hug || 0) > 0.05) { c.reach = null; return; }
+  // Turn to face it first (only standing still, and not all the way round).
+  let dy = R.yaw - c.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+  if ((c.speed || 0) < 0.3 && R.t < 0.5 && Math.abs(dy) < 2.2) c.yaw += dy * Math.min(1, dt * 7);
+  c.m.updateMatrixWorld(true);
+  if (R.arm == null) {   // the nearer hand, for the whole reach
+    let bd = 1e9; u.arms.forEach((A, i) => { if (!A) return; A.sh.getWorldPosition(_rv); const dd = Math.hypot(_rv.x - R.x, _rv.z - R.z); if (dd < bd) { bd = dd; R.arm = i; } });
+    if (R.arm == null || bd > 1.6) { c.reach = null; return; }
+  }
+  const A = u.arms[R.arm]; if (!A) { c.reach = null; return; }
+  // out (0.3 s), hold, back (0.4 s); the hand stops just short of the thing rather than inside it
+  const k = R.t < 0.34 ? G.smooth(0, 0.34, R.t) : R.t > R.dur - 0.4 ? 1 - G.smooth(R.dur - 0.4, R.dur, R.t) : 1;
+  u.spine.rotation.x += k * 0.14 * Math.min(1, Math.max(0, (1.25 - R.y) * 2));   // a little lean for low things
+  c.m.updateMatrixWorld(true);
+  A.sh.getWorldPosition(_rv);
+  const T = new THREE.Vector3(R.x, R.y, R.z); T.lerp(_rv, 0.1);
+  solveArm(c, u, A, R.arm, T, k * 0.92, 0.35);
+}
 // Taking someone by the wrist: arm 0 reaches for the other one's arm-1 hand, wherever their pose has put it
 // (they're facing each other, so that's the hand straight across).
 function grabIK(c, u) {
@@ -1061,6 +1092,8 @@ G.animate = (c, dt, t) => {
       // On this rig +s rolls the arm in toward the body (−s spreads it, as the hug does).
       sx = L(sx, P[0] + (name === 'cold' ? Math.sin(t * 31 + i) * 0.012 : 0), wgt); sz = L(sz, s * P[1], wgt); ex = L(ex, P[2], wgt); sy = L(sy, s * P[3], wgt);
     }
+    // Sitting down or getting up: the hands come forward onto the knees, to push off or to brace.
+    if (c._sitTr > 0.02 && !c.hug && !c.holdW) { const tr = Math.min(1, c._sitTr * 1.15); sx = L(sx, -0.62, tr); sz = L(sz, s * 0.16, tr); ex = L(ex, -0.75, tr); sy = L(sy, s * 0.15, tr); }
     if (c.pose === 'chin') { if (i === (c.chinSide || 0)) { sx = -1.6; sz = s * -0.35; ex = -2.3; } }
     // Snow angels: lying on your back, arms sweeping up and down through the snow.
     if (c.angel) { const sw = 0.5 - 0.5 * Math.cos(t * 2.4); sx = -0.05; sz = -s * (0.25 + 1.55 * sw); ex = -0.12; sy = 0; }
@@ -1083,6 +1116,7 @@ G.animate = (c, dt, t) => {
   if ((c.hug || 0) > 0.01 && c.hugWith && c.hugWith.m) hugIK(c, u, c.hug);
   else if ((c.holdW || 0) > 0.01 && c.holdWith && c.holdWith.m && c.holdArm != null && c.holdWith.holdArm != null) holdIK(c, u, c.holdW);
   else if (c.grabWith && c.grabWith.m && c.grabWith.m.userData.arms) grabIK(c, u);
+  if (c.reach) reachIK(c, u, dt);
   // Blinks on a natural, irregular rhythm (sometimes a double blink).
   c.blinkT = (c.blinkT == null ? Math.random() * 3 : c.blinkT) - dt;
   if (c.noBlink) c.blinkT = Math.max(c.blinkT, 1);   // the imitation, when it stops pretending
