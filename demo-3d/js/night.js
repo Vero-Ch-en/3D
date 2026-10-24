@@ -562,12 +562,15 @@ function hunt(run) {
       await until(() => !live() || !G.busy());
       if (!live()) return;
       // The warning: the kitchen light stutters, then footsteps from the bedroom, getting closer. A few seconds to hide.
+      STATE.hush = true;   // the house goes quiet all at once
+      await wait(1.4);
       const lamps = G.LAMPS.filter((L) => L.on);
       for (let k = 0; k < 3; k++) { lamps.forEach((L) => { L.power *= 0.25; }); await wait(0.09 + Math.random() * 0.08); lamps.forEach((L) => { L.power *= 4; }); await wait(0.15 + Math.random() * 0.25); }
       if (!NIGHT.warned) { NIGHT.warned = true; G.hint('(Footsteps. Coming this way.)', 3); }
       for (let i = 0; i < 7; i++) { G.Audio.step('wood', 0.2 + i * 0.1); await wait(0.6 - i * 0.03); }
       if (!live()) return;
       PARTNER.hidden = false; PARTNER.m.visible = true; PARTNER.mode = 'script'; G.placeChar(PARTNER, 5.8, 1.2, Math.PI / 2);
+      STATE.hush = false;
       G.bark(['Partner?', 'Where did you go?', 'I know you’re in here.'][Math.min(2, S.vars.caught || 0)], 2.2);
       const t0 = G.simT, spd = 0.85 + ob() * 0.2;
       let lostT = 0, closeCall = false;
@@ -592,7 +595,7 @@ function hunt(run) {
 }
 NIGHT.caught = () => caught();   // (tests)
 async function caught() {
-  NIGHT.justCaught = true; NIGHT.searching = false;
+  NIGHT.justCaught = true; NIGHT.searching = false; STATE.hush = false;
   if (STATE.sceneShot) { STATE.sceneShot = false; G.releaseCamera(); }
   STATE.busy = true; NIGHT.hiding = null; STATE.noControl = false;
   S.vars.caught = (S.vars.caught || 0) + 1;
@@ -638,6 +641,7 @@ const STUDY_OUT = { x: 14.35, z: 3.85, yaw: -Math.PI * 0.5 };
 const hideAct = (where) => async () => {
   if (NIGHT.hiding) {
     const was = NIGHT.hiding;
+    if (G.simT - (G.lineEndT || -9) < 1.2) return;   // a tap meant for the last line, not a decision to come out
     // Coming out while it's standing right there.
     if (NIGHT.searching && !PARTNER.hidden && Math.hypot(PARTNER.x - (was === 'study' ? STUDY_OUT.x : PLAYER.x), PARTNER.z - (was === 'study' ? STUDY_OUT.z : PLAYER.z)) < 2.4) {
       NIGHT.hiding = null; PLAYER.forcePose = null;

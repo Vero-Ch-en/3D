@@ -57,6 +57,7 @@ const angDamp = (a, b, k, dt) => { let d = b - a; while (d > Math.PI) d -= 2 * M
  * Audio (procedural)
  * ===================================================================== */
 G.Audio = (() => {
+  let droneG = null;   // the low drone under the night and Act IV (made on first use)
   let ctx = null, master, fireG, windG, windF, outF, padG, pad = [], noiseBuf = null, chordI = 0, nextChord = 0;
   const noise = () => {
     if (!noiseBuf) { noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate); const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; }
@@ -160,6 +161,14 @@ G.Audio = (() => {
       if (o.fire != null) fireG.gain.setTargetAtTime(o.fire * 0.22, t, 0.6);
       if (o.wind != null) { windG.gain.setTargetAtTime(o.wind * 0.1, t, 0.8); windF.frequency.setTargetAtTime(320 + o.wind * 380, t, 0.8); }
       if (o.pad != null) padG.gain.setTargetAtTime(o.pad * 0.04, t, 1.5);
+      if (o.drone != null) {
+        if (!droneG) {
+          // Two low sines a couple of hertz apart (a slow beating), an octave above for body, all through a dark filter.
+          droneG = ctx.createGain(); droneG.gain.value = 0; const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 320; lp.connect(droneG); droneG.connect(master);
+          for (const [f, v, ty] of [[49, 1, 'sine'], [51.4, 0.8, 'sine'], [98.6, 0.25, 'triangle']]) { const os = ctx.createOscillator(); os.type = ty; os.frequency.value = f; const g = ctx.createGain(); g.gain.value = v; os.connect(g); g.connect(lp); os.start(); }
+        }
+        droneG.gain.setTargetAtTime(o.drone * 0.07, t, o.droneFast ? 0.025 : 2.2);
+      }
       if (o.inside != null) outF.frequency.setTargetAtTime(o.inside ? (o.doorOpen ? 2600 : 650) : 9000, t, 0.35);   // an open front door lets the outside in
       if (t > nextChord) { chordI = (chordI + 1) % CHORDS.length; CHORDS[chordI].forEach((fr, i) => pad[i].frequency.setTargetAtTime(fr, t, 1.8)); nextChord = t + 9 + Math.random() * 3; }
     },
@@ -356,7 +365,10 @@ function Audio_ambience(focus, dt, fp) {
   const dFire = Math.hypot(focus.x - 8, focus.z - 1);
   const gust = WIND.gust;
   // The fire is a placed source now: distance and walls do the work.
-  G.Audio.set({ doorOpen: !!STATE.doorOpen, fire: fp, wind: (inside ? 0.35 : 0.45 + STATE.tod * 0.15) + gust * 0.55, pad: STATE.started ? 1 : 0.6, inside });
+  // The night and Act IV (until you're together again): the warm chords thin out and a low drone sits under everything.
+  // When it goes quiet all at once (STATE.hush), something is coming.
+  const eerie = !!G.S && (G.S.chapter === 'night' || (G.S.chapter === 'lastbirthday' && !G.S.flags.reunited));
+  G.Audio.set({ doorOpen: !!STATE.doorOpen, fire: fp, wind: (inside ? 0.35 : 0.45 + STATE.tod * 0.15) + gust * 0.55, pad: (STATE.started ? 1 : 0.6) * (eerie ? 0.3 : 1), drone: eerie && !STATE.hush ? 1 : 0, droneFast: !!STATE.hush, inside });
   G.Audio.crackle(dt, fp * (dFire < 12 ? 1 : 0));
   const cp = G.camera.position, fw = tmpV.set(0, 0, -1).applyQuaternion(G.camera.quaternion);
   const room = inside ? (focus.x < 5 ? 'bed' : focus.x < 11 ? 'liv' : 'kit') : 'out';
@@ -898,7 +910,7 @@ function updateDialogue(dt) {
   if (auto || ((hit('KeyE', 'Space', 'Enter') || DLG.click) && DLG.t > 0.15)) {
     DLG.click = false; pressed.delete('KeyE'); pressed.delete('Space'); pressed.delete('Enter');
     if (!auto && DLG.shown < cur.text.length) DLG.shown = cur.text.length;
-    else { DLG.cur = null; cur.res(); }
+    else { DLG.cur = null; G.lineEndT = G.simT; cur.res(); }
   }
 }
 $('subs').addEventListener('pointerdown', (e) => { e.preventDefault(); DLG.click = true; });
@@ -1803,7 +1815,7 @@ function boot() {
     if (G.NIGHT && G.NIGHT.swapped && G.swapBodies) G.swapBodies();
     G.setHold && G.setHold(false);
     releaseCamera(); CAM.cut = true;
-    G.post.grade.uniforms.uMem.value = 0; STATE.fog = null; if (G.WEATHER) G.WEATHER.hold = null; STATE.snowStill = false;
+    G.post.grade.uniforms.uMem.value = 0; STATE.fog = null; if (G.WEATHER) G.WEATHER.hold = null; STATE.snowStill = false; STATE.hush = false;
     (G.onJump || []).forEach((f) => { try { f(); } catch (e) { console.error('[jump]', e); } });
     const S = G.S; if (S && !S.flags.sign) S.flags.sign = 'pinecones';
     G.go(id);

@@ -187,6 +187,12 @@ blinks, dozing, hugs. Hats and the snow on them are handed to the model's own he
   in Act IV. At its worst the bed gets made perfectly. Scrapbook pages go blank, and one child is painted out of the
   hall photograph (`G.take`).
 
+## Build 68
+
+- **Drone:** `G.Audio.set({ drone, droneFast })`. Two sines at 49 and 51.4 Hz plus a quiet triangle an octave up, lowpassed at 320 Hz and created on first use. It runs in the night and in Act IV before the reunion, and the pad drops to 30% then. `STATE.hush` cuts it in about 25 ms; it comes back over about 2 s.
+- **No breath:** `G.noBreath` is wrapped in act4.js so the imitation (either route) never puffs in the cold.
+- **Phones:** a tap within 1.2 s of a line ending doesn't count as "Come out" (`G.lineEndT`), so advancing the close call's last line can't get her caught by accident.
+
 ## Build 67
 
 - **Hiding on the window seat:** a seated hiding pose (`hideSit`). Her knees are pulled up to her chest, her feet are tucked in on the cushion, and her arms wrap round her knees. She sits well back on the seat.

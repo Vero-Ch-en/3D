@@ -206,7 +206,7 @@ async function setupAct4() {
   TRAIL.g.visible = true; for (const k of ['mitten', 'stump', 'stones']) TRAIL.show(k, true); SIGN.g.visible = true; for (const k of ['cones', 'plate', 'note']) SIGN[k].visible = false;
   SIGN[{ pinecones: 'cones', pancake: 'plate', note: 'note' }[S.flags.sign || 'pinecones']].visible = true;
   EXD.g.visible = true; EXD.hinge.rotation.y = 0; EXD.glow.material.opacity = 0.0; EXD.light.intensity = 0; ENT.g.visible = false;
-  Object.assign(S.flags, { reunited: false, rescued: false, fakeLeftBehind: false, wentBack: false, ateBreakfast: false, foundSign: false, offerDone: false, ending: null, gateN: 0, herA4: false, herCircle: false, wentWithIt: false, sentItAway: false, herWindow: false, heardHer: false, placed_mitten: false, placed_stump: false, placed_stones: false });
+  Object.assign(S.flags, { reunited: false, rescued: false, fakeLeftBehind: false, wentBack: false, ateBreakfast: false, foundSign: false, offerDone: false, ending: null, gateN: 0, breathSeen: false, herA4: false, herCircle: false, wentWithIt: false, sentItAway: false, herWindow: false, heardHer: false, placed_mitten: false, placed_stump: false, placed_stones: false });
   STATE.bounds = null;
 }
 CH.lastbirthday = async () => {
@@ -265,6 +265,11 @@ function loops(run) {
     if (S.flags.fakeLeftBehind && !PARTNER.hidden && !S.flags.reunited && dist() > 12) { PARTNER.hidden = true; PARTNER.m.visible = false; S.flags.fakeWithdrawn = true; }
     // Out in the snow you're dressed for it.
     if (PLAYER.z > G.CAB.z1 + 0.5 && !PLAYER.dressed) G.setDressed(PLAYER, true);
+    // Outside together for a while: your breath clouds in the cold. Hers doesn't.
+    if (fake && !S.flags.breathSeen && PLAYER.z > G.CAB.z1 + 0.8 && PARTNER.z > G.CAB.z1 + 0.8 && dist() < 2.6) {
+      NIGHTT.br = (NIGHTT.br || 0) + 1 / 60;
+      if (NIGHTT.br > 4) { S.flags.breathSeen = true; trust(0.3); G.observe('breath', 'It watched my breath. There was nothing to watch.'); A.run(async () => { await N('(Your breath clouds in front of you in the cold. Hers doesn’t. Not once.)'); }); }
+    }
     // The circle.
     if (!S.flags.reunited && Math.hypot(PLAYER.x - CIRCLE.x, PLAYER.z - CIRCLE.z) < 5.2) A.run(reunion);
     // On the way home: let go of her hand, and the snow closes in.
@@ -272,6 +277,9 @@ function loops(run) {
   });
 }
 const NIGHTT = {}, A4 = {};
+// The imitation doesn't breathe out in the cold. Its breath never shows. (Both routes: the one wearing her, the one wearing him.)
+const isImitation = (c) => here() && c === PARTNER && !PARTNER.hidden && !S.flags.reunited && (S.flags.herA4 ? S.flags.herCircle && !S.flags.sentItAway : !S.flags.fakeLeftBehind);
+{ const nb = G.noBreath; G.noBreath = (c) => isImitation(c) || (nb ? nb(c) : false); }
 
 async function gate() {
   STATE.busy = true; PARTNER.mode = 'still';
@@ -625,8 +633,8 @@ async function herCircle() {
   await wait(Math.min(1.8, G.Audio.whistle(1.0, 0) + 0.3));
   await N('(Three notes come back from the trees. Every one of them perfectly in tune.)', K());
   await P('…That’s new.', K());
-  // The snow stops coming down. It's still there, hanging in the air, all round you.
-  STATE.snowStill = true;
+  // The snow stops coming down. It's still there, hanging in the air, all round you. Everything goes quiet.
+  STATE.snowStill = true; STATE.hush = true;
   // It comes first: his shape, the sleeping jumper, bare feet in the snow.
   dressBody(PARTNER, false);
   G.standAt(PARTNER, CIRCLE.x + 0.2, CIRCLE.z - 2.4, 0); PARTNER.hidden = false; PARTNER.m.visible = true; PARTNER.mode = 'still'; PARTNER.lidsClosed = false;
@@ -656,7 +664,7 @@ async function herCircle() {
       await N('(He helps you up. His hand is warm. Warm all the way through.)', K());
       await Y('Good. Home. Everything’s ready. Everything’s always ready.', K());
       S.flags.ending = 'perfect';
-      await fade(true, 1.8); STATE.snowStill = false;
+      await fade(true, 1.8); STATE.snowStill = false; STATE.hush = false;
       return A.go('ending_perfect');
     }
     break;   // "You're not him."
@@ -667,7 +675,7 @@ async function herCircle() {
   await P(tells ? 'Nearly is how I know.' : 'He’d have complained about something by now. Anything. The snow. His feet. Me.', K());
   await N('(It looks at you for a long time without blinking.)', K());
   await Y('I’ll remember this. I remember everything.', K());
-  await G.cutTo(() => { PARTNER.hidden = true; PARTNER.m.visible = false; STATE.snowStill = false; }, 0.6, '#fff');
+  await G.cutTo(() => { PARTNER.hidden = true; PARTNER.m.visible = false; STATE.snowStill = false; STATE.hush = false; }, 0.6, '#fff');
   await N('(And then it isn’t there. The snow comes down again, all at once, settling where it stood. No footprints.)', K());
   await wait(1.2);
   // The real one: whistling badly, in a coat, complaining.
@@ -820,6 +828,7 @@ async function offer() {
   if (o.corrupt_sleep) said.push('You went back to sleep beside me. You trusted me with that.');
   if (o.suspect_stare) said.push('You looked at me for a long time. Nobody has looked at me like that.');
   if (o.gift) said.push('You shook the globe. I held the snow up for you.');
+  if (o.breath) said.push('You watched for my breath in the cold. There was nothing there. I will learn to breathe.');
   if (o.sign) said.push('You found what she left. I didn’t think to copy that. I will next time.');
   if (!said.length) said.push('I watched you all night. You were kind to me, mostly.');
   }
