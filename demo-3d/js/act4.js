@@ -878,7 +878,7 @@ function home(lyingBoth) {
   G.post.grade.uniforms.uMem.value = 0; STATE.fog = null; STATE.bounds = null;
   houseFor('morning');
   PARTNER.hidden = false; PARTNER.m.visible = true; PARTNER.lidsClosed = false; PARTNER.hold = false;
-  if (lyingBoth) { G.cuddleInBed(PLAYER, PARTNER); PARTNER.mode = 'lying'; G.setShot(fixed(V(2.4, 1.55, 1.25), V(2.4, 0.6, -1.0), 40, 0.01)); }
+  if (lyingBoth) { G.cuddleInBed(PLAYER, PARTNER); PARTNER.mode = 'lying'; G.setShot(fixed(V(G.BED.x + 0.1, 2.45, G.BED.z + 0.2), V(G.BED.x + 0.02, 0.55, G.BED.z - 0.95), 44, 0.01)); }
 }
 const free = () => { STATE.sceneShot = false; G.releaseCamera(); G.CAM.cut = true; STATE.busy = false; PARTNER.mode = 'follow'; };
 const stand = () => G.cutTo(() => { G.standAt(PLAYER, G.BED.L - 0.6, 0.2, Math.PI / 2); G.standAt(PARTNER, G.BED.R + 0.6, 0.2, -Math.PI / 2); }, 0.4);

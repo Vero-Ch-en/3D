@@ -734,17 +734,22 @@ function cuddleIK(c, u) {
   if (c.cuddle.role === 'drape') {
     // the upper arm (she's on her side): the shoulder that's higher; the hand comes to rest on his far side of the chest
     let best = -1e9; u.arms.forEach((A, i) => { if (!A) return; const y = A.sh.getWorldPosition(_rv).y; if (y > best) { best = y; arm = i; } });
-    const across = oc.clone().sub(mc); across.y = 0; across.normalize();
+    // elbow bent, the forearm lying across him and the hand resting on the middle of his chest
     const oh = (ou.hips || ou.chest).getWorldPosition(new THREE.Vector3());
-    T = oc.clone().lerp(oh, 0.45).addScaledVector(across, 0.04); T.y += 0.11;   // resting on him, half-way down the chest
+    T = oc.clone().lerp(oh, 0.6).lerp(mc, 0.15); T.y = Math.max(oc.y, oh.y) + 0.04;
   } else {
     // the arm nearer to her goes round under her shoulders, hand on her far side
     let bd = 1e9; u.arms.forEach((A, i) => { if (!A) return; const d = A.sh.getWorldPosition(_rv).distanceTo(oc); if (d < bd) { bd = d; arm = i; } });
     const away = oc.clone().sub(mc); away.y = 0; away.normalize();
-    T = oc.clone().addScaledVector(away, 0.12); T.y -= 0.02;
+    T = oc.clone().addScaledVector(away, 0.06); T.y -= 0.11;
   }
   if (arm < 0 || !u.arms[arm]) return;
   solveArm(c, u, u.arms[arm], arm, T, 0.95, 0.4);
+  // his other hand rests on his own stomach, not out at his side
+  if (c.cuddle.role === 'hold') {
+    const other = arm ? 0 : 1, A = u.arms[other];
+    if (A && u.hips) { const H = u.hips.getWorldPosition(new THREE.Vector3()), C = mc.clone(); const R = H.lerp(C, 0.4); R.y += 0.06; solveArm(c, u, A, other, R, 0.9, 0.3); }
+  }
 }
 // Taking someone by the wrist: arm 0 reaches for the other one's arm-1 hand, wherever their pose has put it
 // (they're facing each other, so that's the hand straight across).

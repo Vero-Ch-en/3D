@@ -195,6 +195,7 @@ blinks, dozing, hugs. Hats and the snow on them are handed to the model's own he
 ## Together in bed (build 73)
 
 - **`G.cuddleInBed(him, her)`:** him on his back, turned a little toward her. Her on her side against him (`lieRoll` about -1.05), her head at his shoulder and her knees drawn up a little. Her top arm rests across his chest, half-way down; his near arm goes round her with his hand at her back (`cuddleIK`, two-bone IK each frame while both are lying).
+- **Build 74:** the blanket is pulled up to their shoulders as one broad mound over both of them, tucked in over their feet, so only their heads show, close together on the pillows. Her face is turned toward him and tucked in at his shoulder. Her forearm lies across the middle of his chest and his hand is at her back, both under the blanket, and his other hand rests on his stomach. The You Found Me opening now looks down from above the pillows, not up from the foot of the bed.
 - **Used in the tender scenes:** bedtime, the first morning, climbing back in for "ten more minutes", and the endings that open in bed. The imitation's nights ("exactly on her side") and the her-route waking ("exactly half the bed") keep them apart on purpose.
 
 ## Loading and cold reactions (build 71)

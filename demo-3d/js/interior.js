@@ -348,18 +348,22 @@ function bedCover(bx) {
 G.shapeBed = (who, shift = 0) => {
   const B = G.BED, m = B.cover, p = m.geometry.attributes.position, base = m.userData.base;
   const bumps = [];
-  if (who.L) bumps.push(B.L - B.x); if (who.R) bumps.push(B.R - B.x);
+  // Lying close together (G.cuddleInBed): one broad mound over the two of them, where they actually are.
+  const P = G.PLAYER, Q = G.PARTNER, close = P && Q && P.lie && Q.lie && P.cuddle && who.L && who.R;
+  if (close) { const lo = Math.min(P.x, Q.x), hi = Math.max(P.x, Q.x); bumps.push(lo - 0.24 - B.x, lo - 0.12 - B.x, lo - B.x, (lo + hi) / 2 - B.x, hi - B.x); }
+  else { if (who.L) bumps.push(B.L - B.x); if (who.R) bumps.push(B.R - B.x); }
   for (let i = 0; i < p.count; i++) {
     const x0 = base[i * 3] + shift * 0.32, z = base[i * 3 + 2], wz = z + 1.42;   // world z
     let y = 0.6;
     // Over each body: highest at the chest (z ≈ 1), lower over the legs, as the bodies lie head-up.
-    for (const b of bumps) { const dx = x0 - b; const along = G.smooth(0.62, 0.95, wz) * (1 - G.smooth(1.3, 2.3, wz) * 0.55); y += Math.exp(-dx * dx / 0.055) * (0.12 + 0.2 * along); }
+    if (close) { let m = 0; for (const b of bumps) { const dx = x0 - b; m = Math.max(m, Math.exp(-dx * dx / 0.075)); } const along = G.smooth(0.6, 0.9, wz) * (1 - G.smooth(1.3, 2.3, wz) * 0.5); y += m * (0.17 + 0.25 * along); }
+    else for (const b of bumps) { const dx = x0 - b; const along = G.smooth(0.62, 0.95, wz) * (1 - G.smooth(1.3, 2.3, wz) * 0.55); y += Math.exp(-dx * dx / 0.055) * (0.12 + 0.2 * along); }
     y += Math.sin(x0 * 9 + z * 5) * 0.008 + Math.cos(z * 11 - x0 * 3) * 0.006;
     // Off the mattress the blanket hangs down the sides and the foot.
-    const ex = Math.abs(x0) - 0.9, ez = wz - 2.26;
+    const ex = Math.abs(x0) - 0.9, ez = wz - (close ? 2.5 : 2.26);   // together: tucked in over their feet
     if (ex > 0) y -= Math.min(0.38, ex * 2.6);
     if (ez > 0) y -= Math.min(0.38, ez * 2.6);
-    if (wz < 0.74) y -= (0.74 - wz) * 0.8;   // turned down at the top
+    if (wz < (close ? 0.76 : 0.74)) y -= ((close ? 0.76 : 0.74) - wz) * (close ? 1.6 : 0.8);   // turned down at the top (pulled up to the shoulders, together)
     p.setXYZ(i, x0, y, z);
   }
   p.needsUpdate = true; m.geometry.computeVertexNormals(); m.geometry.computeBoundingSphere();

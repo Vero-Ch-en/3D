@@ -676,13 +676,15 @@ G.standAt = (c, x, z, yaw) => { c.script = null; c.lie = false; c.sitTarget = 0;
 // her head at his shoulder, her arm across his chest and her knees drawn up; his arm round her. (The imitation's nights
 // keep to "exactly her side": those use lieDown on each side as before.)
 G.cuddleInBed = (him, her, o = {}) => {
-  const B = G.BED, hx = B.x + (o.himX != null ? o.himX : -0.1), sx = B.x + (o.herX != null ? o.herX : 0.2);
+  const B = G.BED, hx = B.x + (o.himX != null ? o.himX : -0.1), sx = B.x + (o.herX != null ? o.herX : 0.17);
   // which side she's on decides which way each turns
   const side = Math.sign(sx - hx) || 1;
-  G.lieDown(him, hx, -0.14, 0.22 * side, 0.3 * side);
-  G.lieDown(her, sx, -0.25, -1.05 * side, -0.25 * side);
+  G.lieDown(him, hx, -0.14, 0.2 * side, 0.32 * side);   // head turned to her
+  G.lieDown(her, sx, -0.4, -1.0 * side, -0.35 * side);  // her face toward him, tucked against his shoulder
   her.lieTilt = 0.05;
   him.cuddle = { with: her, role: 'hold' }; her.cuddle = { with: him, role: 'drape' };
+  if (G.bedMade) G.bedMade(false);
+  if (G.shapeBed) G.shapeBed({ L: true, R: true });   // the blanket up over the two of them, to the shoulders
 };
 G.lieDown = (c, x, zFeet, roll = 0, look = 0) => { c.cuddle = null; c.script = null; c.sitTarget = 0; c.sit = 0; c.speed = 0; c.lie = true; c.x = x; c.z = zFeet; c.lieY = G.BED.top + 0.13; c.y = c.lieY; c.lieRoll = roll; c.lieLook = look; c.yaw = 0; };
 
