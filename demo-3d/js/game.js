@@ -8,6 +8,9 @@ const { $, clamp, lerp, damp, rand, MAT } = G;
 /* Player settings, remembered per browser. */
 const SETTINGS = (G.SETTINGS = { volume: 0.8, muted: false, view: 'third', subs: 'm', keys: {}, motion: (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) ? 'reduced' : 'full' });
 try { Object.assign(SETTINGS, JSON.parse(localStorage.getItem('cbs.base.settings') || '{}')); } catch (e) { /* storage unavailable */ }
+// Playing as her is switched off for now (G.PARTNER_PLAY): everyone plays as him. Her route stays in the code.
+G.PARTNER_PLAY = false;
+if (!G.PARTNER_PLAY) SETTINGS.playAs = 'player';
 const saveSettings = () => { try { localStorage.setItem('cbs.base.settings', JSON.stringify(SETTINGS)); } catch (e) { /* ignore */ } };
 G.saveSettings = saveSettings;
 /* ---------- key bindings ----------

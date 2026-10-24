@@ -16,6 +16,8 @@ The question underneath it all: they have forgotten almost everything about how 
 
 ## Playing as Player or as Partner
 
+**Switched off for now (build 75):** the Play as option is hidden and everyone plays as him (`G.PARTNER_PLAY = false` in game.js; a saved Partner choice is ignored). Control didn't reliably stay with her. Everything below is still in the code, ready to switch back on.
+
 You choose on the title screen ("Play as: Player / Partner"), and the game remembers it.
 - **As Partner:** you control her in free time, and he follows you.
   - The prologue, morning, walk, evening, endings and The First Snow are narrated from her side (`js/narr_her.js`). The speaker labels turn round, and the scene choices are hers. Where the choice used to be one of his lines, she now says her own lead-in and he answers with his line ("Let me guess. Pancakes." → "Pancakes." / "Be honest." → "No. Better."). Things she does herself in the house have plain options ("Leave him a snack on the counter").
