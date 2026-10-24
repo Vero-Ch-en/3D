@@ -192,6 +192,12 @@ blinks, dozing, hugs. Hats and the snow on them are handed to the model's own he
 - **Gentle nights:** `SETTINGS.nights` (`G.gentle()`). It skips `hunt()`, the night heartbeat, `slip()`, the obsessive walk-ups and the Act IV glimpses.
 - **Endings dialog:** `#endings` on the title screen. It reads `snowed.endings`, and `showEnd` refreshes the count through `G.syncEndings`.
 
+## Loading and cold reactions (build 71)
+
+- **Smaller models:** `tools/quantize_glb.js` stores the character geometry quantized (KHR_mesh_quantization, which GLTFLoader reads natively, so no WebAssembly decoder is needed). Normals become 8-bit, UVs and vertex colours 16-bit, and skin weights 8-bit, with each vertex still summing to exactly 255. Positions stay full floats. `dequantize()` in people.js turns those attributes straight back into floats after loading, because this three.js doesn't scale them on getX/setX and the game reshapes the bodies. The adults' file went from 10.7 to 8.3 MB, the children's from 7.5 to 6.0 MB. Run `node tools/quantize_glb.js` (and `... kids`) again after any `patch_gear.js`; the patcher works on quantized files.
+- **Loading screen:** it waits only for the two adults. The children (needed only in the prologue) finish loading behind the title, and the prologue waits for them if they're not in yet.
+- **Cold reactions:** stepping out from under the roof gives a 1.5 s shiver (arms in, a shudder through the shoulders, a bigger breath). Coming in from the snow gives two stamps on the porch or mat, with the sound. On the frozen lake they're slightly bent at the knees, with arms out for balance (more when moving) and an occasional small wobble.
+
 ## Character animation (build 70)
 
 - **Reaching for things:** using something (the kettle, a door, the radio...) starts `G.startReach`. They turn to face it, and the nearer hand goes out to just short of it (two-bone IK through `solveArm`), holds, and comes back over about 1.1 s. There's a little lean for low things. It skips people, things out of reach, and anything while sitting or lying, and lets go if you walk off or a scene moves you. When she busies herself with something (her smart tasks), she reaches for it too.

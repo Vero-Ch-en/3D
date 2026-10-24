@@ -1388,10 +1388,21 @@ function ambientPoses(dt) {
     const toFire = Math.atan2(FIRE_AT.x - c.x, FIRE_AT.z - c.z);
     let facing = toFire - c.yaw; while (facing > Math.PI) facing -= 2 * Math.PI; while (facing < -Math.PI) facing += 2 * Math.PI;
     const nearFire = G.FIRE.on && G.inside(c.x, c.z) && Math.hypot(c.x - FIRE_AT.x, c.z - FIRE_AT.z) < 2.2;
+    // Crossing the threshold: a shiver stepping out into the cold; a couple of stamps on the mat coming in from the snow.
+    const inNow = G.inside(c.x, c.z) || G.underRoof(c.x, c.z);
+    if (c._wasIn != null && !c.hidden && !c.lie && !c.script && !STATE.sceneShot) {
+      if (c._wasIn && !inNow && !(c === PARTNER && PARTNER.mode === 'still')) { c.shiverT = 1.5; if (c === PLAYER || Math.hypot(c.x - PLAYER.x, c.z - PLAYER.z) < 6) G.breathe && G.breathe(c, 1.6); }
+      if (!c._wasIn && inNow && (c.snowyT || 0) > 0) { c.stampT = 0.95; c.stampN = 0; }
+    }
+    c._wasIn = inNow;
+    if (c.shiverT > 0) c.shiverT -= dt;
+    if (c.stampT > 0) { c.stampT -= dt; const n = Math.floor((0.95 - c.stampT) / 0.32); if (n > (c.stampN || 0) && n <= 2) { c.stampN = n; const v = c === PLAYER ? 0.9 : clamp(1.2 - Math.hypot(c.x - PLAYER.x, c.z - PLAYER.z) * 0.25, 0, 0.7); if (v > 0.05) G.Audio.step('wood', v * 1.3); } }
+    c.onIce = !G.inside(c.x, c.z) && G.surfaceAt && G.surfaceAt(c.x, c.z) === 'ice';
     let pose = null;
     if (c.carry && !c.lie && !STATE.hugging) pose = 'carry';
     else if (c.holdPose && !c.lie && !STATE.hugging) pose = c.holdPose;   // a book, a watering can: whatever she's busy with
     else if (STATE.hugging || (c.sit || 0) > 0.2 || c.script || c.lie || c.holdOn) pose = null;
+    else if (c.shiverT > 0) pose = 'cold';   // just stepped out: arms in, shoulders up
     else if (nearFire && c === PARTNER && c.idleT > 1.2 && !busy()) pose = 'warm';   // not mid-conversation
     else if (nearFire && c === PLAYER && c.idleT > 2.5 && Math.abs(facing) < 1.0) pose = 'warm';
     else if (c === PLAYER && (c.cold || 0) > 0.6 && c.idleT > 1.2 && !c.holdOn) pose = 'cold';   // shivering
@@ -1772,7 +1783,9 @@ function boot() {
   KIDS.player.visible = KIDS.partner.visible = false;
   KIDS.adults = { player: PLAYER.m, partner: PARTNER.m };
   buildNav();
-  const bodies = Promise.all([G.attachBlenderBody(PLAYER.m, 'player'), G.attachBlenderBody(PARTNER.m, 'partner'), G.attachBlenderBody(KIDS.player, 'player', { kid: true }), G.attachBlenderBody(KIDS.partner, 'partner', { kid: true })]);
+  // The loading screen waits for the two of them; the children (only in the prologue) finish loading behind the title.
+  const bodies = Promise.all([G.attachBlenderBody(PLAYER.m, 'player'), G.attachBlenderBody(PARTNER.m, 'partner')]);
+  G.kidsReady = bodies.then(() => Promise.all([G.attachBlenderBody(KIDS.player, 'player', { kid: true }), G.attachBlenderBody(KIDS.partner, 'partner', { kid: true })])).then(() => { (G.onKids || []).forEach((f) => { try { f(); } catch (e) { console.error('[onKids]', e); } }); });
   buildPost();
   document.querySelectorAll('#quality button').forEach((b) => b.addEventListener('click', () => { G.qName = b.dataset.q; G.applyQuality(); }));
   $('timeBtn').addEventListener('click', () => G.cycleTime());

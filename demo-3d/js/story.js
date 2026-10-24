@@ -806,6 +806,7 @@ CH.prologue = async () => {
   quiet(); STATE.busy = true;
   S.flags.noTogether = true; S.flags.noBarks = true;
   STATE.bounds = { zMin: 15 };   // the fair is behind you; the cabin isn't part of this memory
+  if (G.kidsReady) await Promise.race([G.kidsReady, wait(20)]);   // the children may still be loading behind the title
   G.useKids(true); showFair(true); resetMemory();
   houseFor('evening'); G.setCake(false);
   G.setTime({ day: 0, tod: 1, snow: 0.8 }, true);

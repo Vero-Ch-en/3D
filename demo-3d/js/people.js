@@ -339,6 +339,23 @@ G.attachBlenderBody = async (root, name, opts = {}) => {
   if (!G.CHAR_STATUS[key]) G.CHAR_STATUS[key] = ok ? 'built-in' : 'procedural';
   return ok;
 };
+// The models are stored quantized for download (normals, UVs, colours and skin weights as small normalized integers,
+// tools/quantize_glb.js). This version of three.js doesn't scale those on getX/setX, and the game reshapes and
+// reweights the bodies on load, so every quantized attribute goes back to plain floats straight away.
+function dequantize(scene) {
+  scene.traverse((o) => {
+    const g = o.geometry; if (!g || !g.attributes) return;
+    for (const [k, A] of Object.entries(g.attributes)) {
+      if (!A.normalized && !A.isInterleavedBufferAttribute) continue;
+      const arr = A.isInterleavedBufferAttribute ? A.data.array : A.array;
+      const max = arr instanceof Int8Array ? 127 : arr instanceof Uint8Array ? 255 : arr instanceof Int16Array ? 32767 : arr instanceof Uint16Array ? 65535 : 1;
+      const signed = arr instanceof Int8Array || arr instanceof Int16Array;
+      const n = A.itemSize, out = new Float32Array(A.count * n), get = ['getX', 'getY', 'getZ', 'getW'];
+      for (let i = 0; i < A.count; i++) for (let j = 0; j < n; j++) { const v = A[get[j]](i) / (A.normalized ? max : 1); out[i * n + j] = signed ? Math.max(-1, v) : v; }
+      g.setAttribute(k, new THREE.BufferAttribute(out, n));
+    }
+  });
+}
 async function attachBody(root, name, spec, bin) {
   // The realistic models may be meshopt-compressed (EXT_meshopt_compression); the decoder is WebAssembly,
   // so the embedded copies (js/models_real.js) are stored decompressed and load without it.
@@ -346,6 +363,7 @@ async function attachBody(root, name, spec, bin) {
   if (window.MeshoptDecoder && isMeshopt(bin)) { await MeshoptDecoder.ready; loader.setMeshoptDecoder(MeshoptDecoder); }
   return new Promise((resolve) => {
     loader.parse(bin, '', (gltf) => {
+      dequantize(gltf.scene);
       const u = root.userData, k = u.k;
       const model = gltf.scene;
       // A model from the asset manifest can bring its own materials and proportions; the built-in ones
@@ -1017,6 +1035,8 @@ G.animate = (c, dt, t) => {
     }
     if (turnW > 0.02) { const lift = Math.max(0, Math.sin(c._turnPh + i * Math.PI)) * turnW; Lg.th.rotation.x -= lift * 0.32; Lg.kn.rotation.x += lift * 0.62; Lg.ft.rotation.x -= lift * 0.22; }
     if (c.angel) { Lg.th.rotation.set(0, 0, s * (0.05 + 0.32 * (0.5 - 0.5 * Math.cos(t * 2.4)))); Lg.kn.rotation.x = 0.04; }
+    // Stamping the snow off on the mat: one foot, then the other, lifted and brought down hard.
+    if (c.stampT > 0 && sit < 0.1) { const ph2 = (0.95 - c.stampT) / 0.32, leg = Math.floor(ph2) % 2, f = ph2 % 1, up = Math.sin(Math.min(1, f / 0.75) * Math.PI) * (f < 0.75 ? 1 : 0); if (leg === i) { Lg.th.rotation.x -= up * 0.38; Lg.kn.rotation.x += up * 0.75; Lg.ft.rotation.x -= up * 0.15; } }
     // Hiding on a seat: knees pulled right up to the chest, feet tucked in on the cushion.
     if ((c.forcePose === 'hide' || c.forcePose === 'hideSit') && sit > 0.5) { const k3 = (sit - 0.5) * 2; Lg.th.rotation.x = L(Lg.th.rotation.x, -2.0, k3); Lg.th.rotation.z = L(Lg.th.rotation.z, s * 0.06, k3); Lg.kn.rotation.x = L(Lg.kn.rotation.x, 2.8, k3); Lg.ft.rotation.x = L(Lg.ft.rotation.x, -0.35, k3); }
   });
@@ -1052,6 +1072,11 @@ G.animate = (c, dt, t) => {
     u.hips.rotation.z += Math.sin(bt) * 0.05 * sw; u.spine.rotation.z -= Math.sin(bt) * 0.06 * sw;
     c.headSway = Math.sin(bt + 0.6) * 0.07 * sw;
   }
+  // A shiver: a quick shudder through the shoulders, fading out.
+  if (c.shiverT > 0) { const sk = Math.min(1, c.shiverT / 0.6); u.chest.rotation.z += Math.sin(t * 38) * 0.025 * sk; u.spine.rotation.x += 0.05 * sk; }
+  // On the ice: careful, a little bent at the knees, and now and then a small wobble.
+  G.spring(c, '_iceW', c.onIce && !c.lie && sit < 0.1 ? 1 : 0, 3, dt);
+  if (c._iceW > 0.01) { const iw = c._iceW, wob = Math.sin(t * 2.3 + sd * 7) * Math.max(0, Math.sin(t * 0.7 + sd * 3)) * (0.3 + w * 0.7); u.hips.rotation.z += wob * 0.06 * iw; u.spine.rotation.z -= wob * 0.08 * iw; u.spine.rotation.x += 0.06 * iw; }
   // Breathing: a slow chest rise, quicker after running.
   c.breathRate = damp(c.breathRate || 1.8, sp > 1.2 ? 3.4 : 1.8, 0.6, dt);   // ~3.5 s per breath at rest
   c.breath = (c.breath || 0) + dt * c.breathRate;
@@ -1092,6 +1117,8 @@ G.animate = (c, dt, t) => {
       // On this rig +s rolls the arm in toward the body (−s spreads it, as the hug does).
       sx = L(sx, P[0] + (name === 'cold' ? Math.sin(t * 31 + i) * 0.012 : 0), wgt); sz = L(sz, s * P[1], wgt); ex = L(ex, P[2], wgt); sy = L(sy, s * P[3], wgt);
     }
+    // Arms a little out from the body on the ice, for balance (more when moving).
+    if (c._iceW > 0.01 && !c.hug && !c.holdOn && !(pw.carry > 0.1)) { const iw = c._iceW * (0.45 + w * 0.55); sz = L(sz, -s * 0.42, iw); sx = L(sx, -0.25, iw * 0.6); ex = L(ex, -0.35, iw * 0.5); }
     // Sitting down or getting up: the hands come forward onto the knees, to push off or to brace.
     if (c._sitTr > 0.02 && !c.hug && !c.holdW) { const tr = Math.min(1, c._sitTr * 1.15); sx = L(sx, -0.62, tr); sz = L(sz, s * 0.16, tr); ex = L(ex, -0.75, tr); sy = L(sy, s * 0.15, tr); }
     if (c.pose === 'chin') { if (i === (c.chinSide || 0)) { sx = -1.6; sz = s * -0.35; ex = -2.3; } }
