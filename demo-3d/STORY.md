@@ -107,5 +107,5 @@ The game saves at the start of each chapter, at the Elsewhere door in the night,
 
 ## Still to do
 
-- **Night and Act IV as Partner:** possibly a full Partner route for these chapters (she wakes beside the imitation of him).
-- **Playtest:** finish a full pass as both characters. Build 52 played the whole day (morning, walk, evening), four endings and The First Snow as Partner without getting stuck, and every narration line had her version. The night and Act IV as Partner aren't tested yet.
+- **Night and Act IV as Partner:** possibly a full Partner route for these chapters (she wakes beside the imitation of him). For now, someone playing as her is told at the start of the night that they're him until he finds her again (build 65).
+- **Playtest:** finish a full pass as both characters. Build 52 played the whole day (morning, walk, evening), four endings and The First Snow as Partner without getting stuck, and every narration line had her version. Build 65 played the night (through to being kept) and Act IV (to You Found Me) with Partner chosen. There were no errors and every narration line had a version for her, and the door scene from the Act IV restart point leads to Uncertain Morning. Every chapter also gets a quick automated run as both characters.

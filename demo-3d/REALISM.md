@@ -187,6 +187,14 @@ blinks, dozing, hugs. Hats and the snow on them are handed to the model's own he
   in Act IV. At its worst the bed gets made perfectly. Scrapbook pages go blank, and one child is painted out of the
   hall photograph (`G.take`).
 
+## Night light, poses and checks (build 65)
+
+- **Moonlight indoors:** at night with every lamp off and the fire low, the indoor sky fill rises from 55% to 115%, so the dark kitchen is readable (blue, moonlit) instead of black.
+- **Poses:** hiding is now a tighter self-hug (elbows in, hands on the opposite arms, not up at the face). Her held arm is pulled out lower, and his grabbing hand follows it.
+- **The Entity:** it's shaded as packed snow. It keeps only a little of its own glow, adds a cold moonlit rim and a faint sparkle, and has deeper surface bumps and a drift of snow round its feet.
+- **Endings after a chapter jump:** an ending left running by a jump to another chapter no longer puts its end card over the new chapter.
+- **Checks:** there's a quick automated run of every chapter (each one jumped to and played for 45 s, as each character), which fails on any script error. It would have caught build 63's Act IV crash.
+
 ## Poses: hiding, the wrist grab, the Entity (build 64)
 
 - **Wrist grab:** this uses IK (`grabIK` in people.js, set with `c.grabWith`). His arm 0 solves onto her arm-1 hand, wherever her `held` pose has put it, so the hands meet between them. A fixed `grab` arm pose is still there, but it read as an arm stuck out sideways on his rig.

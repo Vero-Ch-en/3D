@@ -892,8 +892,8 @@ const ARM_POSES = (G.ARM_POSES = {
   cup: [-0.55, 0.28, -1.3, -0.7],      // a mug cradled in both hands
   coatPockets: [-0.16, 0.06, -0.5, -0.35], // hands in the coat's side pockets
   grab: [-1.2, 0.12, -0.32, 0.15],      // one arm out, hand closed round someone's wrist (arm 0 only)
-  held: [-0.95, 0.02, -0.12, 0.1],      // one arm pulled out straight by the wrist (arm 1 only)
-  hide: [-0.62, 0.34, -1.75, -0.9],     // hugging yourself small, elbows in (hiding)
+  held: [-0.8, 0.04, -0.14, 0.1],       // one arm pulled out low and straight by the wrist (arm 1 only)
+  hide: [-0.36, 0.46, -1.45, -0.55],    // hugging yourself small, elbows in, hands on the opposite arms (hiding)
 });
 const ONE_ARM = { throw: 0, water: 0, wave: 1, grab: 0, held: 1 };
 /* Motion capture (js/mocap.js, from the CMU motion capture database): looping idle, walk and seated clips,

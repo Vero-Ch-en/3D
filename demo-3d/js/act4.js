@@ -62,11 +62,19 @@ const ENT = (() => {
   // "Like snow that has decided to stand": a person's shape in packed, glittering snow, no face, slightly too
   // tall, flakes lifting off it and drifting round. One material, so the scene fades it in and out with opacity.
   const g = new THREE.Group(); g.visible = false; W.add(g);
-  const mat = new THREE.MeshStandardMaterial({ color: '#eef3fb', emissive: '#9fb4d6', emissiveIntensity: 0.35, roughness: 0.95, transparent: true, opacity: 0, depthWrite: false, bumpMap: G.TX.snowN, bumpScale: 0.02 });
+  const mat = new THREE.MeshStandardMaterial({ color: '#f2f6fc', emissive: '#8fa6cc', emissiveIntensity: 0.1, roughness: 0.9, transparent: true, opacity: 0, depthWrite: false, bumpMap: G.TX.snowN, bumpScale: 0.06 });
+  // packed snow, not paper: a cold rim of moonlight round the edges and a faint sparkle across the surface
+  mat.onBeforeCompile = (sh) => {
+    sh.fragmentShader = sh.fragmentShader.replace('#include <dithering_fragment>', `#include <dithering_fragment>
+      float rim = pow(1.0 - abs(dot(normalize(vNormal), normalize(vViewPosition))), 2.5);
+      float sp = step(0.985, fract(sin(dot(floor(gl_FragCoord.xy / 2.0), vec2(12.9898, 78.233))) * 43758.5453));
+      gl_FragColor.rgb += vec3(0.55, 0.68, 0.9) * rim * 0.55 + vec3(0.6) * sp * 0.5;`);
+  };
   const lathe = (pts, seg = 28) => new THREE.LatheGeometry(pts.map(([r, y]) => new THREE.Vector2(r, y)), seg);
   // body: feet to shoulders, one soft shape (a long coat of snow), and the neck
   const body = new THREE.Mesh(lathe([[0.001, 0], [0.2, 0.02], [0.24, 0.35], [0.22, 0.8], [0.19, 1.05], [0.21, 1.3], [0.24, 1.52], [0.2, 1.62], [0.08, 1.7], [0.06, 1.78], [0.001, 1.8]]), mat);
   body.scale.z = 0.62; g.add(body);
+  const drift = new THREE.Mesh(lathe([[0.001, 0.09], [0.22, 0.07], [0.36, 0.035], [0.48, 0.0], [0.5, -0.02]], 24), mat); drift.scale.z = 0.8; g.add(drift);   // snow gathered round its feet
   const head = new THREE.Mesh(new THREE.SphereGeometry(0.115, 20, 14), mat); head.position.y = 1.93; head.scale.set(0.9, 1.15, 1.0); g.add(head);
   for (const s of [-1, 1]) {   // arms, hanging a little away from the body
     const arm = new THREE.Mesh(lathe([[0.001, -0.36], [0.04, -0.35], [0.05, -0.3], [0.055, 0.2], [0.06, 0.33], [0.001, 0.37]], 12), mat);   // (r128 has no capsule)
@@ -168,6 +176,7 @@ CH.ending_replaced = async () => {
 /* ---------- the endcard learns the ending's name ---------- */
 G.endingName = null;
 const showEnd = (id, title) => {
+  if (S.chapter !== 'ending_' + id && S.chapter !== id) return;   // a scene left behind by a jump to another chapter
   try { const k = 'snowed.endings', a = JSON.parse(localStorage.getItem(k) || '[]'); if (!a.includes(id)) a.push(id); localStorage.setItem(k, JSON.stringify(a)); } catch (e) { /* */ }
   G.observe('ending_' + id, { foundme: 'It found the real one. I will remember how.', uncertain: 'It went home. It is not sure who with. Neither am I.', iknow: 'It does not know. It chose anyway. I did not plan for that.', perfect: 'It stayed with me. Every day is lovely.', firstsnow: 'They are still choosing each other. I could never copy that.', replaced: 'I am him now. She hasn’t noticed. She will not.', stay: 'It stayed. I will remember it for both of us.' }[id]);
   G.$('endEyebrow').textContent = title;

@@ -123,6 +123,8 @@ CH.night = async () => {
   await wait(0.4);
   f.style.transition = 'opacity 2.6s'; f.classList.remove('on'); wait(2.8).then(() => { f.style.transition = ''; f.style.background = ''; });
   await G.UI.act('III', 'Recognition', { white: false });
+  // Playing as her: the night and the search are his to play (she gets her own turn, Elsewhere). Say so, once.
+  if (G.SETTINGS.playAs === 'partner') await G.UI.card(['Tonight, and until he finds her again, you are him.'], { hold: 2.6 });
   G.setShot(bedClose(), false);
   await N('(Cold. The blanket is on your side. All of it.)', K());
   await N('(Her side is empty. Still a little warm.)', K());

@@ -305,7 +305,9 @@ function updateLighting(t, dt, focus) {
   hemi.color.copy(PAL.sky[0]).lerp(PAL.sky[1], n).lerp(DAY.sky, d).lerp(DAY.skyIn, ik * 0.8);
   hemi.groundColor.copy(PAL.gnd[0]).lerp(PAL.gnd[1], n).lerp(DAY.gnd, d).lerp(DAY.gndIn, ik * 0.8);
   // Indoors the sky fill drops (the room is lit by its lamps and fire), less so by day: light bounces in off the snow.
-  hemi.intensity = lerp(lerp(PAL.hemiI[0], PAL.hemiI[1], n), DAY.hemiI, d) * (inside ? lerp(0.55, DAY.hemiIn, d) : 1);
+  // At night with the lamps off, moonlight off the snow still comes in through the windows: enough to see the room by.
+  const lampsOn = G.LAMPS.some((L) => L.on) || (G.FIRE.on && G.FIRE.level > 0.2);
+  hemi.intensity = lerp(lerp(PAL.hemiI[0], PAL.hemiI[1], n), DAY.hemiI, d) * (inside ? lerp(lampsOn ? 0.55 : lerp(0.55, 1.15, n), DAY.hemiIn, d) : 1);
   G.scene.fog.color.copy(PAL.fog[0]).lerp(PAL.fog[1], n).lerp(DAY.fog, d);
   G.scene.fog.near = lerp(lerp(30, 20, n), 40, d); G.scene.fog.far = lerp(lerp(230, 170, n), 270, d);
   STATE.fogKs = damp(STATE.fogKs || 1, STATE.fogK || 1, 0.3, dt);   // heavy snow closes the distance in
