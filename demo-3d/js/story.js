@@ -819,11 +819,19 @@ CH.prologue = async () => {
   await wait(0.5);
   G.fade(false);
   await G.UI.card(['We don’t remember exactly how it started.'], { hold: 3.8 });
-  STATE.busy = false;
-  G.hint(G.MOBILE ? 'Drag on the left side of the screen to walk.' : `Walk with ${[G.keyFor('forward'), G.keyFor('left'), G.keyFor('back'), G.keyFor('right')].join('')} or the arrow keys.`, 7);
+  const asHer = G.herRoute();   // playing as her: you're the one on the log, and he comes to you
+  if (!asHer) STATE.busy = false;
+  if (!asHer) G.hint(G.MOBILE ? 'Drag on the left side of the screen to walk.' : `Walk with ${[G.keyFor('forward'), G.keyFor('left'), G.keyFor('back'), G.keyFor('right')].join('')} or the arrow keys.`, 7);
   // The fair, behind you: a music box at one of the stalls, now and then.
   (async () => { await wait(2.5); while (live() && S.chapter === 'prologue' && !MEM.sat) { G.Audio.musicBox(); S.flags.fairTune = 1; await wait(26); } })();
-  wait(12).then(() => { if (live() && dist() > 6) G.hint('(Behind you, the fair: a lantern stall, a man roasting chestnuts. Ahead, past the last light, somebody small is sitting on a log.)', 8); });
+  if (asHer) {
+    // Low behind her on the log, looking back up the path: footsteps in the snow, coming closer.
+    STATE.sceneShot = true;
+    G.setShot(() => { const pos = V(L.x + 0.9, L.seatY + 0.75, L.z + 1.6), look = V((PLAYER.x + L.x) / 2, L.seatY + 0.5, (PLAYER.z + L.z) / 2 - 1); return { pos, look, fov: 44, focus: pos.distanceTo(look), aperture: 0.01 }; }, true);
+    (async () => { await wait(1.2); await N('(The end of the path, past the last lantern. A log, the snow, and you, keeping out of the way of everybody being loud.)', { shot: 'keep' }); await wait(1.5); await N('(Footsteps in the snow behind you. Small ones. Coming this way.)', { shot: 'keep' }); })();
+    G.walkTo(PLAYER, L.x - 0.2, L.z - 2.1, 1.05);
+  }
+  wait(12).then(() => { if (live() && !asHer && dist() > 6) G.hint('(Behind you, the fair: a lantern stall, a man roasting chestnuts. Ahead, past the last light, somebody small is sitting on a log.)', 8); });
   // Alone on the log, she isn't still: she watches the snow, the fair, her own boots.
   (async () => {
     const looks = [{ x: L.x, z: L.z + 8, headY: L.seatY + 1.4 }, { x: L.x - 1, z: L.z - 10, headY: L.seatY + 1.2 }, { x: L.x + 0.2, z: L.z + 0.5, headY: L.seatY - 0.4 }, { x: L.x + 3, z: L.z + 6, headY: L.seatY + 2.4 }];
@@ -976,15 +984,18 @@ CH.prologue = async () => {
     PARTNER.mode = 'follow'; G.setHold(true);
     STATE.sceneShot = false; G.releaseCamera(); G.CAM.yaw = 0; G.CAM.pitch = 0.16; G.CAM.cut = true;
   });
+  if (asHer) { G.swapBodies(); PARTNER.mode = 'follow'; G.setHold(true); G.CAM.cut = true; }   // you're her now; he holds on
   STATE.noControl = false; STATE.busy = false;
-  G.hint('(Walk her back to the lanterns.)', 6);
+  G.hint(asHer ? '(Walk back to the lanterns. He doesn’t let go of your hand.)' : '(Walk her back to the lanterns.)', 6);
   await until(() => !live() || PLAYER.z < 24.5);
+  if (asHer && G.NIGHT && G.NIGHT.swapped && !live()) G.swapBodies();
   if (!live()) return;
   STATE.noControl = true;
   await N('(You came over. That part, everyone agrees on.)');
   const f = G.$('fade'); f.style.transition = 'opacity 2.4s'; G.fade(true, '#ffffff');
   await wait(2.6); f.style.transition = '';
   G.setHold(false);
+  if (G.NIGHT && G.NIGHT.swapped) G.swapBodies();   // back to who's who before the morning
   S.flags.noTogether = false; S.flags.noBarks = false; S.flags.noInteract = false; STATE.bounds = null;
   return go('morning');
 };
@@ -1050,6 +1061,7 @@ CH.morning = async () => {
     G.standAt(PLAYER, 1.1, -0.5, Math.PI / 2);
     G.shapeBed({ R: true }, c === 1 ? 0.35 : 0);
     PARTNER.lieLook = -0.2; PARTNER.lidsClosed = true;
+    if (G.herRoute()) { Story.partnerGetsUp(true); PARTNER.lidsClosed = false; }   // playing as her: she's up too, and it's her turn
     STATE.sceneShot = false; G.releaseCamera(); G.CAM.yaw = -Math.PI / 2 + Math.PI; G.CAM.cut = true;
   });
   STATE.busy = false;

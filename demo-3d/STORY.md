@@ -22,6 +22,7 @@ You choose on the title screen ("Play as: Player / Partner"), and the game remem
   - Story scenes hand control back to him for their length.
   - Using things in the house is hers to do, where she stands.
   - She isn't handed control while the story is walking or leading her somewhere, and he doesn't take over her routines (the armchair, Basil) while you play as her.
+- **From the very start (build 72):** in the prologue you're her, on the log at the end of the path. He walks up from the fair while the camera watches from behind her, the talk on the log has her choices, and walking back to the lanterns you're her, with him holding your hand. In the morning she gets up with him, so control is hers as soon as the bed scene ends. Before, both opened as him: the prologue all the way through, and the morning until she got up on her own.
 - **Some chapters decide who you are:** playing as him, dawn and Elsewhere are played as her. Playing as her, the night and Act IV follow her own route (below).
 
 ## Act I · Shared Life
