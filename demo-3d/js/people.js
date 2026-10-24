@@ -957,7 +957,7 @@ G.animate = (c, dt, t) => {
     if (sit > 0.01) { mcSample(MC.sit, (t * 0.9 + sd * 5) * MC.sit.fps, S.s); mb = mcMix(mb, S.s, sit, S.m2); }
     // Talking: while it's your line, the recorded conversation's hand gestures come in (and a laugh, when the line
     // laughs), eased in and out, softer when sitting or walking. Each person at their own point in the recording.
-    const D = G.DLG && G.DLG.cur, mine = !!D && ((D.who === 'partner' && c === G.PARTNER) || (D.who === 'player' && c === G.PLAYER));
+    const D = G.DLG && G.DLG.cur, sw = !!(G.NIGHT && G.NIGHT.swapped), mine = !!D && ((D.who === 'partner' && c === (sw ? G.PLAYER : G.PARTNER)) || (D.who === 'player' && c === (sw ? G.PARTNER : G.PLAYER)));
     const laughing = mine && /\bha\b|haha|\bheh|laugh/i.test(D.text);
     if (D && D !== c._line) { c._line = D; if (laughing) c._laughT = 2.6; if (!mine && /laugh/i.test(D.text) && !D.who) c._laughT = 2.2; }
     c._laughT = Math.max(0, (c._laughT || 0) - dt);

@@ -164,6 +164,8 @@ G.Audio = (() => {
       if (t > nextChord) { chordI = (chordI + 1) % CHORDS.length; CHORDS[chordI].forEach((fr, i) => pad[i].frequency.setTargetAtTime(fr, t, 1.8)); nextChord = t + 9 + Math.random() * 3; }
     },
     click() { tone(1800, 0.01, 0.03); },
+    // A heartbeat, felt more than heard: two low thumps (lub-dub).
+    heart(v = 1) { burst(0.11, 65, 0.2 * v, 'lowpass', 1.2); burst(0.09, 55, 0.14 * v, 'lowpass', 1.2, 0.26); },
     crackle(dt, level) {
       if (!ctx) return;
       if (Math.random() < dt * 10 * level) burst(0.04, 1500 + Math.random() * 2500, 0.1 * Math.random(), 'bandpass', 2, 0, SPOTS.fire.in);
@@ -861,6 +863,10 @@ const DLG = { q: [], cur: null, shown: 0, t: 0, auto: false };
 // and the speaker labels turn round ("You" is her, "Partner" is him).
 const HER_CH = /^(prologue|morning|walk|evening|firstsnow|ending_(foundme|uncertain|iknow|perfect|stay))$/;
 G.herSide = () => SETTINGS.playAs === 'partner' && !!G.S && HER_CH.test(G.S.chapter || '');
+// Playing as her through the night and Act IV (her own route there, not just free time).
+G.herRoute = () => SETTINGS.playAs === 'partner';
+// "You" is whoever you're playing: her in her chapters, in her own route, and whenever the bodies are swapped.
+G.labelsTurned = () => G.herSide() || !!(G.NIGHT && G.NIGHT.swapped) || (G.herRoute() && !!G.S && G.S.chapter === 'bedtime');
 const herLine = (who, text) => (who == null && G.herSide() && window.CBS_NARR_HER && window.CBS_NARR_HER[text]) || text;
 G.say = (who, text, o = {}) => (who != null && STATE.asHer && G.S && G.S.inInter ? Promise.resolve() : new Promise((res) => DLG.q.push({ who, text: G.fmt(herLine(who, text)), res, o })));
 const busy = () => !!DLG.cur || DLG.q.length > 0 || STATE.busy || !!(G.UI && G.UI.blocking());
@@ -870,8 +876,10 @@ function pickShotFor(who, o) {
   if (o.shot) { setShot(o.shot, o.cut !== false); return; }
   const d = Math.hypot(PARTNER.x - PLAYER.x, PARTNER.z - PLAYER.z);
   if (d > 3.6 || STATE.sceneShot || G.simT - (CAM.lastMove || -99) < 1.6) return;
-  if (who === 'partner') setShot(() => SHOTS.ots(PARTNER, PLAYER, 1));
-  else if (who === 'player') setShot(() => SHOTS.ots(PLAYER, PARTNER, -1));
+  // With the bodies swapped, her lines come from the body you're driving.
+  const sw = !!(G.NIGHT && G.NIGHT.swapped), her = sw ? PLAYER : PARTNER, him = sw ? PARTNER : PLAYER;
+  if (who === 'partner') setShot(() => SHOTS.ots(her, him, 1));
+  else if (who === 'player') setShot(() => SHOTS.ots(him, her, -1));
   else setShot(() => SHOTS.twoShot(), true);
 }
 function updateDialogue(dt) {
@@ -879,7 +887,7 @@ function updateDialogue(dt) {
   if (!DLG.cur && DLG.q.length) {
     DLG.cur = DLG.q.shift(); DLG.shown = 0; DLG.t = 0;
     box.className = 'show ' + (DLG.cur.who ? 'who-' + DLG.cur.who : 'narr');
-    { const hs = G.herSide(); $('who').textContent = DLG.cur.who === 'partner' ? (hs ? G.CFG.playerLabel : G.CFG.partnerLabel) : DLG.cur.who === 'player' ? (hs ? G.CFG.partnerLabel : G.CFG.playerLabel) : ''; }
+    { const hs = G.labelsTurned(); $('who').textContent = DLG.cur.who === 'partner' ? (hs ? G.CFG.playerLabel : G.CFG.partnerLabel) : DLG.cur.who === 'player' ? (hs ? G.CFG.partnerLabel : G.CFG.playerLabel) : ''; }
     pickShotFor(DLG.cur.who, DLG.cur.o);
   }
   if (!DLG.cur) { if (box.className !== '') { box.className = ''; if (!STATE.sceneShot && CAM.shot) releaseCamera(); } return; }

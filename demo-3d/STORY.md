@@ -22,7 +22,7 @@ You choose on the title screen ("Play as: Player / Partner"), and the game remem
   - Story scenes hand control back to him for their length.
   - Using things in the house is hers to do, where she stands.
   - She isn't handed control while the story is walking or leading her somewhere, and he doesn't take over her routines (the armchair, Basil) while you play as her.
-- **Some chapters decide who you are:** dawn and Elsewhere are played as her; the night and Act IV as him.
+- **Some chapters decide who you are:** playing as him, dawn and Elsewhere are played as her. Playing as her, the night and Act IV follow her own route (below).
 
 ## Act I · Shared Life
 
@@ -72,6 +72,24 @@ You wake at night in a house that's almost exactly right: lamps on, perfectly ro
 - **The walk home**, holding hands, with three conversations along the way.
 - **The door in the meadow** only opens for two. The Entity speaks from what it observed about how you played ("You liked the fire. I kept it going all night."). "You could stay." Stay, or go home.
 
+## Act III and Act IV as her (playing as Partner, build 66)
+
+- **Bedtime from her side.** He asks "A good first snow?" and the answers are hers. Then she can curl into him, look at him ("You could simply admit I'm charming." "I could." "…Coward."), or kiss him goodnight. The water line is still hers: "If I get up for water, don't steal my side."
+- **Act III, Recognition, as her.** She wakes about three. He's really there, asleep on his front, taking up exactly half the bed. She gets up for water, and the kitchen at night is almost right: three mugs on the rack ("You washed two"), the third shape in the photograph, and snow inside the sill. Then bare footsteps come from the bedroom, and something in his shape comes all the way into the kitchen. From there it plays as Elsewhere: it hunts her, she hides, it can catch her by the wrist, she whistles at the window, leaves her sign, and walks out into the snow. If it catches her three times, it keeps her. If she goes back to the bed while it's up, his side is empty and still warm, and she doesn't get back in.
+- **Act IV, The Same Day, as her.** She's outside in the snow with every window of the cabin lit. "He'll come out eventually. He always comes out eventually. I'll leave him a trail."
+  - **The trail is hers to leave:** her left mitten on the bottom porch step ("Placed. Not dropped. Placed."), one pinecone standing on the contest stump, and three flat stones from her secret summer pile, pointing west.
+  - **The kitchen window:** he's at the perfect breakfast in the jumper he sleeps in, talking to the empty chair and laughing at nothing. If she knocks, he passes the syrup to nobody. If she whistles, he stops, half turns to the window, and then the chair tells him it was the kettle.
+  - **The circle** (or the frozen lake if it kept her): she sits and whistles and waits. Something wearing him arrives first, in his sleeping jumper, in his socks in the snow, and says "Found you." She can test it. It remembers the first meeting perfectly, its feet aren't cold, it "counted" the pinecone score, and its hand squeezes exactly the right amount. Going home with it leads to *The Perfect Partner* (from her side, with him left standing in the circle, whistling badly). "You're not him." "I could be. I've been practising. I'm nearly right." "Nearly is how I know." It's gone, with no footprints.
+  - **The real one:** three notes from the trees, very badly whistled. He arrives in his coat, complaining that all of the snow is in his boots. He comments on how much of her trail he found, and on her whistle at the window if she whistled. "Say something only you would say." "…The floor is cold." They sit in the grass, he empties his boots, and they find the two sets of small footprints. Then a hug, and the walk home holding hands, with his three conversations on the way.
+  - **The door in the meadow:** the Entity speaks from what it watched her do (hiding, the wrist, the window, the trail, sending it away). He says "Your call." She can stay or go home, and the endings work as before.
+
+## Suspense (build 66)
+
+- **Before it comes:** the kitchen light stutters three times, then bare footsteps come from the bedroom, getting louder and closer. That gives a few seconds to hide. The first time, a hint says "(Footsteps. Coming this way.)"
+- **While it's searching:** a heartbeat, quicker the closer it gets.
+- **The close call:** once per search, if she's hidden, it comes and stands right outside her hiding place. In the alcove, it stands in the opening with its back to her, while the camera holds on the alcove from the dark room. At the study, it stands at the door with its head on one side, listening. "I can hear you breathing, Partner." "(You don't breathe.)" Then "…Pipes. Old house." and it wanders off. **Coming out while it's standing right there gets her caught.**
+- **Her Act IV:** on the way to the circle, now and then, something stands between the trees, very still, and fades when she gets near. At the window, the second time she looks, the empty chair has been turned round to face her. At the circle, three notes answer her whistle **perfectly in tune** ("…That's new."), and the snow stops falling and hangs in the air while the one wearing him is there. When she sends it away, the snow comes down again all at once. The real one's whistle, later, is terrible.
+
 ## Endings
 
 None of them is labelled good or bad. The end card names the ending you reached, and the endings you've seen are remembered in this browser.
@@ -107,5 +125,4 @@ The game saves at the start of each chapter, at the Elsewhere door in the night,
 
 ## Still to do
 
-- **Night and Act IV as Partner:** possibly a full Partner route for these chapters (she wakes beside the imitation of him). For now, someone playing as her is told at the start of the night that they're him until he finds her again (build 65).
 - **Playtest:** finish a full pass as both characters. Build 52 played the whole day (morning, walk, evening), four endings and The First Snow as Partner without getting stuck, and every narration line had her version. Build 65 played the night (through to being kept) and Act IV (to You Found Me) with Partner chosen. There were no errors and every narration line had a version for her, and the door scene from the Act IV restart point leads to Uncertain Morning. Every chapter also gets a quick automated run as both characters.

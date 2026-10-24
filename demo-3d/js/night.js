@@ -78,6 +78,7 @@ CH.bedtime = async () => {
   f.style.transition = 'opacity 1.6s'; f.classList.remove('on'); wait(1.8).then(() => { f.style.transition = ''; f.style.background = ''; });
   await P('Bed. Now. I’m declaring it.', K());
   await G.cutTo(() => { G.lieDown(PLAYER, B().L, -0.14, 0.15, 0.35); G.lieDown(PARTNER, B().R, -0.40, -0.3, -0.4); PARTNER.mode = 'lying'; G.shapeBed({ L: true, R: true }); G.setShot(bedClose()); }, 0.5);
+  if (G.herRoute()) return bedtimeHer(f);
   await P('Partner.', K());
   await Y('Partner.', K());
   await P('A good first snow?', K());
@@ -101,8 +102,35 @@ CH.bedtime = async () => {
   return A.go('night');
 };
 
+// Bedtime from her side: the same night, her choices, his answers.
+async function bedtimeHer(f) {
+  await Y('Partner.', K());
+  await P('Partner.', K());
+  await Y('A good first snow?', K());
+  const a = await choose(['“Top three.”', '“Apart from the firefly.”', '“Every one with you is.”']);
+  if (a === 0) { await Y('Top three? What were the other two?', K()); await P('Classified.', K()); await Y('I’ll find out. I have methods.', K()); await P('You have one method. It’s asking nicely.', K()); }
+  else if (a === 1) { addBond(0.2); S.vars.trust = (S.vars.trust || 0) + 0.4; await Y('…Yes. Apart from that.', K()); await N('(You find his hand under the blanket and keep it.)', K()); }
+  else { addBond(0.6); await Y('…Stop it. You can’t say things like that at night. I’m not equipped for it.', K()); }
+  const b = await choose(['Curl into him', 'Look at him', 'Kiss him goodnight']);
+  addBond(0.6);
+  if (b === 0) { PARTNER.lidsClosed = true; await N('(You fit into his side as though you were measured for it.)', K()); await Y('Mm. Don’t get used to this, {toHer}.', K()); await P('Too late.', K()); PARTNER.lidsClosed = false; }
+  else if (b === 1) { await Y('You’re staring.', K()); await P('I’m looking.', K()); await Y('At me.', K()); await P('Unfortunately.', K()); await Y('You could simply admit I’m charming.', K()); await P('I could.', K()); await Y('…Coward.', K()); }
+  else { await Y('A goodnight kiss. Very proper. Very old married couple.', K()); await P('We’re not married.', K()); await Y('Very old unmarried couple, then.', K()); }
+  await P('If I get up for water, don’t steal my side.', K());
+  await Y('You don’t recognise sides.', K());
+  await P('…Touché. Goodnight, {dear}.', K());
+  await Y('Goodnight, {dear}.', K());
+  for (const L of G.LAMPS) L.on = false;
+  G.Audio.click && G.Audio.click();
+  PARTNER.lidsClosed = true;
+  await N('(Snow taps at the window. He’s asleep before you are. He always is.)', K());
+  f.style.background = '#000'; f.style.transition = 'opacity 2.2s'; f.classList.add('on'); await wait(2.4); f.style.transition = '';
+  return A.go('night');
+}
+
 /* ---------- the night ---------- */
 CH.night = async () => {
+  if (G.herRoute()) return nightHer();
   checkpoint('night');
   const f = G.$('fade');
   if (!f.classList.contains('on')) { f.style.background = '#000'; f.classList.add('on'); await wait(0.7); }
@@ -123,8 +151,6 @@ CH.night = async () => {
   await wait(0.4);
   f.style.transition = 'opacity 2.6s'; f.classList.remove('on'); wait(2.8).then(() => { f.style.transition = ''; f.style.background = ''; });
   await G.UI.act('III', 'Recognition', { white: false });
-  // Playing as her: the night and the search are his to play (she gets her own turn, Elsewhere). Say so, once.
-  if (G.SETTINGS.playAs === 'partner') await G.UI.card(['Tonight, and until he finds her again, you are him.'], { hold: 2.6 });
   G.setShot(bedClose(), false);
   await N('(Cold. The blanket is on your side. All of it.)', K());
   await N('(Her side is empty. Still a little warm.)', K());
@@ -144,6 +170,24 @@ CH.night = async () => {
   S.flags.noTogether = true; S.flags.noBarks = true; S.flags.nightUp = true;
   nightLoops(S.run);
 };
+// The night from her side: she wakes beside the real one, gets up for water, and the house is almost right.
+// Then something in his shape comes into the kitchen (Elsewhere, as her whole Act III).
+async function nightHer() {
+  checkpoint('night');
+  const f = G.$('fade');
+  if (!f.classList.contains('on')) { f.style.background = '#000'; f.classList.add('on'); await wait(0.7); }
+  quiet(); STATE.busy = true;
+  G.useKids(false); G.setDressed(PLAYER, false); G.setDressed(PARTNER, false);
+  G.post.grade.uniforms.uMem.value = 0; STATE.fog = null;
+  G.setTime({ day: 0, tod: 1, snow: 0.25 }, true);
+  houseFor('morning'); G.FIRE.on = true; G.FIRE.level = 0.35;
+  for (const L of G.LAMPS) { if (L.power0 == null) L.power0 = L.power; const p = L.g.getWorldPosition(new THREE.Vector3()); if (p.x > 12.5 && p.x < 13.5 && p.y > 1.5) { L.on = true; L.power = 0.9; } }
+  NIGHT.door.visible = false; NIGHT.done = new Set(); NIGHT.whistles = 0; NIGHT.seen = new Set(); NIGHT.outside = false; NIGHT.canWhistle = false;
+  Object.assign(S.flags, { doorOpen: true, nightUp: true, sleptBeside: false, fakeWithdrawn: false, povWhistled: false, herWater: false });
+  S.vars.suspicion = 0;
+  await elsewhere({ her: true });
+}
+const herUp = () => night() && NIGHT.her && NIGHT.swapped && !NIGHT.outside && !NIGHT.left;
 // Getting up: you're on your feet beside the bed.
 const getUp = () => G.cutTo(() => { G.standAt(PLAYER, B().L - 0.6, 0.2, Math.PI / 2); G.releaseCamera(); G.CAM.cut = true; }, 0.4);
 // Moving while you're lying there gets you up (the bed's prompt still offers going back to sleep).
@@ -349,9 +393,20 @@ async function cake() {
   await G.cutTo(() => { for (const c2 of [PLAYER, PARTNER]) { c2.sitTarget = c2.sit = 0; } G.standAt(PLAYER, 12.6, 3.9, Math.PI); G.standAt(PARTNER, 13.4, 3.9, Math.PI); }, 0.3);
 }
 /* ---------- small things in the dark house, for anyone who looks (none of them needed) ---------- */
-inter('nSink', [13.05, 1, -1.6], 0.6, 'Sink', async () => { await N('(Three mugs on the drying rack, washed and turned upside down. There were two.)'); NIGHT.seen.add('mugs'); }, () => night() && S.flags.nightUp && !S.flags.doorOpen);
-inter('nPhoto', [7.75, 1.4, 4.15], 0.8, 'Photograph', async () => { if (!EVE.photo.visible) EVE.showPhoto(); thirdShape(); await N('(The photograph. The two children on the log. And at the very edge, between the trees, a third shape, standing very still.)'); NIGHT.seen.add('photo'); }, () => night() && S.flags.nightUp && !S.flags.doorOpen);
-inter('nWin', [0.6, 1.3, -0.15], 0.8, 'Window', async () => { await N('(There’s snow on the inside of the sill. A little drift of it, as if the window had been open. It hasn’t.)'); NIGHT.seen.add('sill'); }, () => night() && S.flags.nightUp && !S.flags.doorOpen);
+inter('nSink', [13.05, 1, -1.6], 0.6, 'Sink', async () => { await N(NIGHT.her ? '(Three mugs on the drying rack, washed and turned upside down. You washed two. You remember washing two.)' : '(Three mugs on the drying rack, washed and turned upside down. There were two.)'); NIGHT.seen.add('mugs'); }, () => (night() && S.flags.nightUp && !S.flags.doorOpen) || (herUp() && S.flags.herWater));
+inter('nPhoto', [7.75, 1.4, 4.15], 0.8, 'Photograph', async () => { if (!EVE.photo.visible) EVE.showPhoto(); thirdShape(); await N('(The photograph. The two children on the log. And at the very edge, between the trees, a third shape, standing very still.)'); NIGHT.seen.add('photo'); }, () => (night() && S.flags.nightUp && !S.flags.doorOpen) || herUp());
+inter('nWin', [0.6, 1.3, -0.15], 0.8, 'Window', async () => { await N('(There’s snow on the inside of the sill. A little drift of it, as if the window had been open. It hasn’t.)'); NIGHT.seen.add('sill'); }, () => (night() && S.flags.nightUp && !S.flags.doorOpen) || herUp());
+// Her night: the glass of water she got up for, and the bed once he's gone from it.
+inter('hWater', [13.05, 1, -1.6], 1.1, 'Glass of water', async () => {
+  await N('(A cold glass of water at the window. Snow everywhere, blue in the dark. Not a sound.)');
+  await N('(Behind you, the house makes its house noises. One of them is wrong. You can’t say which.)');
+  S.flags.herWater = true;
+}, () => herUp() && !S.flags.herWater);
+findInter('hWater').prio = 2;
+inter('hBed', [2.4, 0.6, 0.15], 1.25, 'Bed', async () => {
+  if (!PARTNER.hidden) { await N('(He’s asleep on his front, taking up exactly half. Not one inch more.)'); return; }
+  await N(cyc('hBedSeen', ['(His side of the bed is empty. Still warm.)', '(You don’t get back in. You don’t know why not. You just don’t.)']));
+}, () => herUp());
 // The front door won't open tonight.
 { const fd = findInter('frontdoor'), orig = fd && fd.raw; if (fd) rewire('frontdoor', async () => { if (night() && !S.flags.doorOpen) { await N('(It won’t open. It isn’t locked. It just won’t.)'); return; } return orig(); }); }
 // Walking into the kitchen once the door is there.
@@ -374,24 +429,46 @@ G.swapBodies = () => {
   for (const c of [PLAYER, PARTNER]) { c._hsp = null; c._ikOff = null; c.lookAt = null; c.hugWith = null; c.holdWith = null; c.lie = false; c.sit = c.sitTarget = 0; }
   NIGHT.swapped = !NIGHT.swapped;
 };
-async function elsewhere() {
-  if (S.chapter === 'night') { checkpoint('elsewhere'); S.chapter = 'night'; }   // a reload resumes here, not at bedtime
-  const f = G.$('fade'); f.style.background = S.flags.sleptBeside ? '#000' : '#dfe9f5'; f.style.transition = 'opacity 1.6s'; f.classList.add('on'); await wait(1.8);
+async function elsewhere(o = {}) {
+  if (S.chapter === 'night' && !o.her) { checkpoint('elsewhere'); S.chapter = 'night'; }   // a reload resumes here, not at bedtime
+  const f = G.$('fade');
+  if (!o.her) { f.style.background = S.flags.sleptBeside ? '#000' : '#dfe9f5'; f.style.transition = 'opacity 1.6s'; f.classList.add('on'); await wait(1.8); }
   STATE.busy = true; STATE.sceneShot = false; NIGHT.left = false; NIGHT.outside = false; NIGHT.kept = false; NIGHT.hiding = null; S.vars.caught = 0;
   NIGHT.door.visible = false; STATE.bounds = { zMin: -5, zMax: 4.3 };
+  NIGHT.her = !!o.her;
   G.swapBodies();
-  // Earlier, the same night. She's up for water. He's asleep.
-  G.standAt(PLAYER, 13.05, -1.25, Math.PI); PARTNER.hidden = true; PARTNER.m.visible = false; PARTNER.mode = 'still';
-  G.post.grade.uniforms.uMem.value = 0.25;
-  G.releaseCamera(); G.CAM.cut = true;
-  await wait(0.3);
-  f.classList.remove('on'); wait(1.8).then(() => { f.style.transition = ''; f.style.background = ''; });
-  await G.UI.card(['Earlier.'], { hold: 2.2 });
+  if (o.her) {
+    // Her own Act III: she wakes beside him. He's really there, asleep. She gets up for water.
+    G.lieDown(PLAYER, B().R, -0.40, 0, 0); G.lieDown(PARTNER, B().L, -0.14, 0.15, 0.35); PARTNER.mode = 'lying'; PARTNER.lidsClosed = true;
+    G.post.grade.uniforms.uMem.value = 0.18;
+    STATE.sceneShot = true; G.setShot(bedClose());
+    await wait(0.4);
+    f.style.transition = 'opacity 2.6s'; f.classList.remove('on'); wait(2.8).then(() => { f.style.transition = ''; f.style.background = ''; });
+    await G.UI.act('III', 'Recognition', { white: false });
+    await N('(Three in the morning, or near it. He’s asleep on his front, taking up exactly half the bed. Not one inch more. He’s very fair about it.)', K());
+    await N('(He’s snoring. Lovingly. You’re thirsty.)', K());
+    await G.cutTo(() => { G.standAt(PLAYER, B().R + 0.6, 0.2, -Math.PI / 2); STATE.sceneShot = false; G.releaseCamera(); G.CAM.cut = true; }, 0.4);
+    STATE.busy = false; S.flags.noTogether = true;
+    G.hint('A glass of water: the kitchen sink.', 6);
+    await until(() => S.flags.herWater && !G.busy());
+    // A little while to look round the kitchen at night before anything happens.
+    const t0 = G.simT; await until(() => (G.simT - t0 > 22 || NIGHT.seen.size >= 2) && !G.busy() && PLAYER.x > 9.4);
+  } else {
+    // Earlier, the same night. She's up for water. He's asleep.
+    G.standAt(PLAYER, 13.05, -1.25, Math.PI); PARTNER.hidden = true; PARTNER.m.visible = false; PARTNER.mode = 'still';
+    G.post.grade.uniforms.uMem.value = 0.25;
+    G.releaseCamera(); G.CAM.cut = true;
+    await wait(0.3);
+    f.classList.remove('on'); wait(1.8).then(() => { f.style.transition = ''; f.style.background = ''; });
+    await G.UI.card(['Earlier.'], { hold: 2.2 });
     await N('(Water. A cold glass. The house making its house noises. In the bedroom, he is asleep and snoring, lovingly.)');
-  STATE.busy = false; S.flags.noTogether = true;
+    STATE.busy = false; S.flags.noTogether = true;
     await wait(4);
+  }
   // Something in his shape comes into the kitchen.
   STATE.busy = true;
+  PARTNER.lie = false; PARTNER.lidsClosed = false;
+  if (o.her) await N('(Footsteps. From the bedroom. Bare feet on the boards, unhurried.)');
   PARTNER.hidden = false; PARTNER.m.visible = true; G.placeChar(PARTNER, 10.6, 2.0, Math.PI / 2); PARTNER.mode = 'script';
   await G.walkTo(PARTNER, PLAYER.x - 1.1, PLAYER.z + 0.9, 0.9);
   G.gaze(PARTNER, [PLAYER.x, PLAYER.y + 1.5, PLAYER.z], 9); G.gaze(PLAYER, [PARTNER.x, PARTNER.y + 1.7, PARTNER.z], 9);
@@ -436,9 +513,43 @@ async function elsewhere() {
   STATE.busy = false;
   return A.go('lastbirthday');
 }
+// While it's searching: a heartbeat when it's near, quicker the nearer it gets.
+function heartbeat(live) {
+  let beatT = 0;
+  G.TICKERS.add(function beat(dt) {
+    if (!live()) { G.TICKERS.delete(beat); NIGHT.tense = 0; return; }
+    const d = NIGHT.searching && !PARTNER.hidden ? Math.hypot(PLAYER.x - PARTNER.x, PLAYER.z - PARTNER.z) : 99;
+    NIGHT.tense = d < 7 ? 1 - d / 7 : 0;
+    if (NIGHT.tense > 0.05) { beatT -= dt; if (beatT <= 0) { G.Audio.heart && G.Audio.heart(0.5 + NIGHT.tense); beatT = 1.15 - NIGHT.tense * 0.6; } }
+    else beatT = 0;
+  });
+}
+// The close call: it comes and stands right outside where she's hiding, and waits.
+async function nearMiss(spd) {
+  const w = NIGHT.hiding; if (!w) return;
+  const stop = w === 'nook' ? { x: G.NOOK.x + 0.1, z: G.NOOK.z + 1.25 } : { x: 14.2, z: 3.9 };
+  PARTNER.mode = 'script';
+  await Promise.race([G.walkTo(PARTNER, stop.x, stop.z, spd * 0.75), wait(9)]);
+  if (!NIGHT.hiding || !NIGHT.searching) return;
+  PARTNER.mode = 'still';
+  if (w === 'nook') { PARTNER.yaw = 0.5; G.gaze(PARTNER, [G.NOOK.x + 3, 1.5, G.NOOK.z + 4], 5); }   // its back to her, looking out into the room
+  else G.gaze(PARTNER, [G.CAB.x1, 1.5, 3.85], 5);
+  STATE.busy = true;
+  await N(w === 'nook' ? '(It stops in the mouth of the alcove, a step away, its back to you. It doesn’t turn round. Not yet.)' : '(Through the crack at the hinges: it’s standing right outside the door, with its head on one side, listening.)');
+  await wait(1.2);
+  await Y(['Partner? Are you playing a game? I like games.', 'I can hear you breathing, Partner.', 'It’s cold out here. It’s warm in bed. I’ll wait.'][Math.min(2, S.vars.caught || 0)]);
+  await N('(You don’t breathe.)');
+  STATE.busy = false;
+  await wait(2.2);
+  if (!NIGHT.hiding || !NIGHT.searching) return;
+  G.bark('…Pipes. Old house.', 2.2);
+  PARTNER.mode = 'script';
+  G.walkTo(PARTNER, 12.6, 1.4, spd * 0.7);
+}
 // It comes back for her. Sooner, and faster, the more it got its way with him earlier.
 function hunt(run) {
   const live = () => S.run === run && !NIGHT.left && !NIGHT.kept;
+  heartbeat(live);
   const ob = () => Math.min(3, S.vars.corruption || 0);
   (async () => {
     while (live()) {
@@ -446,15 +557,22 @@ function hunt(run) {
       if (!live()) return;
       await until(() => !live() || !G.busy());
       if (!live()) return;
-      // Footsteps from the bedroom. The lights in the kitchen dip.
-      for (let i = 0; i < 4; i++) { G.Audio.step('wood', 0.6); await wait(0.45); }
+      // The warning: the kitchen light stutters, then footsteps from the bedroom, getting closer. A few seconds to hide.
+      const lamps = G.LAMPS.filter((L) => L.on);
+      for (let k = 0; k < 3; k++) { lamps.forEach((L) => { L.power *= 0.25; }); await wait(0.09 + Math.random() * 0.08); lamps.forEach((L) => { L.power *= 4; }); await wait(0.15 + Math.random() * 0.25); }
+      if (!NIGHT.warned) { NIGHT.warned = true; G.hint('(Footsteps. Coming this way.)', 3); }
+      for (let i = 0; i < 7; i++) { G.Audio.step('wood', 0.2 + i * 0.1); await wait(0.6 - i * 0.03); }
       if (!live()) return;
       PARTNER.hidden = false; PARTNER.m.visible = true; PARTNER.mode = 'script'; G.placeChar(PARTNER, 5.8, 1.2, Math.PI / 2);
       G.bark(['Partner?', 'Where did you go?', 'I know you’re in here.'][Math.min(2, S.vars.caught || 0)], 2.2);
       const t0 = G.simT, spd = 0.85 + ob() * 0.2;
-      let lostT = 0;
+      let lostT = 0, closeCall = false;
+      NIGHT.searching = true; NIGHT.justCaught = false;
       while (live() && G.simT - t0 < 40) {
+        if (NIGHT.justCaught) break;   // she came out right in front of it
         const hid = !!NIGHT.hiding, d = Math.hypot(PLAYER.x - PARTNER.x, PLAYER.z - PARTNER.z);
+        // Once per search, if she's hidden, it comes and stands right outside her hiding place.
+        if (hid && !closeCall && G.simT - t0 > 2.5 && !G.busy()) { closeCall = true; await nearMiss(spd); continue; }
         if (!hid && d < 0.95 && !G.busy()) { await caught(); break; }
         if (hid) lostT += 0.5; else lostT = 0;
         if (lostT > 6) break;   // it can't find her: it goes back to wait for her
@@ -462,6 +580,7 @@ function hunt(run) {
         else G.walkTo(PARTNER, PLAYER.x, PLAYER.z, spd);
         await wait(0.5);
       }
+      NIGHT.searching = false;
       if (!live()) return;
       if (!PARTNER.hidden && !NIGHT.kept) { G.bark('Come back to bed when you’re ready.', 2.4); await G.walkTo(PARTNER, 5.6, 1.2, spd); PARTNER.hidden = true; PARTNER.m.visible = false; }
     }
@@ -469,6 +588,8 @@ function hunt(run) {
 }
 NIGHT.caught = () => caught();   // (tests)
 async function caught() {
+  NIGHT.justCaught = true; NIGHT.searching = false;
+  if (STATE.sceneShot) { STATE.sceneShot = false; G.releaseCamera(); }
   STATE.busy = true; NIGHT.hiding = null; STATE.noControl = false;
   S.vars.caught = (S.vars.caught || 0) + 1;
   const n = S.vars.caught;
@@ -513,20 +634,32 @@ const STUDY_OUT = { x: 14.35, z: 3.85, yaw: -Math.PI * 0.5 };
 const hideAct = (where) => async () => {
   if (NIGHT.hiding) {
     const was = NIGHT.hiding;
+    // Coming out while it's standing right there.
+    if (NIGHT.searching && !PARTNER.hidden && Math.hypot(PARTNER.x - (was === 'study' ? STUDY_OUT.x : PLAYER.x), PARTNER.z - (was === 'study' ? STUDY_OUT.z : PLAYER.z)) < 2.4) {
+      NIGHT.hiding = null; PLAYER.forcePose = null;
+      if (was === 'study') G.standAt(PLAYER, STUDY_OUT.x, STUDY_OUT.z, STUDY_OUT.yaw); else { PLAYER.sitTarget = PLAYER.sit = 0; G.standAt(PLAYER, G.NOOK.x, G.NOOK.z + 0.75, Math.PI); }
+      STATE.sceneShot = false; G.releaseCamera(); G.CAM.cut = true;
+      await N('(It’s right there. It was waiting.)');
+      return caught();
+    }
     NIGHT.hiding = null; PLAYER.forcePose = null;
     if (was === 'study') {
       await G.cutTo(() => { G.standAt(PLAYER, STUDY_OUT.x, STUDY_OUT.z, STUDY_OUT.yaw); STATE.sceneShot = false; G.releaseCamera(); G.CAM.cut = true; }, 0.2);
     }
     STATE.noControl = false;
+    if (was === 'nook') { STATE.sceneShot = false; G.releaseCamera(); G.CAM.cut = true; }
     if (PLAYER.sitTarget) { PLAYER.sitTarget = 0; await wait(0.5); }
     await N('(You come out.)'); return;
   }
   NIGHT.hiding = where; STATE.noControl = true;
+  G.observe('her_hid', where === 'nook' ? 'She hid behind the curtain. I knew where she was. I let her.' : 'She hid in the study. I knew where she was. I let her.');
   const h = HIDE[where]();
   if (where === 'nook') {
     // knees up on the window seat behind the curtain
     G.sitDown(PLAYER, h.x, h.z, h.yaw, h.y, 0.5); PLAYER.forcePose = 'hide';
     await N('(You fold yourself into the window seat behind the curtain, knees up, and keep very still.)');
+    // Held on the alcove from the dark room: her, small against the moonlit window. Anything that comes stands in between.
+    if (NIGHT.hiding === 'nook') { STATE.sceneShot = true; G.setShot(fixed(V(G.NOOK.x - 0.25, 1.35, G.NOOK.z + 2.7), V(G.NOOK.x + 0.05, 0.85, G.NOOK.z + 0.1), 46, 0.006)); }
   } else {
     // through the door and flat against the wall behind it, in the dark
     await G.cutTo(() => {

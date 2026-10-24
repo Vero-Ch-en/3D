@@ -1,0 +1,6 @@
+INIT="window.SERR=[]; addEventListener('error',e=>SERR.push(String(e.message))); addEventListener('unhandledrejection',e=>SERR.push('rej: '+String(e.reason&&e.reason.stack||e.reason))); $(cat plog.js)" CLEAR=1 SW=600 W=1000 H=700 timeout 2400 python3 st.py \
+"(async()=>{ document.getElementById('title').classList.add('hide'); G.jumpTo('lastbirthday'); await T.run(3); await T.run(40,[],{until:'G.S.flags.herA4 && !G.busy()'}); await T.walk(6.5,12,30); await T.walk(-3.6,41.5,90); await T.run(40,[],{until:'G.UI.modal===\"choices\"'}); return [G.S.flags.herCircle, DEMO.PLAYER.x.toFixed(1), DEMO.PLAYER.z.toFixed(1)] })()" "SHOT:h2_fake" \
+"(async()=>{ const r=await T.run(90,[5],{until:'G.S.chapter===\"ending_perfect\" && DEMO.STATE.nightDone'}); return [r, G.S.flags.ending, SERR] })()" "SHOT:h2_perfect" \
+"(async()=>{ G.S.flags.keptHer=true; G.S.flags.herA4=false; G.jumpTo('lastbirthday'); await T.run(3); await T.run(40,[],{until:'G.S.flags.herA4 && !G.busy()'}); await T.walk(6.5,12,30); await T.walk(7.5,40,90); await T.walk(7.5,49.5,40); const r=await T.run(60,[],{until:'G.UI.modal===\"choices\"'}); return [r, G.S.flags.herCircle, SERR] })()" "SHOT:h2_lake" \
+"(async()=>{ const r=await T.run(150,[6,3,3,2,2],{until:'G.S.flags.reunited && !G.busy()'}); return [r, G.S.flags.sentItAway, G.S.flags.reunited, SERR] })()" "SHOT:h2_lake2" \
+"JSON.stringify(PLOG)"

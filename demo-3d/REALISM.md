@@ -187,6 +187,15 @@ blinks, dozing, hugs. Hats and the snow on them are handed to the model's own he
   in Act IV. At its worst the bed gets made perfectly. Scrapbook pages go blank, and one child is painted out of the
   hall photograph (`G.take`).
 
+## Her route through the night and Act IV (build 66)
+
+- **Switch:** `G.herRoute()` (Partner chosen on the title screen). `CH.bedtime` hands over to `bedtimeHer`, `CH.night` to `nightHer` (Elsewhere with `{ her: true }`: she wakes beside him and gets up for water first), and `CH.lastbirthday` to `lastHer` (act4.js). `CH.act4_home` resumes either route.
+- **Swapped bodies:** her route drives her body through `G.swapBodies()`, as Elsewhere does. Clothes belong to the model, not to whoever is driving it, so act4.js dresses through `dressBody(c, on)`.
+- **Who "you" is:** speaker labels, the speaker camera and the talking gestures now follow the swap. `G.labelsTurned()` covers her chapters, swapped bodies, and her bedtime. This also fixes Elsewhere and dawn, which used to label her lines "Partner".
+- **Her Act IV:** the trail pieces start hidden and appear as she places them (`TRAIL.show`). His version's interactions are off while `S.flags.herA4` is set. The Entity's lines at the door draw on what she did: `her_hid`, `caught`, `her_window`, `her_trail`, `her_sent`.
+
+- **Suspense:** `heartbeat()` and `nearMiss()` in night.js (with `NIGHT.searching` and `NIGHT.tense`), and `G.Audio.heart()` (two low filtered-noise thumps). Coming out next to it calls `caught()` straight away (`NIGHT.justCaught` stops the search loop). In Act IV, the glimpses use the snow figure (`ENT`) at low opacity, and `STATE.snowStill` freezes the snow.
+
 ## Night light, poses and checks (build 65)
 
 - **Moonlight indoors:** at night with every lamp off and the fire low, the indoor sky fill rises from 55% to 115%, so the dark kitchen is readable (blue, moonlit) instead of black.
