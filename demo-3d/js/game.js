@@ -877,6 +877,8 @@ const HER_CH = /^(prologue|morning|walk|evening|firstsnow|ending_(foundme|uncert
 G.herSide = () => SETTINGS.playAs === 'partner' && !!G.S && HER_CH.test(G.S.chapter || '');
 // Playing as her through the night and Act IV (her own route there, not just free time).
 G.herRoute = () => SETTINGS.playAs === 'partner';
+// Gentle nights (title screen): nothing chases you, nothing catches you, no heartbeat. The story is the same.
+G.gentle = () => SETTINGS.nights === 'gentle';
 // "You" is whoever you're playing: her in her chapters, in her own route, and whenever the bodies are swapped.
 G.labelsTurned = () => G.herSide() || !!(G.NIGHT && G.NIGHT.swapped) || (G.herRoute() && !!G.S && G.S.chapter === 'bedtime');
 const herLine = (who, text) => (who == null && G.herSide() && window.CBS_NARR_HER && window.CBS_NARR_HER[text]) || text;
@@ -1337,8 +1339,10 @@ function renderControls() {
 }
 function updateKeyHints() {
   const k = (a) => G.keyFor(a), mv = [k('forward'), k('left'), k('back'), k('right')].join('');
-  const t = $('titleKeys'); if (t) t.textContent = `${mv} walk · ${k('run')} run · drag to look · scroll to zoom · ${k('interact')} interact · ${k('together')} together · ${k('photo')} take a photo · ${k('view')} first person · N time of day · \` stats`;
-  const pk = $('pKeys'); if (pk) pk.textContent = `Esc pause · M mute · ${k('view')} first/third person · ${mv} walk · ${k('run')} run · ${k('interact')} interact · ${k('together')} together · ${k('photo')} photo`;
+  const esc = (x) => String(x).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+  const chip = ([key, what]) => `<span class="k">${key ? `<kbd>${esc(key)}</kbd>` : ''}${esc(what)}</span>`;
+  const t = $('titleKeys'); if (t) t.innerHTML = [[mv, 'walk'], [k('run'), 'run'], [null, 'Drag to look'], [k('interact'), 'use'], [k('together'), 'together'], [k('photo'), 'photo'], [k('view'), 'first person']].map(chip).join('');
+  const pk = $('pKeys'); if (pk) pk.innerHTML = [['Esc', 'pause'], ['M', 'mute'], [mv, 'walk'], [k('run'), 'run'], [k('interact'), 'use'], [k('together'), 'together'], [k('photo'), 'photo'], [k('view'), 'first person']].map(chip).join('');
 }
 G.updateKeyHints = updateKeyHints;
 G.setPaused = setPaused;
@@ -1837,6 +1841,44 @@ function boot() {
   const syncAs = () => document.querySelectorAll('[data-as]').forEach((b) => b.setAttribute('aria-pressed', String((SETTINGS.playAs || 'player') === b.dataset.as)));
   document.querySelectorAll('[data-as]').forEach((b) => b.addEventListener('click', () => { SETTINGS.playAs = b.dataset.as; saveSettings(); syncAs(); }));
   syncAs();
+  // Tense or gentle nights.
+  const syncNights = () => {
+    document.querySelectorAll('[data-nights]').forEach((b) => b.setAttribute('aria-pressed', String((SETTINGS.nights || 'tense') === b.dataset.nights)));
+    if ($('nightsNote')) $('nightsNote').textContent = G.gentle() ? 'Nothing chases you.' : '';
+  };
+  document.querySelectorAll('[data-nights]').forEach((b) => b.addEventListener('click', () => { SETTINGS.nights = b.dataset.nights; saveSettings(); syncNights(); }));
+  syncNights();
+  // The endings you've reached (kept in this browser), with a nudge towards the ones you haven't.
+  const ENDINGS = [
+    ['foundme', 'You Found Me', 'Follow the trail. Go home together.'],
+    ['uncertain', 'Uncertain Morning', 'Go home, but not quite sure who with.'],
+    ['iknow', 'I Know It’s You', 'Let it get to you a little. Choose each other anyway.'],
+    ['perfect', 'The Perfect Partner', 'Sit down to the perfect breakfast, or go home with whoever comes first.'],
+    ['stay', 'Stay Here', 'At the door in the meadow, stay.'],
+    ['replaced', 'Replaced', 'Let it win the night.'],
+    ['firstsnow', 'The First Snow', 'After any ending: one more morning.'],
+  ];
+  const seenEndings = () => { try { return JSON.parse(localStorage.getItem('snowed.endings') || '[]'); } catch (e) { return []; } };
+  const syncEndBtn = () => { if ($('endingsBtn')) $('endingsBtn').textContent = 'Endings ' + ENDINGS.filter(([id]) => seenEndings().includes(id)).length + '/' + ENDINGS.length; };
+  const showEndings = () => {
+    const seen = seenEndings(), n = ENDINGS.filter(([id]) => seen.includes(id)).length;
+    $('endingsSub').textContent = n ? n + ' of ' + ENDINGS.length + ' found. None of them is the right one.' : 'None found yet. None of them is the right one.';
+    $('endingsList').innerHTML = ENDINGS.map(([id, name, hint]) => {
+      const f = seen.includes(id);
+      return `<div class="ending ${f ? 'found' : 'locked'}"><div class="et"><div class="en">${f ? name : '· · ·'}</div><div class="eh">${hint}</div></div>${f ? `<button class="btn small" type="button" data-replay="${id}">Replay</button>` : ''}</div>`;
+    }).join('');
+    $('endings').hidden = false;
+  };
+  if ($('endingsBtn')) {
+    $('endingsBtn').addEventListener('click', showEndings);
+    $('endingsClose').addEventListener('click', () => { $('endings').hidden = true; });
+    $('endings').addEventListener('click', (e) => {
+      if (e.target === $('endings')) { $('endings').hidden = true; return; }
+      const id = e.target.dataset && e.target.dataset.replay; if (!id) return;
+      $('endings').hidden = true; G.jumpTo(id === 'firstsnow' ? 'firstsnow' : 'ending_' + id);
+    });
+    syncEndBtn(); G.syncEndings = syncEndBtn;
+  }
   for (const sel of [$('chapterSel'), $('pChapter')]) {
     if (!sel) continue;
     sel.innerHTML = '<option value="">Jump to…</option>' + G.CHAPTERS.map(([id, t]) => `<option value="${id}">${t}</option>`).join('');

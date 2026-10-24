@@ -225,8 +225,8 @@ function nightLoops(run) {
     else stare = Math.max(0, stare - dt);
     if ((PLAYER.speed || 0) > 2.4 && d < 3.2) { NIGHT.runT = (NIGHT.runT || 0) + dt; if (NIGHT.runT > 1.2) { NIGHT.runT = -8; suspect(0.5, 'run'); } }
     // It's noticed you noticing: close to it, with suspicion up, you can hear your own heart.
-    if ((S.vars.suspicion || 0) >= 2 && d < 3) { NIGHT.hbT = (NIGHT.hbT || 0) - dt; if (NIGHT.hbT <= 0) { G.Audio.heart && G.Audio.heart(0.5 + (3 - d) / 4); NIGHT.hbT = 0.75 + d * 0.15; } }
-    if ((S.vars.suspicion || 0) >= 3 && !S.flags.fakeWithdrawn && !NIGHT.slipping) A.run(slip);
+    if ((S.vars.suspicion || 0) >= 2 && d < 3 && !G.gentle()) { NIGHT.hbT = (NIGHT.hbT || 0) - dt; if (NIGHT.hbT <= 0) { G.Audio.heart && G.Audio.heart(0.5 + (3 - d) / 4); NIGHT.hbT = 0.75 + d * 0.15; } }
+    if ((S.vars.suspicion || 0) >= 3 && !S.flags.fakeWithdrawn && !NIGHT.slipping && !G.gentle()) A.run(slip);
   });
   // The more you've let it convince you, the closer it keeps you, and the more it says so.
   (async () => {
@@ -241,7 +241,7 @@ function nightLoops(run) {
       const lv = Math.min(2, Math.floor(S.vars.corruption || 0));
       if (lv < 1 && dist() < 5) continue;
       G.bark(lines[lv][Math.floor(Math.random() * 3)], 2.8);
-      if (lv >= 2 && dist() > 2) { PARTNER.mode = 'script'; await G.walkTo(PARTNER, PLAYER.x + 0.5, PLAYER.z + 0.3, 1.5); if (live() && !S.flags.fakeWithdrawn) PARTNER.mode = 'follow'; }
+      if (lv >= 2 && dist() > 2 && !G.gentle()) { PARTNER.mode = 'script'; await G.walkTo(PARTNER, PLAYER.x + 0.5, PLAYER.z + 0.3, 1.5); if (live() && !S.flags.fakeWithdrawn) PARTNER.mode = 'follow'; }
     }
   })();
   // A hint, if you've heard the whistle and stood about a while.
@@ -552,6 +552,7 @@ async function nearMiss(spd) {
 }
 // It comes back for her. Sooner, and faster, the more it got its way with him earlier.
 function hunt(run) {
+  if (G.gentle()) return;   // gentle nights: it doesn't come back for her
   const live = () => S.run === run && !NIGHT.left && !NIGHT.kept;
   heartbeat(live);
   const ob = () => Math.min(3, S.vars.corruption || 0);

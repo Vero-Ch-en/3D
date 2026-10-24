@@ -178,6 +178,7 @@ G.endingName = null;
 const showEnd = (id, title) => {
   if (S.chapter !== 'ending_' + id && S.chapter !== id) return;   // a scene left behind by a jump to another chapter
   try { const k = 'snowed.endings', a = JSON.parse(localStorage.getItem(k) || '[]'); if (!a.includes(id)) a.push(id); localStorage.setItem(k, JSON.stringify(a)); } catch (e) { /* */ }
+  G.syncEndings && G.syncEndings();
   G.observe('ending_' + id, { foundme: 'It found the real one. I will remember how.', uncertain: 'It went home. It is not sure who with. Neither am I.', iknow: 'It does not know. It chose anyway. I did not plan for that.', perfect: 'It stayed with me. Every day is lovely.', firstsnow: 'They are still choosing each other. I could never copy that.', replaced: 'I am him now. She hasn’t noticed. She will not.', stay: 'It stayed. I will remember it for both of us.' }[id]);
   G.$('endEyebrow').textContent = title;
   STATE.nightDone = true; STATE.busy = false; STATE.ending = id;
@@ -540,7 +541,7 @@ function herLoops(run) {
     let n = 0;
     while (live() && !S.flags.herCircle) {
       await wait(18 + Math.random() * 14);
-      if (!live() || S.flags.herCircle || G.busy() || PLAYER.z < 13 || PLAYER.z > 40) continue;
+      if (!live() || S.flags.herCircle || G.busy() || PLAYER.z < 13 || PLAYER.z > 40 || G.gentle()) continue;
       const fx = Math.sin(PLAYER.yaw), fz = Math.cos(PLAYER.yaw), side = Math.random() < 0.5 ? -1 : 1;
       const x = PLAYER.x + fx * 16 + fz * side * 4, z = PLAYER.z + fz * 16 - fx * side * 4;
       ENT.g.position.set(x, fy(x, z), z); ENT.g.rotation.y = Math.atan2(PLAYER.x - x, PLAYER.z - z); ENT.g.visible = true;

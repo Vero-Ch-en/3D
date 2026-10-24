@@ -187,6 +187,20 @@ blinks, dozing, hugs. Hats and the snow on them are handed to the model's own he
   in Act IV. At its worst the bed gets made perfectly. Scrapbook pages go blank, and one child is painted out of the
   hall photograph (`G.take`).
 
+## Build 69
+
+- **Gentle nights:** `SETTINGS.nights` (`G.gentle()`). It skips `hunt()`, the night heartbeat, `slip()`, the obsessive walk-ups and the Act IV glimpses.
+- **Endings dialog:** `#endings` on the title screen. It reads `snowed.endings`, and `showEnd` refreshes the count through `G.syncEndings`.
+
+## Interface (build 69)
+
+- **Direction: frosted window glass at night.** Surfaces are cool and translucent (`--frost`, blurred and saturated). Text is a cool white (`--ink`). The warm lamplight colour (`--lamp`, #f3b76e) is kept for what you press (Begin, Resume), and for the choice you're on, which gets a lamp-coloured bar down its left edge.
+- **Type:** Instrument Serif for the title, act cards, narration and endings; Hanken Grotesk for everything else; JetBrains Mono only inside key caps. No tracked all-caps labels.
+- **Title:** bottom-left, the name large and calm, with a soft shadow behind the text block. Play as, Nights and Chapter sit in one glass panel with segmented controls (a recessed track with the chosen option lifted out). Below that are the Endings link and the controls as key caps.
+- **Corner bar:** quality, time of day, stats and pause are one slim pane of glass with dividers.
+- **Menus** (pause, endings) are one frosted pane each, with hairline dividers between rows. Nights can also be changed from the pause menu.
+- **Phones:** below 560 px the title text gets a darker bottom-up gradient, the option rows wrap, and the key list is hidden.
+
 ## Build 68
 
 - **Drone:** `G.Audio.set({ drone, droneFast })`. Two sines at 49 and 51.4 Hz plus a quiet triangle an octave up, lowpassed at 320 Hz and created on first use. It runs in the night and in Act IV before the reunion, and the pad drops to 30% then. `STATE.hush` cuts it in about 25 ms; it comes back over about 2 s.

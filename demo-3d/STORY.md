@@ -121,6 +121,12 @@ The game saves at the start of each chapter, at the Elsewhere door in the night,
 - **Caught:** they stand face to face. Her arm is pulled out, and his hand reaches across and closes round her wrist (his arm goes to wherever her hand actually is).
 - **The Entity:** when it finally stands in front of you, it's a person's shape in packed, glittering snow. It's a little too tall and has no face, and flakes keep lifting off it and drifting round.
 
+## Title screen (build 69)
+
+- **Nights: Tense / Gentle.** Gentle keeps the story the same, but nothing chases you. Playing as her, the imitation doesn't come back looking for her, so there's no hunt, close call or getting caught, and she can't be kept. Playing as him, the mask never slips and it doesn't walk right up to you. There's no heartbeat, and no figure between the trees. The setting is remembered.
+- **Look:** a sleeker, frosted-glass interface (see the realism plan).
+- **Endings:** a button shows how many of the seven endings you've found (kept in this browser). The list shows found endings by name, with a Replay button. Unfound ones are hidden, but their one-line hints still show ("At the door in the meadow, stay."). "None of them is the right one."
+
 ## Testing aids
 
 - **Chapter list:** on the title screen and in the pause menu. It covers every act, Elsewhere on its own, Act IV on the way home, and each ending.
