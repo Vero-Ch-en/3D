@@ -192,6 +192,11 @@ blinks, dozing, hugs. Hats and the snow on them are handed to the model's own he
 - **Gentle nights:** `SETTINGS.nights` (`G.gentle()`). It skips `hunt()`, the night heartbeat, `slip()`, the obsessive walk-ups and the Act IV glimpses.
 - **Endings dialog:** `#endings` on the title screen. It reads `snowed.endings`, and `showEnd` refreshes the count through `G.syncEndings`.
 
+## Together in bed (build 73)
+
+- **`G.cuddleInBed(him, her)`:** him on his back, turned a little toward her. Her on her side against him (`lieRoll` about -1.05), her head at his shoulder and her knees drawn up a little. Her top arm rests across his chest, half-way down; his near arm goes round her with his hand at her back (`cuddleIK`, two-bone IK each frame while both are lying).
+- **Used in the tender scenes:** bedtime, the first morning, climbing back in for "ten more minutes", and the endings that open in bed. The imitation's nights ("exactly on her side") and the her-route waking ("exactly half the bed") keep them apart on purpose.
+
 ## Loading and cold reactions (build 71)
 
 - **Smaller models:** `tools/quantize_glb.js` stores the character geometry quantized (KHR_mesh_quantization, which GLTFLoader reads natively, so no WebAssembly decoder is needed). Normals become 8-bit, UVs and vertex colours 16-bit, and skin weights 8-bit, with each vertex still summing to exactly 255. Positions stay full floats. `dequantize()` in people.js turns those attributes straight back into floats after loading, because this three.js doesn't scale them on getX/setX and the game reshapes the bodies. The adults' file went from 10.7 to 8.3 MB, the children's from 7.5 to 6.0 MB. Run `node tools/quantize_glb.js` (and `... kids`) again after any `patch_gear.js`; the patcher works on quantized files.

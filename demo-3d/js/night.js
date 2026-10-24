@@ -77,7 +77,7 @@ CH.bedtime = async () => {
   await wait(0.3);
   f.style.transition = 'opacity 1.6s'; f.classList.remove('on'); wait(1.8).then(() => { f.style.transition = ''; f.style.background = ''; });
   await P('Bed. Now. I’m declaring it.', K());
-  await G.cutTo(() => { G.lieDown(PLAYER, B().L, -0.14, 0.15, 0.35); G.lieDown(PARTNER, B().R, -0.40, -0.3, -0.4); PARTNER.mode = 'lying'; G.shapeBed({ L: true, R: true }); G.setShot(bedClose()); }, 0.5);
+  await G.cutTo(() => { G.cuddleInBed(PLAYER, PARTNER); PARTNER.mode = 'lying'; G.shapeBed({ L: true, R: true }); G.setShot(bedClose()); }, 0.5);
   if (G.herRoute()) return bedtimeHer(f);
   await P('Partner.', K());
   await Y('Partner.', K());

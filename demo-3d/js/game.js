@@ -672,7 +672,19 @@ G.sitDown = (c, x, z, yaw, seatY, dur = 0.6) => { c.seatY = seatY; c.sitTarget =
 G.sitAt = (c, x, z, yaw, seatY) => { c.script = null; c.lie = false; placeChar(c, x, z, yaw); c.seatY = seatY; c.sitTarget = 1; c.sit = 1; };
 G.standAt = (c, x, z, yaw) => { c.script = null; c.lie = false; c.sitTarget = 0; c.sit = 0; c.freeSit = null; c.rise = null; placeChar(c, x, z, yaw); };
 // In bed: feet at (x, zFeet), head toward the headboard; roll turns onto one side, look turns the head.
-G.lieDown = (c, x, zFeet, roll = 0, look = 0) => { c.script = null; c.sitTarget = 0; c.sit = 0; c.speed = 0; c.lie = true; c.x = x; c.z = zFeet; c.lieY = G.BED.top + 0.13; c.y = c.lieY; c.lieRoll = roll; c.lieLook = look; c.yaw = 0; };
+// The two of them in bed together, close: him on his back turned a little towards her, her on her side against him with
+// her head at his shoulder, her arm across his chest and her knees drawn up; his arm round her. (The imitation's nights
+// keep to "exactly her side": those use lieDown on each side as before.)
+G.cuddleInBed = (him, her, o = {}) => {
+  const B = G.BED, hx = B.x + (o.himX != null ? o.himX : -0.1), sx = B.x + (o.herX != null ? o.herX : 0.2);
+  // which side she's on decides which way each turns
+  const side = Math.sign(sx - hx) || 1;
+  G.lieDown(him, hx, -0.14, 0.22 * side, 0.3 * side);
+  G.lieDown(her, sx, -0.25, -1.05 * side, -0.25 * side);
+  her.lieTilt = 0.05;
+  him.cuddle = { with: her, role: 'hold' }; her.cuddle = { with: him, role: 'drape' };
+};
+G.lieDown = (c, x, zFeet, roll = 0, look = 0) => { c.cuddle = null; c.script = null; c.sitTarget = 0; c.sit = 0; c.speed = 0; c.lie = true; c.x = x; c.z = zFeet; c.lieY = G.BED.top + 0.13; c.y = c.lieY; c.lieRoll = roll; c.lieLook = look; c.yaw = 0; };
 
 /* =====================================================================
  * Camera director

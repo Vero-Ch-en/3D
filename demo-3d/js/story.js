@@ -696,7 +696,7 @@ Object.assign(Story, {
   async morningCuddle() {
     S.flags.inBedScene = true; S.flags.cuddled = true;
     STATE.sceneShot = true;
-    await G.cutTo(() => { G.lieDown(PLAYER, G.BED.L, -0.14, 0.15, 0.35); G.shapeBed({ L: true, R: true }); G.setShot(bedCloseShot()); });
+    await G.cutTo(() => { G.cuddleInBed(PLAYER, PARTNER); PARTNER.mode = 'lying'; G.shapeBed({ L: true, R: true }); G.setShot(bedCloseShot()); });
     await N('(You climb back in. She doesn’t open her eyes. She simply shifts until she’s against you again.)', { shot: 'keep' });
     PARTNER.lidsClosed = true;
     await P('I knew you’d come back.', { shot: 'keep' });
@@ -1011,13 +1011,12 @@ CH.morning = async () => {
   houseFor('morning');
   Object.assign(S.flags, { teaMade: false, pancakesMade: false, breakfastDone: false, leaveHouse: false, cuddled: false });
   const B = G.BED;
-  G.lieDown(PLAYER, B.L, -0.14, 0.15, 0.35);
-  G.lieDown(PARTNER, B.R, -0.40, -0.3, -0.4); PARTNER.mode = 'lying'; PARTNER.lidsClosed = true;
+  G.cuddleInBed(PLAYER, PARTNER); PARTNER.mode = 'lying'; PARTNER.lidsClosed = true;   // she's curled against him, asleep
   STATE.sceneShot = true; G.setShot(bedShot());
   await wait(0.4);
   f.style.transition = 'opacity 2.2s'; f.classList.remove('on'); wait(2.4).then(() => { f.style.transition = ''; f.style.background = ''; });
   await G.UI.act('I', 'Shared Life', { white: false });
-  if (G.herDawn && !S.flags.dawnDone && !window.SKIP_DAWN) { await G.herDawn(); G.lieDown(PLAYER, B.L, -0.14, 0.15, 0.35); G.lieDown(PARTNER, B.R, -0.40, -0.3, -0.4); PARTNER.mode = 'lying'; PARTNER.lidsClosed = true; STATE.sceneShot = true; G.setShot(bedShot()); STATE.busy = true; }
+  if (G.herDawn && !S.flags.dawnDone && !window.SKIP_DAWN) { await G.herDawn(); G.cuddleInBed(PLAYER, PARTNER); PARTNER.mode = 'lying'; PARTNER.lidsClosed = true; STATE.sceneShot = true; G.setShot(bedShot()); STATE.busy = true; }
   G.setShot(bedCloseShot(), false);
   await N('(The first real snow of the winter came in the night. Morning. Warm. Someone is breathing, very softly, against your neck.)', { shot: 'keep' });
   await P('…Mm. Don’t move, {toHim}. You’re warm.', { shot: 'keep' });

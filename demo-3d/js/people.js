@@ -725,6 +725,27 @@ function reachIK(c, u, dt) {
   const T = new THREE.Vector3(R.x, R.y, R.z); T.lerp(_rv, 0.1);
   solveArm(c, u, A, R.arm, T, k * 0.92, 0.35);
 }
+// In bed together: her top arm across his chest; his near arm round her, hand at her back.
+function cuddleIK(c, u) {
+  const o = c.cuddle.with, ou = o.m.userData; if (!ou.chest || !u.arms) return;
+  c.m.updateMatrixWorld(true); o.m.updateMatrixWorld(true);
+  const oc = ou.chest.getWorldPosition(new THREE.Vector3()), mc = u.chest.getWorldPosition(new THREE.Vector3());
+  let arm = -1, T;
+  if (c.cuddle.role === 'drape') {
+    // the upper arm (she's on her side): the shoulder that's higher; the hand comes to rest on his far side of the chest
+    let best = -1e9; u.arms.forEach((A, i) => { if (!A) return; const y = A.sh.getWorldPosition(_rv).y; if (y > best) { best = y; arm = i; } });
+    const across = oc.clone().sub(mc); across.y = 0; across.normalize();
+    const oh = (ou.hips || ou.chest).getWorldPosition(new THREE.Vector3());
+    T = oc.clone().lerp(oh, 0.45).addScaledVector(across, 0.04); T.y += 0.11;   // resting on him, half-way down the chest
+  } else {
+    // the arm nearer to her goes round under her shoulders, hand on her far side
+    let bd = 1e9; u.arms.forEach((A, i) => { if (!A) return; const d = A.sh.getWorldPosition(_rv).distanceTo(oc); if (d < bd) { bd = d; arm = i; } });
+    const away = oc.clone().sub(mc); away.y = 0; away.normalize();
+    T = oc.clone().addScaledVector(away, 0.12); T.y -= 0.02;
+  }
+  if (arm < 0 || !u.arms[arm]) return;
+  solveArm(c, u, u.arms[arm], arm, T, 0.95, 0.4);
+}
 // Taking someone by the wrist: arm 0 reaches for the other one's arm-1 hand, wherever their pose has put it
 // (they're facing each other, so that's the hand straight across).
 function grabIK(c, u) {
@@ -1035,6 +1056,7 @@ G.animate = (c, dt, t) => {
     }
     if (turnW > 0.02) { const lift = Math.max(0, Math.sin(c._turnPh + i * Math.PI)) * turnW; Lg.th.rotation.x -= lift * 0.32; Lg.kn.rotation.x += lift * 0.62; Lg.ft.rotation.x -= lift * 0.22; }
     if (c.angel) { Lg.th.rotation.set(0, 0, s * (0.05 + 0.32 * (0.5 - 0.5 * Math.cos(t * 2.4)))); Lg.kn.rotation.x = 0.04; }
+    if (c.lie && c.cuddle && c.cuddle.role === 'drape') { Lg.th.rotation.x = -0.55 - i * 0.12; Lg.kn.rotation.x = 0.85 + i * 0.15; Lg.ft.rotation.x = 0.1; }   // curled a little, knees towards him
     // Stamping the snow off on the mat: one foot, then the other, lifted and brought down hard.
     if (c.stampT > 0 && sit < 0.1) { const ph2 = (0.95 - c.stampT) / 0.32, leg = Math.floor(ph2) % 2, f = ph2 % 1, up = Math.sin(Math.min(1, f / 0.75) * Math.PI) * (f < 0.75 ? 1 : 0); if (leg === i) { Lg.th.rotation.x -= up * 0.38; Lg.kn.rotation.x += up * 0.75; Lg.ft.rotation.x -= up * 0.15; } }
     // Hiding on a seat: knees pulled right up to the chest, feet tucked in on the cushion.
@@ -1144,6 +1166,7 @@ G.animate = (c, dt, t) => {
   else if ((c.holdW || 0) > 0.01 && c.holdWith && c.holdWith.m && c.holdArm != null && c.holdWith.holdArm != null) holdIK(c, u, c.holdW);
   else if (c.grabWith && c.grabWith.m && c.grabWith.m.userData.arms) grabIK(c, u);
   if (c.reach) reachIK(c, u, dt);
+  if (c.lie && c.cuddle && c.cuddle.with && c.cuddle.with.m && c.cuddle.with.lie) cuddleIK(c, u);
   // Blinks on a natural, irregular rhythm (sometimes a double blink).
   c.blinkT = (c.blinkT == null ? Math.random() * 3 : c.blinkT) - dt;
   if (c.noBlink) c.blinkT = Math.max(c.blinkT, 1);   // the imitation, when it stops pretending
