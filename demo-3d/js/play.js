@@ -58,6 +58,7 @@ function refreshFridge() {
     img.src = p.src;
   });
 }
+G.refreshFridge = () => { FRIDGE.forEach((f) => { f.src = null; }); refreshFridge(); };
 function shutter() { G.Audio.tone(2400, 0.015, 0.03); G.Audio.tone(1300, 0.03, 0.025, 0.06); }
 // Read the canvas right after it's drawn (same task), crop to 4:3 and keep a small JPEG.
 function capture() {

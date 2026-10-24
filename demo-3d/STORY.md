@@ -47,6 +47,8 @@ Around the story the cabin is lived in. It has a deeper 15 × 7 m layout with a 
   - **Reading in the window seat:** she does the voices and makes you do the lighthouse keeper. Then she reads ahead with her head on your shoulder, and says "Let's never finish it. Let's always be halfway through something."
   - **The frost on the kitchen window:** draw a heart, a snowman or the pinecone score, and she adds to it (a second, lopsided heart; a very tall hat; "recount").
   - If you stand about, she suggests the ones you haven't done yet.
+- **Cocoa** now comes from the kettle's "Make cocoa": the first time in the evening it's the scene; after that, the usual mugs.
+- **Photographs (build 77):** if you took a photo with her in it during the day, the photographs on the fridge door have something new at night. In the newest one of her, half out of the frame at the edge, someone is standing very still, out of focus, arms straight down. The caption now says "The three of you". The fridge and scrapbook keep the changed one. In You Found Me it's "just snow now, and trees. Just the two of you"; in Uncertain Morning it's still there, and "Neither of you remembers who took it." The Entity notes it.
 - **They come back wrong in the night:**
   - At the cocoa, the imitation drinks it straight off the heat without blinking.
   - In the window seat, its "nothing has changed at all" comes with a reminder of "always halfway through something".

@@ -167,7 +167,7 @@ G.TICKERS.add(() => {
 /* ===================== the evening ===================== */
 // Cocoa at the hob.
 const KX = () => (G.KITCHEN && G.KITCHEN.stove && G.KITCHEN.stove.x) || 12.35;
-inter('mCocoa', [KX(), 1.0, -1.3], 0.95, 'Make cocoa together', async () => {
+const cocoaScene = async () => {
   STATE.busy = true; const p = PARTNER, kx = KX();
   await G.cutTo(() => { G.setDressed(PLAYER, false); G.setDressed(p, false); G.standAt(PLAYER, kx - 0.35, -1.25, Math.PI + 0.2); G.standAt(p, kx + 0.38, -1.2, Math.PI - 0.3); p.mode = 'still'; }, 0.35);
   const shot = fixed(V(kx + 0.1, 1.55, 0.2), V(kx, 1.0, -1.5), 42, 0.012);
@@ -188,8 +188,9 @@ inter('mCocoa', [KX(), 1.0, -1.3], 0.95, 'Make cocoa together', async () => {
   addScrap('cocoa', 'Cocoa at the hob. One sugar. (Two. The second one fell.)');
   await G.cutTo(() => { G.standAt(PLAYER, kx - 0.5, -0.4, 0); G.standAt(p, kx + 0.5, -0.35, 0); }, 0.3);
   back();
-}, () => evening() && !S.flags.eveCocoa && !PARTNER.hidden);
-findInter('mCocoa').prio = 1;
+};
+// The kettle's "Make cocoa": the first time in the evening it's this scene, then the usual mugs.
+{ const k = findInter('kettle'), raw = k.raw; A.rewire('kettle', async () => { if (evening() && !S.flags.eveCocoa && !PARTNER.hidden) return cocoaScene(); return raw(); }); }
 
 // Reading together in the window seat.
 inter('mRead', [G.NOOK.x, 0.6, G.NOOK.z + 0.6], 1.0, 'Read together', async () => {
@@ -258,6 +259,51 @@ inter('nFrost', [13.0, 1.35, 4.0], 1.0, 'Kitchen window', async () => {
   if (G.NIGHT) G.NIGHT.seen.add('frost');
 }, () => S.chapter === 'night' && S.flags.nightUp && !S.flags.doorOpen && S.flags.eveFrost && G.NIGHT && G.NIGHT.seen && !G.NIGHT.seen.has('frost'));
 
+/* ===================== photographs ===================== */
+// In the night, one of your photographs of her has changed: at the edge of it, between the trees or by the door,
+// a third shape, standing very still. The fridge shows the changed one from then on. (Only photos with her in them.)
+const herIn = (ph) => /\{P\}|two of you/.test(ph.caption || '');
+function alterPhoto(ph) {
+  return new Promise((res) => {
+    const img = new Image();
+    img.onload = () => {
+      const cv = document.createElement('canvas'); cv.width = 320; cv.height = 240; const c = cv.getContext('2d');
+      c.drawImage(img, 0, 0, 320, 240);
+      // colder, a touch faded
+      c.fillStyle = 'rgba(120,140,170,0.16)'; c.fillRect(0, 0, 320, 240);
+      // the shape: tall, thin, slightly too still, half out of the frame on the right
+      c.filter = 'blur(3px)';   // out of focus, like something nobody was focusing on
+      const x = 282, g = c.createLinearGradient(0, 30, 0, 240); g.addColorStop(0, 'rgba(14,16,22,0.0)'); g.addColorStop(0.12, 'rgba(14,16,22,0.86)'); g.addColorStop(1, 'rgba(14,16,22,0.74)');
+      c.fillStyle = g; c.beginPath(); c.ellipse(x, 58, 15, 19, 0, 0, 7); c.fill();
+      c.beginPath(); c.moveTo(x - 13, 78); c.lineTo(x + 14, 78); c.lineTo(x + 21, 240); c.lineTo(x - 20, 240); c.closePath(); c.fill();
+      c.fillStyle = 'rgba(14,16,22,0.7)'; c.fillRect(x - 21, 86, 7, 90); c.fillRect(x + 14, 86, 7, 90);   // arms, hanging straight down
+      c.filter = 'none';
+      res(cv.toDataURL('image/jpeg', 0.8));
+    };
+    img.onerror = () => res(null);
+    img.src = ph.src;
+  });
+}
+inter('nPhotos', [14.45, 1.1, -1.4], 0.8, 'Photographs on the fridge', async () => {
+  const ph = S.photos.filter(herIn).slice(-1)[0]; if (!ph) return;
+  STATE.busy = true;
+  if (!ph.altered) {
+    const src = await alterPhoto(ph);
+    if (src) {
+      ph.src = src; ph.altered = true; ph.caption = ph.caption.replace('The two of you', 'The three of you');
+      const sp = S.scrap.find((p) => p.art === 'photo' && p.caption && p.caption.replace('The two of you', 'The three of you') === ph.caption); if (sp) { sp.src = src; sp.caption = ph.caption; }
+      if (G.refreshFridge) G.refreshFridge();
+    }
+  }
+  S.flags.photoAltered = 1; if (G.NIGHT) G.NIGHT.seen.add('photo2');
+  G.observe('photo_fridge', 'It found itself in one of the photographs. I thought it would like that.');
+  const pol = G.$('polaroid'); pol.querySelector('img').src = ph.src; pol.querySelector('p').textContent = G.fmt(ph.caption); pol.classList.add('show'); setTimeout(() => pol.classList.remove('show'), 5200);
+  await N('(Your photographs, on the fridge door. The one you took of her today.)');
+  await N('(At the edge of it, half out of the frame, someone is standing very still. You were the one holding the camera. There was nobody else there.)');
+  STATE.busy = false;
+}, () => S.chapter === 'night' && S.flags.nightUp && !S.flags.doorOpen && G.NIGHT && G.NIGHT.seen && !G.NIGHT.seen.has('photo2') && S.photos.some(herIn));
+findInter('nPhotos').prio = 2;
+
 // Now and then in the evening she suggests one of them, if you haven't done it yet.
 (() => {
   let idle = 0;
@@ -266,7 +312,7 @@ inter('nFrost', [13.0, 1.35, 4.0], 1.0, 'Kitchen window', async () => {
     idle += (PLAYER.speed < 0.2 ? 1 : 0.4) * dt;
     if (idle < 45) return; idle = -30;
     const opts = [];
-    if (!S.flags.eveCocoa) opts.push('Cocoa? I’ll supervise. I’m an excellent supervisor.');
+    if (!S.flags.eveCocoa) opts.push('Cocoa? The kettle’s right there. I’ll supervise. I’m an excellent supervisor.');
     if (!S.flags.eveRead) opts.push('We could read a bit. The lighthouse keeper is in terrible trouble.');
     if (!S.flags.eveFrost) opts.push('The kitchen window’s all frosted. I’m just saying.');
     if (opts.length) G.bark(opts[Math.floor(Math.random() * opts.length)], 3.2);

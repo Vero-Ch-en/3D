@@ -894,6 +894,7 @@ CH.ending_foundme = async () => {
   const c = await choose(['Don’t let go', 'Make breakfast together']);
   if (c === 0) await N('(You don’t let go. The kettle can wait. Everything can wait.)', K());
   else { await N('(Toast, this time. She steals your crust. Of course she does.)', K()); }
+  if (S.photos && S.photos.length) await N(S.flags.photoAltered ? '(On the fridge, yesterday’s photographs. The one with somebody standing at the edge of it is just snow now, and trees. Just the two of you.)' : '(On the fridge, yesterday’s photographs. Both of you in all of them. Mostly blinking.)', K());
   await P('Hey. You found me.', K());
   await Y('You whistled like an idiot.', K());
   await P('I whistled PERFECTLY.', K());
@@ -926,6 +927,7 @@ CH.ending_uncertain = async () => {
   await Y('No.', K());
   await P('Huh.', K());
   await N('(She makes tea in one of them, humming.)', K());
+  if (S.flags.photoAltered) await N('(On the fridge door, a photograph from yesterday. Two people, and at the edge, someone standing very still. Neither of you remembers who took it.)', K());
   await wait(1.2);
   await N('(It’s a lovely morning.)', K());
   showEnd('uncertain', 'Uncertain Morning');
