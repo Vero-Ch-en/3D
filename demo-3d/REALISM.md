@@ -187,6 +187,11 @@ blinks, dozing, hugs. Hats and the snow on them are handed to the model's own he
   in Act IV. At its worst the bed gets made perfectly. Scrapbook pages go blank, and one child is painted out of the
   hall photograph (`G.take`).
 
+## Build 67
+
+- **Hiding on the window seat:** a seated hiding pose (`hideSit`). Her knees are pulled up to her chest, her feet are tucked in on the cushion, and her arms wrap round her knees. She sits well back on the seat.
+- **His night:** a heartbeat near the imitation once suspicion is at 2, and the lamps stutter before `slip()`.
+
 ## Her route through the night and Act IV (build 66)
 
 - **Switch:** `G.herRoute()` (Partner chosen on the title screen). `CH.bedtime` hands over to `bedtimeHer`, `CH.night` to `nightHer` (Elsewhere with `{ her: true }`: she wakes beside him and gets up for water first), and `CH.lastbirthday` to `lastHer` (act4.js). `CH.act4_home` resumes either route.

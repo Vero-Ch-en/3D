@@ -88,6 +88,7 @@ You wake at night in a house that's almost exactly right: lamps on, perfectly ro
 - **Before it comes:** the kitchen light stutters three times, then bare footsteps come from the bedroom, getting louder and closer. That gives a few seconds to hide. The first time, a hint says "(Footsteps. Coming this way.)"
 - **While it's searching:** a heartbeat, quicker the closer it gets.
 - **The close call:** once per search, if she's hidden, it comes and stands right outside her hiding place. In the alcove, it stands in the opening with its back to her, while the camera holds on the alcove from the dark room. At the study, it stands at the door with its head on one side, listening. "I can hear you breathing, Partner." "(You don't breathe.)" Then "…Pipes. Old house." and it wanders off. **Coming out while it's standing right there gets her caught.**
+- **His night (build 67):** once suspicion is at 2 and it's close, you can hear your own heart. Before the mask slips, the lamps stutter.
 - **Her Act IV:** on the way to the circle, now and then, something stands between the trees, very still, and fades when she gets near. At the window, the second time she looks, the empty chair has been turned round to face her. At the circle, three notes answer her whistle **perfectly in tune** ("…That's new."), and the snow stops falling and hangs in the air while the one wearing him is there. When she sends it away, the snow comes down again all at once. The real one's whistle, later, is terrible.
 
 ## Endings

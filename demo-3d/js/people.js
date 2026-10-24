@@ -784,7 +784,7 @@ const CURL = { Thumb: [0.1, 0.15, 0.15], Index: [0.18, 0.28, 0.2], Middle: [0.24
 G.curlFingers = (c, dt) => {
   const u = c.m.userData; if (!u.fingers || !u.fingers.length || window.NOCURL) return;
   const pz = c.forcePose || c.pose;
-  const grip = c.carry || pz === 'carry' || pz === 'grab' ? 1 : pz === 'hide' ? 0.9 : (c.holdPose || pz === 'cup' || pz === 'read') ? 0.75 : pz === 'cold' ? 0.85 : pz === 'pockets' || pz === 'coatPockets' ? 0.6 : c.holdOn ? 0.45 : (c.hug || 0) > 0.3 ? 0.4 : 0;
+  const grip = c.carry || pz === 'carry' || pz === 'grab' ? 1 : pz === 'hide' ? 0.9 : pz === 'hideSit' ? 0.6 : (c.holdPose || pz === 'cup' || pz === 'read') ? 0.75 : pz === 'cold' ? 0.85 : pz === 'pockets' || pz === 'coatPockets' ? 0.6 : c.holdOn ? 0.45 : (c.hug || 0) > 0.3 ? 0.4 : 0;
   c.grip = G.damp(c.grip || 0, grip, 6, dt);
   const fid = Math.sin((c.breath || 0) * 0.5) * 0.04;   // the smallest restlessness, so hands never look carved
   for (const F of u.fingers) {
@@ -894,6 +894,7 @@ const ARM_POSES = (G.ARM_POSES = {
   grab: [-1.2, 0.12, -0.32, 0.15],      // one arm out, hand closed round someone's wrist (arm 0 only)
   held: [-0.8, 0.04, -0.14, 0.1],       // one arm pulled out low and straight by the wrist (arm 1 only)
   hide: [-0.36, 0.46, -1.45, -0.55],    // hugging yourself small, elbows in, hands on the opposite arms (hiding)
+  hideSit: [-0.95, 0.4, -0.95, -0.3],   // sitting, arms wrapped round your knees (hiding on a seat)
 });
 const ONE_ARM = { throw: 0, water: 0, wave: 1, grab: 0, held: 1 };
 /* Motion capture (js/mocap.js, from the CMU motion capture database): looping idle, walk and seated clips,
@@ -985,6 +986,8 @@ G.animate = (c, dt, t) => {
     }
     if (turnW > 0.02) { const lift = Math.max(0, Math.sin(c._turnPh + i * Math.PI)) * turnW; Lg.th.rotation.x -= lift * 0.32; Lg.kn.rotation.x += lift * 0.62; Lg.ft.rotation.x -= lift * 0.22; }
     if (c.angel) { Lg.th.rotation.set(0, 0, s * (0.05 + 0.32 * (0.5 - 0.5 * Math.cos(t * 2.4)))); Lg.kn.rotation.x = 0.04; }
+    // Hiding on a seat: knees pulled right up to the chest, feet tucked in on the cushion.
+    if ((c.forcePose === 'hide' || c.forcePose === 'hideSit') && sit > 0.5) { const k3 = (sit - 0.5) * 2; Lg.th.rotation.x = L(Lg.th.rotation.x, -2.0, k3); Lg.th.rotation.z = L(Lg.th.rotation.z, s * 0.06, k3); Lg.kn.rotation.x = L(Lg.kn.rotation.x, 2.8, k3); Lg.ft.rotation.x = L(Lg.ft.rotation.x, -0.35, k3); }
   });
   u.hips.position.y = L(u.hipY, (c.seatY || 0.6) - c.y + 0.03, sit) - Math.abs(Math.sin(ph)) * 0.03 * w - Math.abs(shift) * 0.012;
   // Walking, the hips sway over the planted foot; standing, they sit out over the loaded leg.
@@ -1052,7 +1055,7 @@ G.animate = (c, dt, t) => {
     if (mb && sit > 0.5 && c._talkW > 0.01 && c._mc.t && c._mc.t['sh' + i]) { const T = c._mc.t, kt = Math.min(1, c._talkW) * 0.4 * sit; sx = L(sx, Math.max(-1.1, T['sh' + i][0]), kt * 0.6); ex = L(ex, T['el' + i], kt); sz = L(sz, T['sh' + i][2] + s * 0.12, kt * 0.4); }
     if (mb) { const a = mb['sh' + i], ka = 1 - sit; sx = L(sx, a[0], ka); sy = L(sy, a[1] * 0.6, ka); sz = L(sz, a[2] + s * (c.dressed ? 0.1 : 0.06), ka); ex = L(ex, mb['el' + i], ka); }
     for (const name in ARM_POSES) {
-      const wgt = pw[name] * (name === 'read' || name === 'cup' ? 1 : 1 - sit) * (name === 'warm' ? idle : 1);   // a book or a mug works sitting down too
+      const wgt = pw[name] * (name === 'read' || name === 'cup' || name === 'hideSit' ? 1 : 1 - sit) * (name === 'warm' ? idle : 1);   // a book or a mug works sitting down too
       if (wgt < 0.001 || (ONE_ARM[name] != null && i !== ONE_ARM[name])) continue;   // one arm throws, or waves
       const P = ARM_POSES[name];
       // On this rig +s rolls the arm in toward the body (−s spreads it, as the hug does).

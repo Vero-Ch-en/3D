@@ -224,6 +224,8 @@ function nightLoops(run) {
     if ((PLAYER.speed || 0) < 0.2 && d < 2.4 && facing && !PLAYER.lie && !(PLAYER.sit > 0.1)) { stare += dt; if (stare > 5) { stare = -6; suspect(1, 'stare'); G.bark('…What?', 1.6); } }
     else stare = Math.max(0, stare - dt);
     if ((PLAYER.speed || 0) > 2.4 && d < 3.2) { NIGHT.runT = (NIGHT.runT || 0) + dt; if (NIGHT.runT > 1.2) { NIGHT.runT = -8; suspect(0.5, 'run'); } }
+    // It's noticed you noticing: close to it, with suspicion up, you can hear your own heart.
+    if ((S.vars.suspicion || 0) >= 2 && d < 3) { NIGHT.hbT = (NIGHT.hbT || 0) - dt; if (NIGHT.hbT <= 0) { G.Audio.heart && G.Audio.heart(0.5 + (3 - d) / 4); NIGHT.hbT = 0.75 + d * 0.15; } }
     if ((S.vars.suspicion || 0) >= 3 && !S.flags.fakeWithdrawn && !NIGHT.slipping) A.run(slip);
   });
   // The more you've let it convince you, the closer it keeps you, and the more it says so.
@@ -250,6 +252,8 @@ function nightLoops(run) {
 async function slip() {
   NIGHT.slipping = true; STATE.busy = true;
   S.vars.slips = (S.vars.slips || 0) + 1;
+  // The lamps stutter first.
+  { const on = G.LAMPS.filter((L) => L.on); for (let k = 0; k < 3; k++) { on.forEach((L) => { L.power *= 0.3; }); await wait(0.08 + Math.random() * 0.07); on.forEach((L) => { L.power /= 0.3; }); await wait(0.12 + Math.random() * 0.2); } }
   const n = S.vars.slips, o = S.obs || {};
   for (const L of G.LAMPS) if (L.on) L.power *= 0.25;
   G.Audio.thud && G.Audio.thud();
@@ -656,7 +660,7 @@ const hideAct = (where) => async () => {
   const h = HIDE[where]();
   if (where === 'nook') {
     // knees up on the window seat behind the curtain
-    G.sitDown(PLAYER, h.x, h.z, h.yaw, h.y, 0.5); PLAYER.forcePose = 'hide';
+    G.sitDown(PLAYER, h.x, h.z - 0.14, h.yaw, h.y, 0.5); PLAYER.forcePose = 'hideSit';   // well back on the seat, feet up on the cushion
     await N('(You fold yourself into the window seat behind the curtain, knees up, and keep very still.)');
     // Held on the alcove from the dark room: her, small against the moonlit window. Anything that comes stands in between.
     if (NIGHT.hiding === 'nook') { STATE.sceneShot = true; G.setShot(fixed(V(G.NOOK.x - 0.25, 1.35, G.NOOK.z + 2.7), V(G.NOOK.x + 0.05, 0.85, G.NOOK.z + 0.1), 46, 0.006)); }
