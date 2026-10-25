@@ -192,6 +192,19 @@ blinks, dozing, hugs. Hats and the snow on them are handed to the model's own he
 - **Gentle nights:** `SETTINGS.nights` (`G.gentle()`). It skips `hunt()`, the night heartbeat, `slip()`, the obsessive walk-ups and the Act IV glimpses.
 - **Endings dialog:** `#endings` on the title screen. It reads `snowed.endings`, and `showEnd` refreshes the count through `G.syncEndings`.
 
+## Companion awareness (build 79)
+
+- `js/companion.js` runs through `G.STEP_HOOKS`.
+  - It is limited to his route in her chapters (`hers()`), and stays quiet while busy, during scripts, tasks or leads, while she's hidden or lying down, or when `flags.noBarks` is set.
+- `goal()` returns a target and two lines for each chapter state.
+  - If he hasn't got 1.5 m closer to the target for 40 s (75 s after the first prompt), `pointTowards` runs.
+  - She barks, walks up to 2.2 m toward the target (`G.navOpen` check, 3 s cap), gazes at it and plays the `wave` pose. Cooldown 30 s.
+- Wall bump: a movement key held, actual displacement under 0.15 m/s for 1.8 s, she's within 6 m → a bark. Cooldown 70 s.
+  - `PLAYER.speed` is the commanded speed, so it doesn't drop against a wall. The check measures displacement instead.
+- Evening memory barks: the first unused entry in `DAY` whose condition holds, when she's within 4 m and not seated. Every 55–90 s. Reset on jump.
+- `life.js` STOKE task: if `F.fuel < 0.28`, the basket has logs, she's free, inside and within 8 m of the hearth, she walks to the hearth, plays the `warm` pose, and her `onEnd` adds 0.42 fuel and takes one log.
+  - The 30 s gate uses a timestamp (`STOKE.at`) rather than a flag, so an aborted walk can't lock it.
+
 ## Together in bed (build 73)
 
 - **`G.cuddleInBed(him, her)`:** him on his back, turned a little toward her. Her on her side against him (`lieRoll` about -1.05), her head at his shoulder and her knees drawn up a little. Her top arm rests across his chest, half-way down; his near arm goes round her with his hand at her back (`cuddleIK`, two-bone IK each frame while both are lying).

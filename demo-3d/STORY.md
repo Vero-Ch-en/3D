@@ -54,6 +54,14 @@ Around the story the cabin is lived in. It has a deeper 15 × 7 m layout with a 
   - In the window seat, its "nothing has changed at all" comes with a reminder of "always halfway through something".
   - The kitchen window you drew on has been wiped clean, right to the corners.
 
+## She's paying attention (build 79)
+
+Only on his route, in her own chapters (morning, the walk, the evening, the endings, the first snow). Never in the night or Act IV, because that isn't her.
+- **She knows what the day is waiting for.** If you wander for a while without getting closer to it (the pancakes, breakfast, the cake, the sofa, the porch), she says so in her own way, walks a few steps that way and points. "The kitchen is that way. The pancakes won't make themselves. I've asked them."
+- **She feeds the fire.** When it's getting low and there are logs in the basket, she gets up and does it herself. "Fire's fed. You're welcome."
+- **She notices when you're walking into a wall.** "That's a wall, {toHim}. Walls don't move. I've checked."
+- **She remembers the day you've had.** In the evening, now and then, she brings up something from earlier: the pinecones (won or lost), the burnt or golden pancakes, her ambush, the branch, the fox, the photographs, the snowman, what you said on the hill. And the circle, which she has decided not to think about.
+
 ## Act II · Something Strange: the evening
 
 - She hadn't forgotten what day it is: the cake, five candles, a wish.

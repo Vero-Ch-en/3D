@@ -618,6 +618,10 @@ function armful(m, n) {
 }
 const ARMS = { player: armful(ADULT.player, 3), partner: armful(ADULT.partner, 2) };
 function setCarry(c, on) { c.carry = on; (c === PLAYER ? ARMS.player : ARMS.partner).visible = on; }
+// Her feeding the fire: kneel at the hearth, a log on, sparks; a word if you're there to hear it.
+const STOKE = { at: -99, id: 'stoke', spot: { x: 8.05, z: -0.75 }, yaw: Math.PI, dur: [2.2, 2.6], look: { x: 8.0, y: 0.35, z: -1.8 },
+  onArrive: (p) => { p.forcePose = 'warm'; },
+  onEnd: (p) => { p.forcePose = null; if (L.basket > 0 && F.on) { L.basket--; F.fuel = Math.min(1, F.fuel + 0.42); G.Audio.poke(); G.sparkBurst && G.sparkBurst(); freeBark(pick(['There. Can’t have it going out on us.', 'One more log. It was looking at me.', 'Fire’s fed. You’re welcome.']), 2.8); } } };
 const fire = A.findInter('fire');
 fire.label = () => (!F.on ? 'Light the fire' : F.fuel < 0.62 && L.basket > 0 ? 'Add a log' : 'Poke the fire');
 const pokeAct = fire.raw;
@@ -662,6 +666,12 @@ function updateFire(dt) {
   if (F.on) {
     F.fuel = Math.max(0, F.fuel - dt / 480);
     if (F.fuel <= 0) { F.outT = (F.outT || 0) + dt; if (F.outT > 50) { F.on = false; F.outT = 0; freeBark('Oh. The fire’s gone out.', 2.6); } } else F.outT = 0;
+    // Low, with logs in the basket and her at a loose end nearby: she sees to it herself.
+    const p = PARTNER;
+    if (F.fuel < 0.28 && L.basket > 0 && G.simT - STOKE.at > 30 && !G.busy() && p.mode === 'follow' && !p.task && !p.lead && !p.hold && !p.hidden && !p.lie && !p.carry && G.inside(p.x, p.z) && Math.hypot(p.x - 8, p.z - 0.2) < 8 && /^(morning|evening|ending_|firstsnow)/.test(S.chapter || '')) {
+      STOKE.at = G.simT;
+      p.task = { o: STOKE, phase: 'go', t: 0 };
+    }
     if (F.fuel < 0.2 && !L.lowWarned) { L.lowWarned = 1; freeBark(pick(['The fire’s getting sleepy, {dear}.', 'Is it me, or is it getting colder in here?']), 3); }
     if (F.fuel > 0.4) L.lowWarned = 0;
   }
