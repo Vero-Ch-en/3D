@@ -276,6 +276,29 @@ G.Audio = (() => {
       if (!on && this._sz) { const z = this._sz; this._sz = null; z.g.gain.setTargetAtTime(0, ctx.currentTime, 0.3); z.s.stop(ctx.currentTime + 1.5); }
     },
     flip() { burst(0.08, 900, 0.05, 'bandpass', 1.5); tone(220, 0.05, 0.02, 0.05); },
+    // A fingertip dragged on cold glass: a thin, wavering, rubbery squeak in short strokes.
+    squeak(strokes = 3) {
+      if (!ctx) return;
+      for (let i = 0; i < strokes; i++) {
+        const t = ctx.currentTime + i * (0.22 + Math.random() * 0.12), d = 0.12 + Math.random() * 0.14, f = 1300 + Math.random() * 700;
+        const o = ctx.createOscillator(); o.type = 'triangle'; o.frequency.setValueAtTime(f, t);
+        o.frequency.linearRampToValueAtTime(f * (0.85 + Math.random() * 0.35), t + d);
+        const lfo = ctx.createOscillator(), lg = ctx.createGain(); lfo.frequency.value = 38 + Math.random() * 20; lg.gain.value = f * 0.05; lfo.connect(lg); lg.connect(o.frequency);
+        const bf = ctx.createBiquadFilter(); bf.type = 'bandpass'; bf.frequency.value = f; bf.Q.value = 6;
+        const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.012, t + 0.02); g.gain.setValueAtTime(0.012, t + d * 0.7); g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+        o.connect(bf); bf.connect(g); g.connect(master); o.start(t); o.stop(t + d + 0.05); lfo.start(t); lfo.stop(t + d + 0.05);
+      }
+    },
+    // A page turning: a soft paper swish, then the faint pat of it landing.
+    page() { burst(0.22, 3200, 0.03, 'bandpass', 0.7); burst(0.16, 6000, 0.012, 'highpass', 0.5, 0.05); burst(0.05, 700, 0.02, 'lowpass', 1, 0.24); },
+    // A log catching: a breathy whoomp, then the crackle quickening.
+    catchFire() {
+      if (!ctx) return;
+      burst(0.6, 260, 0.09, 'lowpass', 0.8, 0, SPOTS.fire.in); burst(0.5, 1100, 0.03, 'bandpass', 0.6, 0.05, SPOTS.fire.in);
+      for (let i = 0; i < 16; i++) burst(0.025, 2000 + Math.random() * 4000, 0.05 + Math.random() * 0.04, 'bandpass', 2, 0.3 + Math.random() * 1.4, SPOTS.fire.in);
+    },
+    // Small paws on snow: light, quick, uneven crunches that go off into the distance.
+    paws(n = 8) { for (let i = 0; i < n; i++) { const v = 0.05 * (1 - i / (n + 2)); burst(0.06, 1400 + Math.random() * 500, v, 'bandpass', 1.6, i * (0.16 + Math.random() * 0.07), outF); burst(0.04, 300, v * 0.6, 'lowpass', 1, i * 0.18 + 0.01, outF); } },
   };
 })();
 
@@ -701,6 +724,7 @@ function blocked(from, to) {
   ray.set(from, d.normalize()); ray.far = len;
   return ray.intersectObjects(G.CAMBLOCK, false).length > 0;
 }
+G.camBlocked = blocked;
 function clampToWalls(target, desired) {
   const d = desired.clone().sub(target), len = d.length();
   ray.set(target, d.clone().normalize()); ray.far = len + 0.25;

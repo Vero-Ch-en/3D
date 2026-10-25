@@ -153,7 +153,7 @@ CH.firstsnow = async () => {
     const Nk = G.NOOK, rshot = fixed(V(Nk.x - 0.45, 1.25, Nk.z + 0.95), V(Nk.x + 0.12, 0.88, Nk.z - 0.05), 56, 0.012);
     if (G.MOM) G.MOM.FROST.m.visible = false;
     await G.cutTo(() => { G.sitAt(PLAYER, Nk.x + 0.32, Nk.z, 0, Nk.seatY); G.sitAt(PARTNER, Nk.x - 0.3, Nk.z, 0, Nk.seatY); PARTNER.mode = 'seated'; PARTNER.holdPose = 'read'; G.setShot(rshot); }, 0.5);
-    await N('(The window seat. The book is where you left it, still open at the middle. The lighthouse keeper is still in terrible trouble.)', K());
+    G.Audio.page(); await N('(The window seat. The book is where you left it, still open at the middle. The lighthouse keeper is still in terrible trouble.)', K());
     await P('We still haven’t finished it.', K());
     await Y('Good.', K());
     await P('Good.', K());
@@ -164,7 +164,7 @@ CH.firstsnow = async () => {
   await G.cutTo(() => { if (G.MOM) G.MOM.FROST.m.visible = false; PLAYER.lie = PARTNER.lie = false; PARTNER.holdPose = null; G.setDressed(PLAYER, true); G.setDressed(PARTNER, true); for (const [c, dx] of [[PLAYER, 0.38], [PARTNER, -0.38]]) { c.x = B.x + dx; c.z = B.z + 0.02; c.y = c.yFloor = 0; c.yaw = 0; c.seatY = B.seatY; c.sitTarget = 1; c.sit = 1; c.speed = 0; } PARTNER.mode = 'seated'; G.setShot(fixed(V(B.x + 0.2, 1.3, B.z + 0.95), V(B.x, 0.95, B.z), 50, 0.012)); }, 0.6);
   G.WEATHER.hold = 'snow';
   await N('(The porch bench. Two mugs of tea going cold because neither of you wants to move.)', K());
-  if (F.mTracks) { await N('(Out in the clearing, a line of small, neat tracks, going twice round the stump for no reason at all.)', K()); await P('He’s back. The fox with opinions.', K()); }
+  if (F.mTracks) { G.Audio.paws(7); await N('(Out in the clearing, a line of small, neat tracks, going twice round the stump for no reason at all.)', K()); await P('He’s back. The fox with opinions.', K()); }
   if (S.mem.pinecones) {
     await P('Who won the pinecones? Yesterday.', K());
     const w = await choose(['“I did.”', '“You did.”', '“I don’t remember.”']);

@@ -104,6 +104,7 @@ inter('mTracks', [TRACKS.x() + 0.6, 0.3, TRACKS.z + 0.3], 1.2, 'Tracks', async (
   await P('*whispering* A fox. Has to be a fox.', K());
   const c = await choose(['Follow them a little way', '“Why are we whispering?”', 'Leave the fox in peace']);
   if (c === 0) {
+    G.Audio.paws(10);
     await N('(You follow them to the edge of the trees. They stop at a fallen branch, go round it twice, and carry on, as if whoever made them had to think about it.)', K());
     await P('A fox with opinions. My favourite kind.', K());
     addBond(0.2);
@@ -199,12 +200,13 @@ inter('mRead', [G.NOOK.x, 0.6, G.NOOK.z + 0.6], 1.0, 'Read together', async () =
   const shot = fixed(V(Nk.x - 0.45, 1.25, Nk.z + 0.95), V(Nk.x + 0.12, 0.88, Nk.z - 0.05), 56, 0.012);   // inside the alcove, past the curtains
   STATE.sceneShot = true; G.setShot(shot);
   await N('(The window seat, the snow going past the glass behind you, and the book you’re both halfway through. She reads. She does all the voices.)', { shot });
+  G.Audio.page();
   await P('“…and the lighthouse keeper turned, and said—” No. You do him. You do the gruff ones.', { shot });
   const c = await choose(['Do the voice', 'Do the voice, very badly', '“I’ve never done a voice in my life.”']);
   if (c === 0) { await N('(You do it. It is, generously, a voice.)', { shot }); await P('Perfect. Terrible. Perfect.', { shot }); }
   else if (c === 1) { await N('(You do it as badly as you possibly can. It goes somewhere unexpected.)', { shot }); await P('That was a pirate. He is a lighthouse keeper. He’s never seen a boat he didn’t want to warn.', { shot }); addRivalry(0.2); }
   else { await P('You did a bear last winter. For a whole chapter. It was one of the best nights of my life.', { shot }); addBond(0.3); }
-  p.tiltTarget = -0.28;
+  p.tiltTarget = -0.28; G.Audio.page(); wait(0.9).then(() => G.Audio.page());
   await N('(Two chapters later her head is on your shoulder. She is pretending to read. She is reading ahead.)', { shot });
   await Y('You’re reading ahead.', { shot });
   await P('I would never.', { shot });
@@ -227,6 +229,7 @@ const FROST = (() => {
   return { cv, tex, m };
 })();
 function drawFrost(kind, extra) {
+  G.Audio.squeak && G.Audio.squeak(kind === 'score' ? 4 : 3);
   const x = FROST.cv.getContext('2d'); x.clearRect(0, 0, 256, 200);
   x.strokeStyle = 'rgba(235,242,250,0.95)'; x.lineWidth = 7; x.lineCap = x.lineJoin = 'round';
   const heart = (cx, cy, s) => { x.beginPath(); x.moveTo(cx, cy + 30 * s); x.bezierCurveTo(cx - 55 * s, cy - 5 * s, cx - 25 * s, cy - 45 * s, cx, cy - 18 * s); x.bezierCurveTo(cx + 25 * s, cy - 45 * s, cx + 55 * s, cy - 5 * s, cx, cy + 30 * s); x.stroke(); };

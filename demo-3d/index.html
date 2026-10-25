@@ -315,6 +315,28 @@
     .keys { display: none; }
   }
   @media (prefers-reduced-motion: reduce) { .btn, #choices button { transition: none; } }
+  /* Phones. The corner bar fits on one line (Stats is a testing aid; the label is obvious from the buttons). */
+  @media (max-width: 560px), (pointer: coarse) { #quality > span, #hud .pill:has(#statsBtn) { display: none; } }
+  /* Overlays scroll rather than clip when the screen is short (a phone on its side): auto margins centre
+   * the panel when it fits and let it start at the top when it doesn't. */
+  #pause, #endings, #scrap { overflow-y: auto; -webkit-overflow-scrolling: touch; }
+  #pause > *, #endings > *, #scrap > * { margin: auto; }
+  @media (max-height: 520px) {
+    #title { align-items: flex-start; overflow-y: auto; padding-top: calc(14px + env(safe-area-inset-top, 0px)); padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px)); }
+    #title .title-inner { margin-top: auto; }
+    h1 { font-size: 46px; margin: 2px 0 8px; }
+    .eyebrow { font-size: 16px; }
+    .lede { font-size: 13.5px; line-height: 1.5; margin-bottom: 12px; max-width: 58ch; }
+    body:not(.playing) #hud { display: none; }
+  }
+  /* A phone on its side: subtitles, choices and prompts go to the bottom, between the stick's side and the buttons,
+   * instead of floating over the middle of the picture. */
+  @media (pointer: coarse) and (max-height: 520px) and (orientation: landscape) {
+    #subs, #choices { bottom: calc(14px + env(safe-area-inset-bottom, 0px)); width: min(620px, calc(100vw - 380px)); }
+    #prompt { bottom: calc(14px + env(safe-area-inset-bottom, 0px)); }
+    #together { bottom: calc(60px + env(safe-area-inset-bottom, 0px)); width: min(560px, calc(100vw - 380px)); }
+    #subs #line { font-size: calc(17px * var(--subK)); } #subs.narr #line { font-size: calc(18px * var(--subK)); }
+  }
 </style>
 </head>
 <body>

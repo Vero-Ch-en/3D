@@ -11,7 +11,7 @@
  * ========================================================================= */
 (G.afterBuild = G.afterBuild || []).push(() => {
 const { PLAYER, PARTNER, STATE } = G;
-const A = G.SAPI, S = A.S;
+const A = G.SAPI, S = A.S, { N, P } = A;
 const pick = (a) => a[Math.floor(Math.random() * a.length)];
 const dist = () => Math.hypot(PARTNER.x - PLAYER.x, PARTNER.z - PLAYER.z);
 const hers = () => !!G.S && /^(morning|walk|evening|ending_|firstsnow)/.test(S.chapter || '') && !(G.NIGHT && G.NIGHT.swapped);
@@ -119,9 +119,89 @@ function updateWindow(dt) {
     const look = { x: WIN.v.x, y: 1.35, z: WIN.v.z };
     PARTNER.task = { o: { id: 'window', spot: { x: sx, z: sz }, yaw: Math.atan2(WIN.v.x - sx, WIN.v.z - sz), dur: [5.5, 6.5], look, noReach: true,
       onArrive: (p) => { p.gaze = { x: look.x, z: look.z, headY: 1.35, t: 5 }; G.bark(windowLine(), 4.2); },
-      onEnd: () => {} }, phase: 'go', t: 0 };
+      onEnd: () => { if (dist() < 1.6 && HAND.cd <= 0) G.wait(0.3).then(() => { if (dist() < 1.6 && canHold()) takeHand(['*takes your hand*', '*her hand finds yours*'], 14 + Math.random() * 8); }); } }, phase: 'go', t: 0 };
     return;
   }
+}
+
+/* ---------- she takes your hand: walking together outside, after the window, on the porch ---------- */
+const HAND = { walk: 0, porch: 0, cd: 30 };
+const canHold = () => hers() && canTalk() && PARTNER.mode === 'follow' && !PARTNER.hold && !PARTNER.carry && !PLAYER.carry && !(PARTNER.sit > 0.1) && !(PLAYER.sit > 0.1) && !PLAYER.freeSit && !STATE.dancing && !STATE.hugging;
+function takeHand(lines, dur) {
+  G.setHold(true); PARTNER.holdTimer = dur; HAND.cd = 90 + Math.random() * 40;
+  G.bark(pick(lines), 2.6);
+  S.mem.partnerInit = (S.mem.partnerInit || 0) + 1;
+}
+function updateHand(dt) {
+  HAND.cd -= dt;
+  const out = !G.inside(PLAYER.x, PLAYER.z), d = dist();
+  const roof = G.underRoof && G.underRoof(PLAYER.x, PLAYER.z);
+  HAND.walk = out && !roof && (PLAYER.speed || 0) > 0.6 && (PLAYER.speed || 0) < 2.4 && d < 2.4 ? HAND.walk + dt : Math.max(0, HAND.walk - dt * 2);
+  HAND.porch = out && roof && G.underRoof(PARTNER.x, PARTNER.z) && (PLAYER.idleT || 0) > 0.5 && d < 2 ? HAND.porch + dt : 0;
+  if (HAND.cd > 0 || !canHold()) return;
+  if (HAND.walk > 7) { HAND.walk = 0; takeHand(['*slips her hand into yours* Cold fingers. Mine now.', '*takes your hand* For balance. Obviously.', '*finds your hand without looking*'], 22 + Math.random() * 12); }
+  else if (HAND.porch > 5) { HAND.porch = 0; takeHand(['*takes your hand* Look at it all.', '*leans into you and laces her fingers through yours*'], 18 + Math.random() * 8); }
+}
+
+/* ---------- meanwhile: short cutaways to her, while you're apart ----------
+ * When she's been on her own a while (in bed in the morning, or busy with something of hers) and you're
+ * somewhere else, the camera slips away to her for a few seconds, then back. Nothing to do: just her,
+ * when she thinks nobody's watching. Twice a chapter at most, each one only once. */
+const VIG = (G._VIG = { used: new Set(), n: 0, t: 0, cd: 40, ch: null, on: false });
+const VIGS = {
+  bed: { text: '(Back in the bedroom, she stretches an arm across into the warm patch you left, pulls your pillow over to her side, and sighs like someone who has won something.)', her: '*into the pillow* …Mine.' },
+  read: { text: '(In the armchair, she reads the same paragraph three times, then looks up at the doorway you went through.)', her: '*quietly* Come back and do the voices.' },
+  nap: { text: '(Curled in the corner of the sofa with the blanket up to her nose, half asleep, she pats the empty cushion beside her. Twice. Checking.)' },
+  radio: { text: '(In the kitchen, she dances with no one, badly and on purpose, and laughs at herself when the song ends.)', her: '*to the radio* He’d have trodden on my foot by now.' },
+  water: { text: '(She waters the plants one by one and tells each of them something. You can’t hear what. Basil gets the longest.)' },
+  stoke: { text: '(Kneeling at the hearth, she feeds the fire a log and watches it catch, her face gone orange.)', her: '*to the fire* Keep him warm. That’s your only job.', snd: 'catchFire' },
+  books: { text: '(At the bookshelf, she finds the book you’re halfway through, moves the bookmark one page on, thinks about it, and moves it back.)', snd: 'page' },
+  lwin: { text: '(At the window, she breathes on the glass and draws a small heart. She wipes it away before anyone can see. Then she draws it again.)', snd: 'squeak' },
+  kwin: { text: '(At the kitchen window, she breathes on the glass and draws a small heart. She wipes it away before anyone can see. Then she draws it again.)', snd: 'squeak' },
+  basil: { text: '(She leans close to the basil and whispers to it, very seriously. It sounds like a secret. It sounds like it’s about you.)' },
+};
+function vigFor() {
+  const p = PARTNER;
+  if (S.chapter === 'morning' && p.lie && !VIG.used.has('bed')) return 'bed';
+  const T = p.task; if (!T || T.phase !== 'do' || p.hidden) return null;
+  const id = T.o.id; return VIGS[id] && !VIG.used.has(id) ? id : null;
+}
+function vigShot(id) {
+  const p = PARTNER, V3 = THREE.Vector3;
+  if (id === 'bed') { const B = G.BED; return { pos: new V3(B.x + 0.05, 2.2, -0.9), look: new V3(B.x + 0.02, 0.72, -1.65) }; }
+  const sit = (p.sit || 0) > 0.5, hy = sit ? 1.0 : 1.45, head = new V3(p.x, hy, p.z);
+  for (const [a, r] of [[0.6, 1.8], [-0.6, 1.8], [0.95, 1.6], [-0.95, 1.6], [0.3, 1.5], [-0.3, 1.5], [1.4, 1.5], [-1.4, 1.5], [1.9, 1.5], [-1.9, 1.5], [2.4, 1.6], [-2.4, 1.6], [Math.PI, 1.6], [1.2, 1.1], [-1.2, 1.1]]) {
+    const ya = p.yaw + a, pos = new V3(p.x + Math.sin(ya) * r, hy + 0.15, p.z + Math.cos(ya) * r);
+    if (G.inside(p.x, p.z) !== G.inside(pos.x, pos.z)) continue;
+    if (G.camBlocked && G.camBlocked(head, pos)) continue;
+    return { pos, look: new V3(p.x, hy - 0.12, p.z) };
+  }
+  return null;
+}
+async function meanwhile(id) {
+  const v = VIGS[id], sh = vigShot(id);
+  if (!sh) { VIG.used.add(id); return; }
+  VIG.on = true; VIG.used.add(id); VIG.n++; VIG.cd = 120;
+  STATE.busy = true; STATE.sceneShot = true;
+  const was = PLAYER.speed; PLAYER.speed = 0;
+  G.setShot(A.fixed(sh.pos, sh.look, 40, 0.014));
+  if (v.snd && G.Audio[v.snd]) G.Audio[v.snd]();
+  if (id === 'radio' || id === 'water' || id === 'basil') G.Audio.hum();
+  await N(v.text, { shot: 'keep', auto: 6.5 });
+  if (v.her) await P(v.her, { shot: 'keep', auto: 3.2 });
+  STATE.sceneShot = false; G.releaseCamera(); G.CAM.cut = true;
+  STATE.busy = false; VIG.on = false;
+}
+function updateMeanwhile(dt) {
+  // He's got up; she stops holding on to where he was and settles into the warm patch.
+  if (S.chapter === 'morning' && PARTNER.lie && PARTNER.cuddle && !PLAYER.lie && !G.busy()) { G.lieDown(PARTNER, G.BED.R, PARTNER.z, PARTNER.lieRoll || 0, 0); G.shapeBed({ R: true }); }
+  if (S.chapter !== VIG.ch) { VIG.ch = S.chapter; VIG.n = 0; VIG.t = 0; VIG.cd = 40; }
+  VIG.cd -= dt;
+  if (!/^(morning|evening)$/.test(S.chapter || '') || !hers() || VIG.on) { VIG.t = 0; return; }
+  const apart = dist() > 6.5 && !(A.sameRoom && A.sameRoom());
+  const id = apart && !G.busy() && !PLAYER.lie && !STATE.noControl ? vigFor() : null;
+  VIG.t = id ? VIG.t + dt : 0;
+  if (id && VIG.t > 14 && VIG.cd <= 0 && VIG.n < 2) { VIG.t = 0; A.run(() => meanwhile(id)); }
 }
 
 /* ---------- running indoors; coming back after leaving her alone ---------- */
@@ -146,10 +226,75 @@ function updateAway(dt) {
     PARTNER.gaze = { x: PLAYER.x, z: PLAYER.z, headY: 1.55, t: 2 };
   } else if (d < 3.5) AWAY.t = 0;
 }
-(G.onJump = G.onJump || []).push(() => { MEM.used.clear(); MEM.cd = 40; HELP.t = 0; HELP.key = null; WIN.n = 0; WIN.cd = 10; RUN.n = 0; AWAY.t = 0; });
+
+/* ---------- the night: it has learned her habits, and does them wrong ----------
+ * It feeds a fire that doesn't need feeding. It's beside you at the window before you hear it come. It says
+ * "There you are" when you never went anywhere. Once each, per night. */
+const WRONG = G._WRONG = { fire: false, win: false, there: false, near: 0, winT: 0, cd: 20 };
+const itNight = () => S.chapter === 'night' && S.flags.nightUp && !S.flags.doorOpen && !S.flags.fakeWithdrawn && !(G.NIGHT && (G.NIGHT.slipping || G.NIGHT.swapped));
+const itFree = () => !G.busy() && PARTNER.mode === 'follow' && !PARTNER.hidden && !PARTNER.lie && !PARTNER.task && !PARTNER.script && !PARTNER.bark && !PLAYER.lie;
+const OVERFEED = { id: 'overfeed', spot: { x: 8.05, z: -0.75 }, yaw: Math.PI, dur: [5.5, 6], look: { x: 8.0, y: 0.35, z: -1.8 }, noReach: true,
+  onArrive: (p) => { p.forcePose = 'warm'; const F = G.FIRE; F.fuel = Math.min(1, F.fuel + 0.5); G.Audio.catchFire && G.Audio.catchFire(); G.sparkBurst && G.sparkBurst(); G.bark('There. You like it warm. I remember that you like it warm.', 3); },
+  onTick: (p, dt, T) => { if (!T.second && T.t > 3.2) { T.second = true; const F = G.FIRE; F.fuel = 1; G.Audio.catchFire && G.Audio.catchFire(); G.sparkBurst && G.sparkBurst(); G.bark('And another. So you’ll stay.', 2.6); } },
+  onEnd: (p) => { p.forcePose = null; } };
+function updateWrong(dt) {
+  if (!itNight()) { WRONG.near = 0; WRONG.winT = 0; return; }
+  WRONG.cd -= dt;
+  const d = dist();
+  WRONG.near = d < 6 && !PARTNER.hidden && !PARTNER.lie ? WRONG.near + dt : 0;
+  if (WRONG.cd > 0 || !itFree()) return;
+  // The fire: the coals are fine; it doesn't care.
+  if (!WRONG.fire && G.FIRE.on && Math.hypot(PLAYER.x - 8.0, PLAYER.z - (-0.6)) < 2.6 && d < 6) {
+    WRONG.fire = true; WRONG.cd = 25; PARTNER.task = { o: OVERFEED, phase: 'go', t: 0 }; return;
+  }
+  // The window: suddenly, right beside you. Much too close. The snow stops falling while it talks.
+  const win = nearWindow();
+  WRONG.winT = win && (PLAYER.idleT || 0) > 0 ? WRONG.winT + dt : 0;
+  if (!WRONG.win && win && WRONG.winT > 4.5) {
+    const v = win, dx = v.x - PLAYER.x, dz = v.z - PLAYER.z, l = Math.hypot(dx, dz) || 1, tx = -dz / l, tz = dx / l;
+    let spot = null;
+    for (const [lat, back] of [[0.38, 0.12], [-0.38, 0.12], [0.3, 0.35], [-0.3, 0.35], [0, 0.45]]) {
+      const x = PLAYER.x + tx * lat - (dx / l) * back, z = PLAYER.z + tz * lat - (dz / l) * back;
+      if (G.inside(x, z) && (!G.navOpen || G.navOpen(x, z))) { spot = [x, z]; break; }
+    }
+    if (!spot) return;
+    WRONG.win = true; WRONG.cd = 30;
+    A.run(async () => {
+      STATE.busy = true;
+      G.standAt(PARTNER, spot[0], spot[1], Math.atan2(v.x - spot[0], v.z - spot[1])); PARTNER.mode = 'still'; PARTNER.stillLook = { x: v.x, z: v.z, headY: 1.35 };
+      G.Audio.creak && G.Audio.creak();
+      const still = STATE.snowStill; STATE.snowStill = true;
+      await N('(Someone is standing beside you. Very close. You didn’t hear it come.)');
+      await P('There’s nothing out there.');
+      await P('Nothing at all. Come away from the window.');
+      STATE.snowStill = still;
+      if (itNight() || S.chapter === 'night') PARTNER.mode = 'follow';
+      STATE.busy = false;
+    });
+    return;
+  }
+  // "There you are." You never went anywhere.
+  if (!WRONG.there && WRONG.near > 75 && d < 2.8) {
+    WRONG.there = true; WRONG.cd = 25;
+    G.bark('There you are.', 2.4);
+    G.wait(2.9).then(() => { if (itNight() && !G.busy()) G.bark('…You were here all along. I know. I just like saying it.', 3.2); });
+  }
+}
+const _nw = new THREE.Vector3();
+function nearWindow() {
+  if (!G.WINDOWS || !G.inside(PLAYER.x, PLAYER.z)) return null;
+  const fx = Math.sin(PLAYER.yaw), fz = Math.cos(PLAYER.yaw);
+  for (const w of G.WINDOWS) {
+    w.inn.getWorldPosition(_nw); if (_nw.y > 2.2) continue;
+    const dx = _nw.x - PLAYER.x, dz = _nw.z - PLAYER.z, d = Math.hypot(dx, dz);
+    if (d < 1.4 && d > 0.2 && (dx * fx + dz * fz) / d > 0.7) return { x: _nw.x, z: _nw.z };
+  }
+  return null;
+}
+(G.onJump = G.onJump || []).push(() => { VIG.used.clear(); VIG.ch = null; Object.assign(WRONG, { fire: false, win: false, there: false, near: 0, winT: 0, cd: 20 }); MEM.used.clear(); MEM.cd = 40; HELP.t = 0; HELP.key = null; WIN.n = 0; WIN.cd = 10; RUN.n = 0; AWAY.t = 0; });
 
 G.STEP_HOOKS.push((dt) => {
   if (!STATE.started) return;
-  updateAway(dt); updateHelp(dt); updateBump(dt); updateMemories(dt); updateWindow(dt); updateRun(dt);
+  updateWrong(dt); updateAway(dt); updateHelp(dt); updateBump(dt); updateMemories(dt); updateWindow(dt); updateRun(dt); updateHand(dt); updateMeanwhile(dt);
 });
 });

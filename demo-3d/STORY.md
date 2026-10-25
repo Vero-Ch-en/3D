@@ -53,6 +53,10 @@ Around the story the cabin is lived in. It has a deeper 15 × 7 m layout with a 
   - At the cocoa, the imitation drinks it straight off the heat without blinking.
   - In the window seat, its "nothing has changed at all" comes with a reminder of "always halfway through something".
   - The kitchen window you drew on has been wiped clean, right to the corners.
+  - **Her habits, wrong (build 81).** It feeds the fire when the coals are fine, twice: "There. You like it warm. I remember that you like it warm." "And another. So you'll stay."
+    - Stand at a window and it's suddenly beside you, much too close, without a sound. The snow stops in the air while it says "There's nothing out there. Nothing at all. Come away from the window."
+    - After you've been near it a while, it says "There you are," then "…You were here all along. I know. I just like saying it."
+
 
 ## She's paying attention (build 79)
 
@@ -63,6 +67,18 @@ Only on his route, in her own chapters (morning, the walk, the evening, the endi
 - **She joins you at the window (build 80).** Stand at a window for a few seconds and she comes over, stands beside you and looks out too: the stars at night, the snow if it's falling, otherwise "You can see our footprints from here. Look. Two sets."
 - **She notices how you move (build 80).** Run indoors and you get house rules she's just made up. Leave her alone for a while and come back, and she's glad: "There you are. I was about to send out a search party. It was going to be me."
 - **Scenes feel filmed (build 80).** Scene shots push in slowly and drift a little, and the framing leans toward whoever's talking. Reduced motion turns this off.
+- **Meanwhile (build 81).** If you're apart for a while, in another room, and she's busy with something of her own, the camera slips away to her for a few seconds, then comes back. You just watch her when she thinks nobody's looking:
+  - in bed in the morning, reaching an arm into the warm patch you left and stealing your pillow;
+  - in the armchair, reading the same paragraph three times ("Come back and do the voices");
+  - on the sofa, half asleep, patting the empty cushion beside her, twice, to check;
+  - dancing to the radio with no one ("He'd have trodden on my foot by now");
+  - telling the plants things (Basil gets the longest);
+  - asking the fire to keep him warm;
+  - moving the bookmark on a page, then back;
+  - drawing a heart on the window glass, wiping it away, then drawing it again.
+
+  Twice a chapter at most.
+- **She takes your hand (build 81).** Walking together outside, after standing at a window, on the porch: "*slips her hand into yours* Cold fingers. Mine now."
 - **She remembers the day you've had.** In the evening, now and then, she brings up something from earlier: the pinecones (won or lost), the burnt or golden pancakes, her ambush, the branch, the fox, the photographs, the snowman, what you said on the hill. And the circle, which she has decided not to think about.
 
 ## Act II · Something Strange: the evening

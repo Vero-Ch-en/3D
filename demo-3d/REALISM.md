@@ -192,6 +192,31 @@ blinks, dozing, hugs. Hats and the snow on them are handed to the model's own he
 - **Gentle nights:** `SETTINGS.nights` (`G.gentle()`). It skips `hunt()`, the night heartbeat, `slip()`, the obsessive walk-ups and the Act IV glimpses.
 - **Endings dialog:** `#endings` on the title screen. It reads `snowed.endings`, and `showEnd` refreshes the count through `G.syncEndings`.
 
+## Meanwhile, hands, the night's copies, sounds, phones (build 81)
+
+- Meanwhile cutaways (`updateMeanwhile` in companion.js).
+  - When they trigger: morning or evening; more than 6.5 m apart and not `sameRoom()`; she's lying in bed (morning) or her task is in the `do` phase with an id in `VIGS`; this has held for 14 s; at most 2 per chapter, 120 s apart, each id once.
+  - Shot: the existing bed framing, or `vigShot`, which tries 15 angle and distance pairs around her face. It rejects positions on the other side of the cabin wall from her or blocked by `G.CAMBLOCK` (now exposed as `G.camBlocked`).
+  - Lines: `N` with auto 6.5, then an optional `P` with auto 3.2, and a matching sound.
+  - Also: in the morning, once he's out of bed, she leaves the cuddle pose (`lieDown` at `BED.R`, `shapeBed({R:true})`).
+- Hand-holding (`updateHand`).
+  - Walking outside together at 0.6–2.4 m/s within 2.4 m for 7 s, or idle together under the porch roof for 5 s, or the end of the window task → `G.setHold(true)` with `holdTimer` 14–34 s.
+  - Cooldown 90–130 s. Only on his route in her chapters.
+- Night copies (`updateWrong`, once each).
+  - `overfeed` task at the hearth (fuel +0.5, then 1).
+  - The window: it's placed 0.38 m beside him (`standAt`) with `STATE.snowStill` on while it speaks.
+  - "There you are" after 75 s within 6 m.
+  - Gated by `itNight()`: `nightUp`, door not open, not withdrawn, not slipping, not swapped.
+- Sounds (Web Audio, no recordings).
+  - `squeak` (triangle wave with a 38–58 Hz wobble, band-passed, in strokes) on every frost drawing.
+  - `page` (a band-passed swish and a low pat) in the reading scene and the First Snow.
+  - `catchFire` (a low whoomp and a quickening crackle) when lighting the fire, when she stokes it, and when the imitation does.
+  - `paws` (uneven light crunches, fading out) for the fox tracks.
+- Phones.
+  - The corner bar hides the "Quality" label and Stats, so it fits on one line.
+  - The title, pause, endings and scrapbook screens scroll when they don't fit (auto margins in a scrolling grid). Under 520 px tall, the title is smaller and the bar is hidden on the title screen.
+  - Phone in landscape: subtitles, choices and prompts sit at the bottom, between the two control areas (`100vw − 380px`). Subtitle size still follows the subtitle setting (`--subK`).
+
 ## Cameras and reactions (build 80)
 
 - `liven()` in game.js applies to every scene shot (`STATE.sceneShot`), scaled by `G.MOTION`.

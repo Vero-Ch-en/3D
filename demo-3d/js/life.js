@@ -621,14 +621,14 @@ function setCarry(c, on) { c.carry = on; (c === PLAYER ? ARMS.player : ARMS.part
 // Her feeding the fire: kneel at the hearth, a log on, sparks; a word if you're there to hear it.
 const STOKE = { at: -99, id: 'stoke', spot: { x: 8.05, z: -0.75 }, yaw: Math.PI, dur: [2.2, 2.6], look: { x: 8.0, y: 0.35, z: -1.8 },
   onArrive: (p) => { p.forcePose = 'warm'; },
-  onEnd: (p) => { p.forcePose = null; if (L.basket > 0 && F.on) { L.basket--; F.fuel = Math.min(1, F.fuel + 0.42); G.Audio.poke(); G.sparkBurst && G.sparkBurst(); freeBark(pick(['There. Can’t have it going out on us.', 'One more log. It was looking at me.', 'Fire’s fed. You’re welcome.']), 2.8); } } };
+  onEnd: (p) => { p.forcePose = null; if (L.basket > 0 && F.on) { L.basket--; F.fuel = Math.min(1, F.fuel + 0.42); G.Audio.catchFire ? G.Audio.catchFire() : G.Audio.poke(); G.sparkBurst && G.sparkBurst(); freeBark(pick(['There. Can’t have it going out on us.', 'One more log. It was looking at me.', 'Fire’s fed. You’re welcome.']), 2.8); } } };
 const fire = A.findInter('fire');
 fire.label = () => (!F.on ? 'Light the fire' : F.fuel < 0.62 && L.basket > 0 ? 'Add a log' : 'Poke the fire');
 const pokeAct = fire.raw;
 A.rewire('fire', async () => {
   if (!F.on) {
     if (L.basket <= 0) { await N('(No logs. The basket by the hearth is empty, and the woodpile is out on the porch.)'); return; }
-    L.basket--; F.fuel = 0.6; F.on = true; G.Audio.blow();
+    L.basket--; F.fuel = 0.6; F.on = true; G.Audio.blow(); setTimeout(() => G.Audio.catchFire && G.Audio.catchFire(), 500);
     await N('(It takes three matches and a certain amount of quiet swearing.)');
     if (A.canHear()) await Pt('The fire person, at work. My hero, {toHim}.');
     return;
