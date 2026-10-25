@@ -183,6 +183,13 @@ The game saves at the start of each chapter, at the Elsewhere door in the night,
 - **Caught:** they stand face to face. Her arm is pulled out, and his hand reaches across and closes round her wrist (his arm goes to wherever her hand actually is).
 - **The Entity:** when it finally stands in front of you, it's a person's shape in packed, glittering snow. It's a little too tall and has no face, and flakes keep lifting off it and drifting round.
 
+## Memories (build 83)
+
+On the title screen, next to Endings, there's a Memories panel, kept in this browser across every playthrough:
+- **Her, unobserved:** the short cutaways of her on her own (nine in all). Ones you haven't seen show where to look.
+- **Scrapbook:** every page you've ever earned. The power cut has its own painting: three candles in the dark.
+- **Photographs:** the last twelve you took, with their captions.
+
 ## Title screen (build 69)
 
 - **Nights: Tense / Gentle.** Gentle keeps the story the same, but nothing chases you. Playing as her, the imitation doesn't come back looking for her, so there's no hunt, close call or getting caught, and she can't be kept. Playing as him, the mask never slips and it doesn't walk right up to you. There's no heartbeat, and no figure between the trees. The setting is remembered.

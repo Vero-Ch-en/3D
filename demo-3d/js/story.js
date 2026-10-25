@@ -29,7 +29,7 @@ const fresh = () => ({
 const S = (G.S = fresh());
 const addBond = (v) => { S.vars.bond = Math.min(12, S.vars.bond + v); };
 const addRivalry = (v) => { S.vars.rivalry = Math.min(12, S.vars.rivalry + v); };
-const addScrap = (art, caption) => { if (!S.scrap.some((p) => p.art === art)) S.scrap.push({ art, caption }); };
+const addScrap = (art, caption) => { if (!S.scrap.some((p) => p.art === art)) S.scrap.push({ art, caption }); G.remember && G.remember('scrap', { art, caption }); };
 // Successive lines for repeated interactions; the last one repeats.
 const cyc = (id, lines) => { S.n[id] = (S.n[id] || 0) + 1; return lines[Math.min(S.n[id] - 1, lines.length - 1)]; };
 

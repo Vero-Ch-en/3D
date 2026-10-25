@@ -167,11 +167,19 @@ function paintSnap(cv, art) {
     if (art === 'hill') { c.fillStyle = '#f4f7fb'; c.beginPath(); c.ellipse(W / 2, H * 0.78, W * 0.6, H * 0.3, 0, Math.PI, 0); c.fill(); c.fillStyle = '#5a3a26'; c.fillRect(W * 0.42, H * 0.46, 36, 5); c.fillRect(W * 0.44, H * 0.47, 3, 10); c.fillRect(W * 0.56, H * 0.47, 3, 10); }
     if (art === 'lake') { c.fillStyle = '#9fb4c6'; c.beginPath(); c.ellipse(W / 2, H * 0.78, W * 0.42, H * 0.12, 0, 0, 7); c.fill(); c.fillStyle = '#4a4a4e'; for (let i = 0; i < 5; i++) { c.beginPath(); c.ellipse(W * 0.32 + i * 26, H * 0.78 + (i % 2) * 5, 5, 3, 0, 0, 7); c.fill(); } }
     if (art === 'circle') { c.fillStyle = '#6a9a4e'; c.beginPath(); c.ellipse(W / 2, H * 0.8, W * 0.34, H * 0.12, 0, 0, 7); c.fill(); for (let i = 0; i < 14; i++) { c.fillStyle = ['#f2e26a', '#e88aa0', '#ffffff'][i % 3]; c.beginPath(); c.arc(W * 0.24 + (i * 37) % (W * 0.52), H * 0.76 + (i * 13) % 16, 2.5, 0, 7); c.fill(); } }
+  } else if (art === 'candles') {
+    // The power cut: a dark room, three small flames on the table, and the two of them leaning into the light.
+    c.fillStyle = '#1c1612'; c.fillRect(0, 0, W, H);
+    const glow = c.createRadialGradient(W * 0.5, H * 0.62, 4, W * 0.5, H * 0.62, W * 0.55); glow.addColorStop(0, 'rgba(255,190,110,0.75)'); glow.addColorStop(0.45, 'rgba(200,120,60,0.25)'); glow.addColorStop(1, 'rgba(0,0,0,0)'); c.fillStyle = glow; c.fillRect(0, 0, W, H);
+    fig(W * 0.34, H * 0.78, 1.0, '#2a2c32', '#1e140f'); fig(W * 0.66, H * 0.79, 0.88, '#b8a88e', '#5e3a26');
+    c.fillStyle = '#4a3020'; c.fillRect(W * 0.18, H * 0.72, W * 0.64, H * 0.06);
+    for (const [x, h] of [[0.42, 30], [0.5, 22], [0.58, 16]]) { c.fillStyle = '#efe6d6'; c.fillRect(W * x - 4, H * 0.72 - h, 8, h); c.fillStyle = '#ffd59a'; c.beginPath(); c.ellipse(W * x, H * 0.72 - h - 6, 3, 6, 0, 0, 7); c.fill(); }
   } else {
     fig(W * 0.42, H * 0.86, 1.15, '#4a4d54', '#1e140f'); fig(W * 0.6, H * 0.88, 0.98, '#e4d7c2', '#5e3a26');
   }
   c.fillStyle = 'rgba(255,230,190,0.12)'; c.fillRect(0, 0, W, H);
 }
+UI.paintSnap = (cv, art) => paintSnap(cv, art);
 UI.scrapbook = (pages) => new Promise((res) => {
   const box = $('scrap'), prev = modal;   // opened from the pause menu it can sit over a choice; give that back after
   if (prev && prev.kind === 'scrapbook') return res();

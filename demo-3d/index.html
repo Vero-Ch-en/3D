@@ -315,6 +315,24 @@
     .keys { display: none; }
   }
   @media (prefers-reduced-motion: reduce) { .btn, #choices button { transition: none; } }
+  /* Memories (title screen). */
+  #memories { position: fixed; inset: 0; z-index: 29; display: grid; place-items: center; padding: 16px; background: rgba(6,9,15,0.55); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); overflow-y: auto; }
+  #memories > * { margin: auto; }
+  .mem-panel { box-sizing: border-box; width: min(640px, 100%); }
+  .mem-tabs { display: flex; gap: 4px; padding: 3px; border: 1px solid var(--edge, rgba(255,255,255,0.1)); border-radius: 11px; background: rgba(255,255,255,0.03); margin: 2px 0 10px; }
+  .mem-tabs button { flex: 1; font: 500 13px var(--ui); color: var(--ink-dim); background: none; border: 0; border-radius: 8px; padding: 7px 10px; cursor: pointer; white-space: nowrap; }
+  .mem-tabs button span { color: var(--ink-faint, rgba(255,255,255,0.45)); margin-left: 4px; font-variant-numeric: tabular-nums; }
+  .mem-tabs button.on { background: rgba(237,241,246,0.92); color: #121823; }
+  .mem-tabs button.on span { color: rgba(18,24,35,0.6); }
+  .mem-body { display: grid; gap: 8px; max-height: min(62vh, 560px); overflow-y: auto; padding-right: 2px; }
+  .mem-sub { margin: 0 0 4px; font-size: 13px; color: var(--ink-dim); line-height: 1.5; }
+  .mem-pages { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+  .mem-page { background: #f4ecdf; color: #3a2a20; border-radius: 6px; padding: 8px 8px 10px; box-shadow: 0 6px 18px rgba(0,0,0,0.35); }
+  .mem-page canvas, .mem-page img { width: 100%; height: auto; display: block; border-radius: 3px; aspect-ratio: 220 / 190; object-fit: cover; }
+  .mem-cap { font: italic 400 13px/1.35 var(--display); margin-top: 6px; }
+  .mem-body .ending .eh { line-height: 1.45; }
+  .title-foot #memoriesBtn { margin-left: 14px; }
+  @media (max-width: 480px) { .mem-panel { padding: 18px 16px 14px; } .mem-tabs button { font-size: 12px; padding: 7px 4px; } .mem-tabs button span { margin-left: 2px; } .mem-pages { grid-template-columns: repeat(2, 1fr); } }
   /* Phones. The corner bar fits on one line (Stats is a testing aid; the label is obvious from the buttons). */
   @media (max-width: 560px), (pointer: coarse) { #quality > span, #hud .pill:has(#statsBtn) { display: none; } }
   /* Overlays scroll rather than clip when the screen is short (a phone on its side): auto margins centre
@@ -354,7 +372,7 @@
       <div class="opt"><span class="opt-l" id="nightsLabel">Nights</span><div class="seg" role="group" aria-labelledby="nightsLabel"><button class="btn small" data-nights="tense" type="button">Tense</button><button class="btn small" data-nights="gentle" type="button">Gentle</button></div><span class="nights-note" id="nightsNote"></span></div>
       <div class="opt"><label class="opt-l" for="chapterSel">Chapter</label><select id="chapterSel" aria-label="Jump to a chapter"></select></div>
     </div>
-    <div class="title-foot"><button class="link" id="endingsBtn" type="button">Endings</button><div class="keys" id="titleKeys"></div></div>
+    <div class="title-foot"><button class="link" id="endingsBtn" type="button">Endings</button><button class="link" id="memoriesBtn" type="button">Memories</button><div class="keys" id="titleKeys"></div></div>
   </div>
 </div>
 
@@ -446,6 +464,7 @@
 <div id="together" hidden role="group" aria-label="Together"></div>
 <div id="minigame" hidden role="dialog"></div>
 <div id="scrap" hidden role="dialog" aria-label="Scrapbook"></div>
+<div id="memories" hidden role="dialog" aria-labelledby="memTitle"></div>
 
 <div id="touch">
   <div id="stickzone"></div>
@@ -492,5 +511,6 @@
 <script src="js/moments.js"></script>
 <script src="js/companion.js"></script>
 <script src="js/powercut.js"></script>
+<script src="js/memories.js"></script>
 </body>
 </html>

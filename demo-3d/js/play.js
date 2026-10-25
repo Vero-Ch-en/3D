@@ -77,6 +77,7 @@ function capture() {
 function keepPhoto(src, caption) {
   S.photos.push({ src, caption });
   if (S.photos.length > 12) S.photos.shift();
+  G.remember && G.remember('photo', { src, caption });
   S.scrap.push({ art: 'photo', src, caption });
   // Only the most recent photographs stay in the scrapbook too (they're big).
   const ph = S.scrap.filter((p) => p.art === 'photo');

@@ -192,6 +192,18 @@ blinks, dozing, hugs. Hats and the snow on them are handed to the model's own he
 - **Gentle nights:** `SETTINGS.nights` (`G.gentle()`). It skips `hunt()`, the night heartbeat, `slip()`, the obsessive walk-ups and the Act IV glimpses.
 - **Endings dialog:** `#endings` on the title screen. It reads `snowed.endings`, and `showEnd` refreshes the count through `G.syncEndings`.
 
+## Loading, Memories, the scene sheet (build 83)
+
+- `tools/shrink_textures.py` re-encodes the oversized textures inside the embedded bundles: hair to 1024 px, skin to 1536 px, WebP q86 (alpha q90).
+  - It repacks the GLB binary chunk around the changed image bufferViews and leaves geometry and materials untouched. Run it again after regenerating a bundle.
+  - The original exports in `models/real/` are untouched.
+  - Result: `models_real.js` 8.3 → 6.1 MB, `models_kids.js` 6.0 → 4.1 MB. No visible difference, even at closer than any in-game shot.
+- `js/memories.js`
+  - `G.remember('vig' | 'scrap' | 'photo', …)` is called from `meanwhile()`, `addScrap()` and `keepPhoto()`.
+  - Storage keys: `snowed.mem.vig`, `snowed.mem.scrap` and `snowed.mem.photo` (newest 12 photos that fit, dropping the oldest if storage is full).
+  - The title-screen panel has three tabs. Scrapbook paintings use `G.UI.paintSnap`, which now has a `candles` painting.
+- `tools/tests/sheet.py` plays every chapter with the first answer each time, captures a JPEG at each new line or choice (plus one frame when a chapter waits for free play), and writes one self-contained HTML page with a grid per chapter.
+
 ## The power cut and the name slips (build 82)
 
 - `js/powercut.js`

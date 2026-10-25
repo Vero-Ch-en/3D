@@ -160,6 +160,7 @@ const VIGS = {
   kwin: { text: '(At the kitchen window, she breathes on the glass and draws a small heart. She wipes it away before anyone can see. Then she draws it again.)', snd: 'squeak' },
   basil: { text: '(She leans close to the basil and whispers to it, very seriously. It sounds like a secret. It sounds like it’s about you.)' },
 };
+G.VIGS = VIGS;
 function vigFor() {
   const p = PARTNER;
   if (S.chapter === 'morning' && p.lie && !VIG.used.has('bed')) return 'bed';
@@ -182,6 +183,7 @@ async function meanwhile(id) {
   const v = VIGS[id], sh = vigShot(id);
   if (!sh) { VIG.used.add(id); return; }
   VIG.on = true; VIG.used.add(id); VIG.n++; VIG.cd = 120;
+  G.remember && G.remember('vig', id);
   STATE.busy = true; STATE.sceneShot = true;
   const was = PLAYER.speed; PLAYER.speed = 0;
   G.setShot(A.fixed(sh.pos, sh.look, 40, 0.014));
