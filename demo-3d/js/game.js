@@ -783,6 +783,7 @@ function updateCamera(dt, t) {
   c.wasWalking = walking;
   if (c.shot && !walking) {
     s = c.shot(t);
+    if (STATE.sceneShot && STATE.started) s = liven(s, t, dt);
     // Looking around inside a scene: drag (or Z / C) turns the view from where the camera stands; it eases back when you let go.
     if (t - c.lastDrag > 4) { c.lookYaw = damp(c.lookYaw || 0, 0, 1.6, dt); c.lookPitch = damp(c.lookPitch || 0, 0, 1.6, dt); }
     if (Math.abs(c.lookYaw || 0) > 1e-3 || Math.abs(c.lookPitch || 0) > 1e-3) {
@@ -830,7 +831,42 @@ function updateCamera(dt, t) {
   c.bars = damp(c.bars, c.shot && !G.MOBILE ? 0.06 : 0, 4, dt);
   grade.uniforms.uBars.value = c.bars;
 }
-function setShot(fn, cut = true) { CAM.shot = fn; CAM.cut = cut; }
+function setShot(fn, cut = true) { CAM.shot = fn; CAM.cut = cut; CAM.shotT = G.simT || 0; }
+/* Scene shots shouldn't sit dead still. Each one pushes in very slowly and drifts in a small arc around what it's
+ * looking at, and the framing leans a little toward whoever is talking, if they're already in frame. Reduced motion
+ * turns all of it off. */
+const _lv = { a: new THREE.Vector3(), b: new THREE.Vector3() };
+function liven(s, t, dt) {
+  const c = CAM, m = G.MOTION;
+  const u = t - (c.shotT || 0);
+  const d = _lv.a.copy(s.pos).sub(s.look), r = d.length();
+  if (r < 0.3) return s;
+  let pos = s.pos, look = s.look, fov = s.fov;
+  if (m > 0) {
+    const push = 0.065 * G.smooth(0, 14, u) * m, arc = 0.03 * Math.sin(u * 0.17) * m * G.smooth(0, 3, u);
+    const rr = Math.max(0.5, r * (1 - push)), ya = Math.atan2(d.x, d.z) + arc, hz = Math.hypot(d.x, d.z);
+    pos = s.look.clone().add(new THREE.Vector3(Math.sin(ya) * hz * rr / r, d.y * rr / r, Math.cos(ya) * hz * rr / r));
+    fov = s.fov * (1 - 0.03 * G.smooth(0, 14, u) * m);
+  }
+  // Lean toward the speaker.
+  const who = DLG.cur && DLG.cur.who, sw = !!(G.NIGHT && G.NIGHT.swapped);
+  const spk = who === 'partner' ? (sw ? PLAYER : PARTNER) : who === 'player' ? (sw ? PARTNER : PLAYER) : null;
+  let want = 0;
+  if (m > 0 && spk && spk.m && spk.m.visible !== false && !spk.hidden) {
+    const h = head(spk); _lv.b.set(h.x, h.headY, h.z);
+    const v1 = _lv.b.clone().sub(pos), v2 = look.clone().sub(pos);
+    const ang = v1.angleTo(v2) * 180 / Math.PI;
+    if (ang < fov * 0.42 && v1.length() < 7) { want = 1; c.leanTo = (c.leanTo || new THREE.Vector3()).copy(_lv.b); }
+  }
+  c.lean = damp(c.lean || 0, want, want ? 1.4 : 0.9, dt);
+  if (c.lean > 0.002 && c.leanTo) {
+    const off = c.leanTo.clone().sub(look), L = off.length(), k = Math.min(0.16, 0.22 / Math.max(L, 1e-3)) * c.lean;
+    look = look.clone().add(off.multiplyScalar(k));
+    fov *= 1 - 0.025 * c.lean;
+  }
+  if (pos === s.pos && look === s.look && fov === s.fov) return s;
+  return { ...s, pos, look, fov, focus: pos.distanceTo(look) };
+}
 function releaseCamera() { CAM.shot = null; CAM.cut = false; CAM.yaw = PLAYER.yaw + Math.PI; CAM.lastDrag = -99; }
 G.setShot = setShot; G.releaseCamera = releaseCamera;
 // Free time-of-day toggle (N / the HUD button): day → sunset → night → day.
@@ -1022,7 +1058,7 @@ function partnerTask(p, dt, t) {
       if (o.lines && Math.random() < 0.8 && !o.hide) bark(o.lines, 3);
       else if (!o.hide && Math.random() < 0.6) G.Audio.hum();   // or she hums to herself
       if (o.onArrive) o.onArrive(p);
-      if (!o.hide && !o.seatAt && o.look && G.startReach) G.startReach(p, { pos: [o.look.x, o.look.y, o.look.z] }, 1.6);   // she reaches for it
+      if (!o.hide && !o.seatAt && o.look && !o.noReach && G.startReach) G.startReach(p, { pos: [o.look.x, o.look.y, o.look.z] }, 1.6);   // she reaches for it
     }
     p.lookAt = null;
     return true;

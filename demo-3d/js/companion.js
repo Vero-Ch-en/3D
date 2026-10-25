@@ -88,10 +88,68 @@ function updateMemories(dt) {
   if (!b) return;
   MEM.used.add(b.id); MEM.cd = 55 + Math.random() * 35; G.bark(b.text, 4.2);
 }
-(G.onJump = G.onJump || []).push(() => { MEM.used.clear(); MEM.cd = 40; HELP.t = 0; HELP.key = null; });
+
+/* ---------- she joins you at the window ---------- */
+const WIN = { cd: 10, n: 0, v: new THREE.Vector3(), q: new THREE.Vector3() };
+function windowLine() {
+  if (STATE.tod > 0.7) return pick(['What are you looking at? …Oh. The stars are out. All of them, by the look of it.', 'It’s so dark out there. And so bright in here. I like that.']);
+  if ((STATE.snow || 0) > 0.5) return pick(['It’s still coming down. We may never leave. What a pity.', 'Look at it. Every flake on its way to somewhere.']);
+  return pick(['What are you looking at? …Oh. It’s lovely, isn’t it.', 'You can see our footprints from here. Look. Two sets.']);
+}
+function updateWindow(dt) {
+  WIN.cd -= dt;
+  if (WIN.cd > 0 || WIN.n >= 3 || !hers() || !G.WINDOWS || !G.inside(PLAYER.x, PLAYER.z) || (PLAYER.idleT || 0) < 6 || PLAYER.sit > 0.1 || PLAYER.freeSit || !canTalk() || PARTNER.mode !== 'follow' || PARTNER.carry || PARTNER.hold || (PARTNER.sit || 0) > 0.1) return;
+  if (dist() > 8) return;
+  const fx = Math.sin(PLAYER.yaw), fz = Math.cos(PLAYER.yaw);
+  for (const w of G.WINDOWS) {
+    w.inn.getWorldPosition(WIN.v);
+    if (WIN.v.y > 2.2) continue;   // the gable windows are out of reach of anyone's view
+    const dx = WIN.v.x - PLAYER.x, dz = WIN.v.z - PLAYER.z, d = Math.hypot(dx, dz);
+    if (d > 1.4 || d < 0.2 || (dx * fx + dz * fz) / d < 0.7) continue;
+    // Stand beside him, on whichever side she's nearer, a touch back from the glass.
+    const tx = -dz / d, tz = dx / d, side = ((PARTNER.x - PLAYER.x) * tx + (PARTNER.z - PLAYER.z) * tz) >= 0 ? 1 : -1;
+    // Try beside him first (her side, then the other), then a little behind; furniture often fills the obvious spot.
+    let sx = null, sz = null;
+    for (const [lat, back] of [[0.62, 0], [-0.62, 0], [0.8, 0.25], [-0.8, 0.25], [0.5, 0.5], [-0.5, 0.5], [0.95, 0.55], [-0.95, 0.55], [0.3, 0.75], [-0.3, 0.75]]) {
+      const x = PLAYER.x + tx * lat * side - (dx / d) * back, z = PLAYER.z + tz * lat * side - (dz / d) * back;
+      if (G.inside(x, z) && (!G.navOpen || G.navOpen(x, z))) { sx = x; sz = z; break; }
+    }
+    if (sx == null) { WIN.cd = 20; return; }
+    WIN.cd = 80; WIN.n++;
+    const look = { x: WIN.v.x, y: 1.35, z: WIN.v.z };
+    PARTNER.task = { o: { id: 'window', spot: { x: sx, z: sz }, yaw: Math.atan2(WIN.v.x - sx, WIN.v.z - sz), dur: [5.5, 6.5], look, noReach: true,
+      onArrive: (p) => { p.gaze = { x: look.x, z: look.z, headY: 1.35, t: 5 }; G.bark(windowLine(), 4.2); },
+      onEnd: () => {} }, phase: 'go', t: 0 };
+    return;
+  }
+}
+
+/* ---------- running indoors; coming back after leaving her alone ---------- */
+const RUN = { t: 0, cd: 30, n: 0 };
+function updateRun(dt) {
+  RUN.cd -= dt;
+  RUN.t = G.inside(PLAYER.x, PLAYER.z) && (PLAYER.speed || 0) > 2.4 ? RUN.t + dt : 0;
+  if (RUN.t > 1.5 && RUN.cd <= 0 && RUN.n < 2 && hers() && canTalk() && dist() < 7) {
+    RUN.t = 0; RUN.cd = 150; RUN.n++;
+    G.bark(RUN.n === 1 ? 'No running in the cabin, {toHim}. House rules. I’ve just made them.' : 'Mind the— …You missed it. Well done.', 3);
+  }
+}
+const AWAY = { t: 0, cd: 0 };
+function updateAway(dt) {
+  AWAY.cd -= dt;
+  if (!/^(morning|evening)$/.test(S.chapter || '') || !hers() || PARTNER.hidden || PARTNER.lie) { AWAY.t = 0; return; }
+  const d = dist();
+  if (d > 14 && !G.busy()) { AWAY.t += dt; return; }
+  if (AWAY.t > 45 && d < 3.5 && AWAY.cd <= 0 && canTalk()) {
+    AWAY.t = 0; AWAY.cd = 120;
+    G.bark(pick(['There you are. I was about to send out a search party. It was going to be me.', 'Oh, good, you’re back. I missed you. Don’t tell anyone.', 'Where did you get to? …You can tell me later. Come here.']), 3.6);
+    PARTNER.gaze = { x: PLAYER.x, z: PLAYER.z, headY: 1.55, t: 2 };
+  } else if (d < 3.5) AWAY.t = 0;
+}
+(G.onJump = G.onJump || []).push(() => { MEM.used.clear(); MEM.cd = 40; HELP.t = 0; HELP.key = null; WIN.n = 0; WIN.cd = 10; RUN.n = 0; AWAY.t = 0; });
 
 G.STEP_HOOKS.push((dt) => {
   if (!STATE.started) return;
-  updateHelp(dt); updateBump(dt); updateMemories(dt);
+  updateAway(dt); updateHelp(dt); updateBump(dt); updateMemories(dt); updateWindow(dt); updateRun(dt);
 });
 });

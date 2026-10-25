@@ -192,6 +192,17 @@ blinks, dozing, hugs. Hats and the snow on them are handed to the model's own he
 - **Gentle nights:** `SETTINGS.nights` (`G.gentle()`). It skips `hunt()`, the night heartbeat, `slip()`, the obsessive walk-ups and the Act IV glimpses.
 - **Endings dialog:** `#endings` on the title screen. It reads `snowed.endings`, and `showEnd` refreshes the count through `G.syncEndings`.
 
+## Cameras and reactions (build 80)
+
+- `liven()` in game.js applies to every scene shot (`STATE.sceneShot`), scaled by `G.MOTION`.
+  - Push-in: 6.5% of the distance, eased over 14 s from `CAM.shotT`, which `setShot` sets.
+  - Arc: ±0.03 rad around the look point (period about 37 s), plus a 3% narrower fov.
+  - Speaker lean: if the current speaker's head is within 0.42×fov of the view centre and under 7 m away, the look point moves toward it (at most 0.22 m or 16%) and the fov narrows by 2.5%. The lean eases in and out (`CAM.lean`).
+- companion.js additions:
+  - Window: `G.WINDOWS` panes below 2.2 m. He's idle for 6 s within 1.4 m of one and facing it → a `window` task beside him (it tries 10 candidate spots because of furniture), with `noReach` (new task option in `partnerTask`), a gaze, and a line for night, snow or day. At most 3 per chapter, cooldown 80 s.
+  - Running indoors: speed above 2.4 inside for 1.5 s → a bark. At most 2, cooldown 150 s.
+  - Away: in the morning or evening, more than 14 m apart for over 45 s, then back within 3.5 m → a bark. Checked before the goal hints, so the hints don't drown it out.
+
 ## Companion awareness (build 79)
 
 - `js/companion.js` runs through `G.STEP_HOOKS`.
