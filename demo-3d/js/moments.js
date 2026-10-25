@@ -253,7 +253,8 @@ inter('mFrost', [13.0, 1.35, 4.0], 1.0, 'Draw in the frost', async () => {
 }, () => evening() && !S.flags.eveFrost && !PARTNER.hidden);
 findInter('mFrost').prio = 1;
 // Only the evening has the drawing. In the night, someone has wiped it.
-G.TICKERS.add(() => { if (FROST.m.visible && S.chapter !== 'evening') FROST.m.visible = false; });
+G.TICKERS.add(() => { if (FROST.m.visible && S.chapter !== 'evening' && S.chapter !== 'firstsnow') FROST.m.visible = false; });
+G.MOM = { drawFrost, FROST };   // (The First Snow draws in the frost again)
 inter('nFrost', [13.0, 1.35, 4.0], 1.0, 'Kitchen window', async () => {
   await N('(The window you drew on this evening has been wiped. Not smudged. Clean, right to the corners, as if nobody had ever drawn on it.)');
   if (G.NIGHT) G.NIGHT.seen.add('frost');

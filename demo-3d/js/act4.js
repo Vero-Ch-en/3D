@@ -120,21 +120,61 @@ G.take = () => {
 /* ---------- The First Snow: after any ending, one more morning. No Entity, nothing wrong. Just them. ---------- */
 G.firstSnowOpen = () => { try { return JSON.parse(localStorage.getItem('snowed.endings') || '[]').some((e) => e !== 'firstsnow'); } catch (e) { return false; } };
 CH.firstsnow = async () => {
+  // One more morning, with nothing else in it. It remembers the day you actually had: what you drew in the frost,
+  // the book, the fox, the cocoa, the photographs; and, unlike the imitation, it doesn't remember the score.
   checkpoint('firstsnow'); home(true); STATE.watchDoor = false;
   G.setTime({ day: 1, tod: 0, snow: 0.0 }, true); G.WEATHER.hold = 'light';
+  const F = S.flags;
   await wait(0.3); fade(false, 2.4, '#fff'); await wait(1);
   await N('(Morning. An ordinary one. Two people, one blanket, the window going slowly white.)', K());
   await P('Hello, {dear}.', K());
   await Y('Hello, {dear}.', K());
   await P('Look. It’s starting.', K());
   await N('(The first snow of the winter. Slow and soft and in no hurry at all.)', K());
+  await P('Five more minutes. Snow-day rules.', K());
+  await N('(It is not five minutes.)', K());
+  // The kitchen: the kettle, the frosted window, the fridge.
+  const kshot = fixed(V(13.85, 1.5, 3.15), V(12.9, 1.3, 4.5), 44, 0.012);
+  await G.cutTo(() => { PLAYER.lie = PARTNER.lie = false; G.setDressed(PLAYER, false); G.setDressed(PARTNER, false); G.standAt(PLAYER, 12.35, 3.95, 0.35); G.standAt(PARTNER, 12.72, 4.05, 0.25); PARTNER.mode = 'still'; G.setShot(kshot); }, 0.6);
+  await N('(The kitchen. The kettle starting to tick. The window by the table has frosted over in the night.)', K());
+  const kind = F.eveFrost || 'heart';
+  PARTNER.forcePose = 'wave'; await wait(0.5);
+  if (G.MOM) G.MOM.drawFrost(kind, true);
+  PARTNER.forcePose = null;
+  if (!F.eveFrost) await N('(She draws a heart in the frost, and then, next to it, a second, lopsided one. “It’s an ordinary amount of soppy. Don’t look at it like that.”)', K());
+  else if (kind === 'heart') await N('(Without saying anything, she draws two hearts in the frost. The second one lopsided. On purpose.)', K());
+  else if (kind === 'snowman') await N('(She draws a snowman in the frost and gives him a very tall hat. “He came back. They always come back.”)', K());
+  else await N('(She writes “11–9” in the frost, looks at it, and crosses it out. “Recount. Always.”)', K());
+  if (F.eveCocoa) { await P('Tea, please. One sugar.', K()); await N('(You put in one. She reaches past you and puts in a second. It fell.)', K()); }
+  else { await P('Tea, please. However you make it. You make it wrong. I like it.', K()); }
+  if (S.photos && S.photos.length) await N(F.photoAltered ? '(On the fridge door, yesterday’s photographs, a little crooked. Two people in every one of them. Nobody else.)' : '(On the fridge door, yesterday’s photographs, a little crooked. Two people, mostly blinking.)', K());
+  // The window seat, if you read together: the book, still halfway.
+  if (F.eveRead) {
+    const Nk = G.NOOK, rshot = fixed(V(Nk.x - 0.45, 1.25, Nk.z + 0.95), V(Nk.x + 0.12, 0.88, Nk.z - 0.05), 56, 0.012);
+    if (G.MOM) G.MOM.FROST.m.visible = false;
+    await G.cutTo(() => { G.sitAt(PLAYER, Nk.x + 0.32, Nk.z, 0, Nk.seatY); G.sitAt(PARTNER, Nk.x - 0.3, Nk.z, 0, Nk.seatY); PARTNER.mode = 'seated'; PARTNER.holdPose = 'read'; G.setShot(rshot); }, 0.5);
+    await N('(The window seat. The book is where you left it, still open at the middle. The lighthouse keeper is still in terrible trouble.)', K());
+    await P('We still haven’t finished it.', K());
+    await Y('Good.', K());
+    await P('Good.', K());
+    PARTNER.holdPose = null;
+  }
+  // The porch bench, in the snow.
   const B = G.BENCH;
-  await G.cutTo(() => { PLAYER.lie = PARTNER.lie = false; G.setDressed(PLAYER, true); G.setDressed(PARTNER, true); for (const [c, dx] of [[PLAYER, 0.38], [PARTNER, -0.38]]) { c.x = B.x + dx; c.z = B.z + 0.02; c.y = c.yFloor = 0; c.yaw = 0; c.seatY = B.seatY; c.sitTarget = 1; c.sit = 1; c.speed = 0; } PARTNER.mode = 'seated'; G.setShot(fixed(V(B.x + 0.2, 1.3, B.z + 0.95), V(B.x, 0.95, B.z), 50, 0.012)); }, 0.6);
+  await G.cutTo(() => { if (G.MOM) G.MOM.FROST.m.visible = false; PLAYER.lie = PARTNER.lie = false; PARTNER.holdPose = null; G.setDressed(PLAYER, true); G.setDressed(PARTNER, true); for (const [c, dx] of [[PLAYER, 0.38], [PARTNER, -0.38]]) { c.x = B.x + dx; c.z = B.z + 0.02; c.y = c.yFloor = 0; c.yaw = 0; c.seatY = B.seatY; c.sitTarget = 1; c.sit = 1; c.speed = 0; } PARTNER.mode = 'seated'; G.setShot(fixed(V(B.x + 0.2, 1.3, B.z + 0.95), V(B.x, 0.95, B.z), 50, 0.012)); }, 0.6);
   G.WEATHER.hold = 'snow';
   await N('(The porch bench. Two mugs of tea going cold because neither of you wants to move.)', K());
+  if (F.mTracks) { await N('(Out in the clearing, a line of small, neat tracks, going twice round the stump for no reason at all.)', K()); await P('He’s back. The fox with opinions.', K()); }
+  if (S.mem.pinecones) {
+    await P('Who won the pinecones? Yesterday.', K());
+    const w = await choose(['“I did.”', '“You did.”', '“I don’t remember.”']);
+    if (w === 0) await P('Did you? I don’t remember either way. I’m choosing to believe it was me.', K());
+    else if (w === 1) await P('Did I? Then I’m magnificent. I’ll take your word for it.', K());
+    else await P('Neither do I. Good. Let’s never find out.', K());
+  }
   await P('Do you remember how it started? Us?', K());
   const c = await choose(['“No.”', '“Vaguely.”', '“Does it matter?”']);
-  if (c === 0) await P('Me neither. A log, I think. A lantern. Somebody gave somebody a scarf.', K());
+  if (c === 0) await P(F.scarfGiven ? 'Me neither. A log, I think. A lantern. Somebody gave somebody a scarf.' : 'Me neither. A log, I think. A lantern. Somebody sat down at the other end of it.', K());
   else if (c === 1) await P('Vaguely is my favourite way to remember things. It leaves room.', K());
   else await P('…No. I suppose it doesn’t. We keep starting it, every morning. That’s the bit that counts.', K());
   await P('If one of us ever gets lost—', K());
@@ -144,6 +184,11 @@ CH.firstsnow = async () => {
   await P('Perfect. Absolutely dreadful. Perfect.', K());
   await N('(The snow keeps coming down on the meadow, the hill, the lake, the little cabin with the light on. It will be there in the morning. So will you.)', K());
   addScrap('firstsnow', 'The first snow. Two mugs going cold. Three notes, slightly flat.');
+  // Later: the scrapbook, every page of it.
+  if ((S.scrap || []).length > 3 && G.UI.scrapbook) {
+    await N('(Later, she gets the scrapbook out, and you go through all of it together. Every page. Some of it you disagree about.)', K());
+    await G.UI.scrapbook(S.scrap);
+  }
   showEnd('firstsnow', 'The First Snow');
 };
 
