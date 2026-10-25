@@ -211,7 +211,7 @@ function nightLoops(run) {
     await until(() => !live() || (!PLAYER.lie && S.flags.upT && G.simT - S.flags.upT > 10));
     if (!live() || S.flags.fakeWithdrawn) return;
     G.standAt(PARTNER, B().R + 0.6, 0.2, Math.PI / 2); PARTNER.mode = 'follow'; PARTNER.lidsClosed = false;
-    G.bark('Can’t sleep either?', 2.4);
+    G.bark('Can’t sleep either, {toHim}?', 2.4);
   })();
   // Social stealth: staring at her too long, or bolting away, is noticed.
   let stare = 0;
@@ -231,8 +231,8 @@ function nightLoops(run) {
   // The more you've let it convince you, the closer it keeps you, and the more it says so.
   (async () => {
     const lines = [
-      ['Don’t go far.', 'Where are you going?', 'Stay where I can see you.'],
-      ['I like it when you’re close. Closer.', 'You don’t need to go in there. Everything you need is here.', 'You keep looking at the door.'],
+      ['Don’t go far, {toHim}.', 'Where are you going, {dear}?', 'Stay where I can see you.'],
+      ['I like it when you’re close, {toHim}. Closer.', 'You don’t need to go in there. Everything you need is here.', 'You keep looking at the door, {dear}.'],
       ['I’ll remember all of it for you. You don’t have to.', 'You’re mine to keep warm. Mine.', 'Nobody else gets to have this. Not even her.'],
     ];
     while (live()) {
@@ -262,7 +262,7 @@ async function slip() {
   const bx = PLAYER.x - Math.sin(PLAYER.yaw) * 0.7, bz = PLAYER.z - Math.cos(PLAYER.yaw) * 0.7;
   G.standAt(PARTNER, bx, bz, PLAYER.yaw); PARTNER.mode = 'still'; PARTNER.lidsClosed = false; PARTNER.noBlink = true;
   G.gaze(PARTNER, [PLAYER.x, PLAYER.y + 1.6, PLAYER.z], 8);
-  const knows = o.corrupt_fire ? 'You put a log on the fire for me. Two, actually. I counted.' : o.gift ? 'You always shake things. Snow globes. Presents. Me.' : 'You checked the sink. Then the window. Then me.';
+  const knows = o.slip_lovely ? 'Charming. Charming. I know what she calls you. I’ve been practising.' : o.corrupt_fire ? 'You put a log on the fire for me. Two, actually. I counted.' : o.gift ? 'You always shake things. Snow globes. Presents. Me.' : 'You checked the sink. Then the window. Then me.';
   const said = [
     ['Stop looking at me like that.', knows],
     ['You’re doing it again.', 'I was being so good. I was being exactly right.'],

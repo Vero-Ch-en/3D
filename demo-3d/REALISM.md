@@ -192,6 +192,21 @@ blinks, dozing, hugs. Hats and the snow on them are handed to the model's own he
 - **Gentle nights:** `SETTINGS.nights` (`G.gentle()`). It skips `hunt()`, the night heartbeat, `slip()`, the obsessive walk-ups and the Act IV glimpses.
 - **Endings dialog:** `#endings` on the title screen. It reads `snowed.endings`, and `showEnd` refreshes the count through `G.syncEndings`.
 
+## The power cut and the name slips (build 82)
+
+- `js/powercut.js`
+  - Trigger: evening, `cakeDone`, not cuddled, porch not done, not watching the door, inside, she's within 7 m, sunset (`todTarget < 0.5`), 35 s settled. Once.
+  - Weather is held at `heavy`. The lamps stutter (power ×0.2 three times), then `LAMPS[i].on` is saved and cleared. `G.setHold(true)` with no timer; if the hand is let go she re-holds up to 3 times.
+  - Candles: three wax cylinders on the coffee table, with flames (stretched spheres plus an additive radial-glow sprite) and one `PointLight` (intensity 0 until lit; 1.5 with a flicker during the cut, 0.55 after).
+  - The `pcCandles` inter at the kitchen drawer (11.45, −1.55) opens a scene with a low shot from the hearth side (both undressed), and a match `strike` sound per candle.
+  - Power returns 75 s after the candles (220 s without them), or quietly as the sofa scene starts (`Story.cuddle` wrapper).
+  - Night: if `flags.powerCut` is set, after 40 s close together and free, the lamps go out with no flicker. The imitation stands `still` and gazes; two narration lines; lamps restored.
+- Name slips
+  - `G.fmt` resolves pet names through `G.nameSlip(k)` first. `G.say` and `bark` set `G.fmtWho` while formatting.
+  - Only for `partner` lines in the `night` chapter. `{toHim}` → `callPartner` on the 2nd, 5th, 8th… use. `{dear}` → `callBoth[1]` with its last word moved to the front on the 2nd, 6th… use.
+  - The first slip of each kind shows a hint 2.8 s later and calls `G.observe('slip_lovely' | 'slip_order')`. `slip()` checks `obs.slip_lovely`.
+  - A few of the night's lines now carry pet names, so there's something to slip.
+
 ## Meanwhile, hands, the night's copies, sounds, phones (build 81)
 
 - Meanwhile cutaways (`updateMeanwhile` in companion.js).

@@ -276,6 +276,8 @@ G.Audio = (() => {
       if (!on && this._sz) { const z = this._sz; this._sz = null; z.g.gain.setTargetAtTime(0, ctx.currentTime, 0.3); z.s.stop(ctx.currentTime + 1.5); }
     },
     flip() { burst(0.08, 900, 0.05, 'bandpass', 1.5); tone(220, 0.05, 0.02, 0.05); },
+    // A match: the scratch, then the soft flare catching.
+    strike() { burst(0.09, 2600, 0.05, 'highpass', 0.9); burst(0.05, 1800, 0.04, 'bandpass', 2, 0.04); burst(0.35, 520, 0.03, 'lowpass', 0.8, 0.1); },
     // A fingertip dragged on cold glass: a thin, wavering, rubbery squeak in short strokes.
     squeak(strokes = 3) {
       if (!ctx) return;
@@ -959,7 +961,9 @@ G.gentle = () => SETTINGS.nights === 'gentle';
 // "You" is whoever you're playing: her in her chapters, in her own route, and whenever the bodies are swapped.
 G.labelsTurned = () => G.herSide() || !!(G.NIGHT && G.NIGHT.swapped) || (G.herRoute() && !!G.S && G.S.chapter === 'bedtime');
 const herLine = (who, text) => (who == null && G.herSide() && window.CBS_NARR_HER && window.CBS_NARR_HER[text]) || text;
-G.say = (who, text, o = {}) => (who != null && STATE.asHer && G.S && G.S.inInter ? Promise.resolve() : new Promise((res) => DLG.q.push({ who, text: G.fmt(herLine(who, text)), res, o })));
+// Who is talking while a line is formatted (the imitation's pet names can slip: companion.js, G.nameSlip).
+const fmtAs = (who, t) => { G.fmtWho = who; try { return G.fmt(t); } finally { G.fmtWho = null; } };
+G.say = (who, text, o = {}) => (who != null && STATE.asHer && G.S && G.S.inInter ? Promise.resolve() : new Promise((res) => DLG.q.push({ who, text: fmtAs(who, herLine(who, text)), res, o })));
 const busy = () => !!DLG.cur || DLG.q.length > 0 || STATE.busy || !!(G.UI && G.UI.blocking());
 G.busy = busy; G.DLG = DLG;
 function pickShotFor(who, o) {
@@ -993,7 +997,7 @@ function updateDialogue(dt) {
   }
 }
 $('subs').addEventListener('pointerdown', (e) => { e.preventDefault(); DLG.click = true; });
-function bark(text, dur = 2.6) { if (STATE.asHer) return; PARTNER.bark = { text: G.fmt(Array.isArray(text) ? text[Math.floor(Math.random() * text.length)] : text), t: dur }; }
+function bark(text, dur = 2.6) { if (STATE.asHer) return; PARTNER.bark = { text: fmtAs('partner', Array.isArray(text) ? text[Math.floor(Math.random() * text.length)] : text), t: dur }; }
 G.bark = (t, d) => bark(t, d); G.hint = (t, d) => hint(G.fmt(t), d);
 function hint(text, dur = 5) { const h = $('hint'); h.textContent = text; h.classList.add('show'); clearTimeout(hint._t); hint._t = setTimeout(() => h.classList.remove('show'), dur * 1000); }
 // Waits run on the game clock, so a scene pauses with the tab instead of racing ahead of the dialogue.

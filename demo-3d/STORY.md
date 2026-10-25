@@ -53,6 +53,8 @@ Around the story the cabin is lived in. It has a deeper 15 × 7 m layout with a 
   - At the cocoa, the imitation drinks it straight off the heat without blinking.
   - In the window seat, its "nothing has changed at all" comes with a reminder of "always halfway through something".
   - The kitchen window you drew on has been wiped clean, right to the corners.
+  - **The pet names, almost right (build 82).** Now and then the imitation calls him "my lovely partner", which is *his* name for *her*, or says "partner my dearest", in the wrong order. The first time each happens, you notice. If it later loses its temper, it knows you noticed: "Charming. Charming. I know what she calls you. I've been practising."
+  - **The lights again (build 82).** If there was a power cut in the evening, the lamps go out again at night. "It's only the storm." Outside, the snow is coming straight down; there's no wind at all. In the dark it stands quite still beside you and doesn't reach for your hand. If you were the one who said "It's only the storm" in the evening, it gives your words back: "It was only the storm. You said so."
   - **Her habits, wrong (build 81).** It feeds the fire when the coals are fine, twice: "There. You like it warm. I remember that you like it warm." "And another. So you'll stay."
     - Stand at a window and it's suddenly beside you, much too close, without a sound. The snow stops in the air while it says "There's nothing out there. Nothing at all. Come away from the window."
     - After you've been near it a while, it says "There you are," then "…You were here all along. I know. I just like saying it."
@@ -80,6 +82,17 @@ Only on his route, in her own chapters (morning, the walk, the evening, the endi
   Twice a chapter at most.
 - **She takes your hand (build 81).** Walking together outside, after standing at a window, on the porch: "*slips her hand into yours* Cold fingers. Mine now."
 - **She remembers the day you've had.** In the evening, now and then, she brings up something from earlier: the pinecones (won or lost), the burnt or golden pancakes, her ambush, the branch, the fox, the photographs, the snowman, what you said on the hill. And the circle, which she has decided not to think about.
+
+## The power cut (build 82)
+
+After the cake, once, on his route: the wind throws itself at the house, the lamps stutter, and every one goes out. She doesn't like the dark. She comes straight to you, takes your hand and keeps it ("Don't let go. I mean it."). If you let go, she takes it back ("Hand. Please." "Not yet. Not in the dark.").
+
+You choose what to say:
+- "I've got you." ("Keep having me.")
+- "Are you scared of the dark?" ("The dark in a cabin is a great deal of dark.")
+- "It's only the storm." ("I would just like the storm to know I'm not on my own.")
+
+There are candles in the kitchen drawer, probably. You find them among the string and the spare key and something that was once a biscuit. You light three on the table by the fire, beside the cake: "This is better than the lamps. Don't tell the lamps." The power comes back a while later ("I was extremely brave throughout"). The candles stay lit for the rest of the evening.
 
 ## Act II · Something Strange: the evening
 

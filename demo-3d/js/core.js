@@ -35,7 +35,7 @@ G.seeded = (s) => () => { s = (s * 16807) % 2147483647; return (s - 1) / 2147483
 G.CFG = window.CBS_CONFIG || { playerLabel: 'You', partnerLabel: 'Partner', nickForPlayer: 'you', nickForPartner: 'you', birthday: { heading: 'Happy birthday.', full: [], signature: '' } };
 // In the 3D game the two of them call each other “Partner” (callPlayer / callPartner in the config).
 let dearN = 0;
-const petName = (k) => { const C = G.CFG; const v = k === 'toHim' ? C.callPlayer : k === 'toHer' ? C.callPartner : C.callBoth; return (Array.isArray(v) ? v[dearN++ % v.length] : v) || 'Partner'; };
+const petName = (k) => { const C = G.CFG; const slip = G.nameSlip && G.nameSlip(k); if (slip) return slip; const v = k === 'toHim' ? C.callPlayer : k === 'toHer' ? C.callPartner : C.callBoth; return (Array.isArray(v) ? v[dearN++ % v.length] : v) || 'Partner'; };
 // Pet names: lower case mid-sentence, a capital at the start of a sentence (or a quote).
 G.fmt = (t) => String(t).replace(/\{(toHim|toHer|dear)\}/g, (m, k, i, s) => { const n = petName(k), pre = s.slice(Math.max(0, i - 2), i); return i === 0 || /(^|[.!?…]\s|[“"(]\s?)$/.test(pre) || /[“"(]$/.test(pre) ? n[0].toUpperCase() + n.slice(1) : n; }).replace(/\{giant\}/g, G.CFG.callPlayer || 'Partner').replace(/\{gremlin\}/g, G.CFG.callPartner || 'Partner')
   .replace(/\{P\}/g, G.CFG.partnerLabel).replace(/\{Y\}/g, G.CFG.playerLabel);

@@ -280,6 +280,27 @@ function updateWrong(dt) {
     G.wait(2.9).then(() => { if (itNight() && !G.busy()) G.bark('…You were here all along. I know. I just like saying it.', 3.2); });
   }
 }
+
+/* ---------- the night: it gets the pet names almost right ----------
+ * She calls him "my charming partner". He calls her "my lovely partner". The imitation has heard both, and
+ * every so often uses the wrong one, or says "my dearest partner" in the wrong order. The first time each,
+ * you notice (a hint after the line). */
+const NS = { n: { toHim: 0, toHer: 0, dear: 0 }, told: new Set() };
+G.nameSlip = (k) => {
+  if (G.fmtWho !== 'partner' || S.chapter !== 'night' || (G.NIGHT && G.NIGHT.swapped)) return null;
+  const C = G.CFG, n = ++NS.n[k];
+  let out = null, kind = null;
+  if (k === 'toHim' && n >= 2 && n % 3 === 2) { out = C.callPartner; kind = 'lovely'; }
+  else if (k === 'dear' && n >= 2 && n % 4 === 2) { const w = String((C.callBoth || [])[1] || 'my dearest partner').split(' '); out = [w[w.length - 1]].concat(w.slice(0, -1)).join(' '); kind = 'order'; }
+  if (kind && !NS.told.has(kind)) {
+    NS.told.add(kind);
+    const cap = (t) => t.charAt(0).toUpperCase() + t.slice(1);
+    const line = kind === 'lovely' ? '(“' + cap(C.callPartner) + '.” That’s what you call her. She has never once called you that.)' : '(“' + cap(out) + '.” Not quite. The words are right. The order isn’t.)';
+    G.wait(2.8).then(() => { if (S.chapter === 'night') G.hint(line, 6); });
+    G.observe && G.observe('slip_' + kind, kind === 'lovely' ? 'I called it by the wrong name. Its name for her. It noticed.' : 'I put the words in the wrong order. It heard.');
+  }
+  return out;
+};
 const _nw = new THREE.Vector3();
 function nearWindow() {
   if (!G.WINDOWS || !G.inside(PLAYER.x, PLAYER.z)) return null;
@@ -291,7 +312,7 @@ function nearWindow() {
   }
   return null;
 }
-(G.onJump = G.onJump || []).push(() => { VIG.used.clear(); VIG.ch = null; Object.assign(WRONG, { fire: false, win: false, there: false, near: 0, winT: 0, cd: 20 }); MEM.used.clear(); MEM.cd = 40; HELP.t = 0; HELP.key = null; WIN.n = 0; WIN.cd = 10; RUN.n = 0; AWAY.t = 0; });
+(G.onJump = G.onJump || []).push(() => { NS.n = { toHim: 0, toHer: 0, dear: 0 }; NS.told.clear(); VIG.used.clear(); VIG.ch = null; Object.assign(WRONG, { fire: false, win: false, there: false, near: 0, winT: 0, cd: 20 }); MEM.used.clear(); MEM.cd = 40; HELP.t = 0; HELP.key = null; WIN.n = 0; WIN.cd = 10; RUN.n = 0; AWAY.t = 0; });
 
 G.STEP_HOOKS.push((dt) => {
   if (!STATE.started) return;
