@@ -47,7 +47,12 @@ def main(out):
         want = [c for c in os.environ.get('CHAPTERS', '').split(',') if c]
         if want: chapters = [c for c in chapters if c[0] in want]
         sheet = []
+        cache = os.environ.get('CACHE', out + '.cache')
+        os.makedirs(cache, exist_ok=True)
         for cid, title in chapters:
+            cf = os.path.join(cache, cid + '.json')
+            if os.path.exists(cf) and not os.environ.get('FRESH'):   # resume: chapters already captured
+                sheet.append((cid, title, json.load(open(cf)))); write(out, sheet); continue
             print('==', cid, flush=True)
             pg.evaluate("async (id) => { let done = false; G.jumpTo(id).then(() => { done = true; }); for (let k = 0; k < 300 && !done; k++) await DEMO.advance(1 / 30, 1 / 30); }", cid)
             frames, last, idle = [], '', 0
@@ -64,6 +69,7 @@ def main(out):
                 last = r['key']
                 pg.evaluate(STEP, r['kind'])
             sheet.append((cid, title, frames))
+            json.dump(frames, open(cf, 'w')); write(out, sheet)   # keep what we have, chapter by chapter
         b.close()
     write(out, sheet)
 
