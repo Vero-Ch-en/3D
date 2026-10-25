@@ -1682,7 +1682,8 @@ function step(dt, t) {
   }
   PLAYER.lookAt = PLAYER.lookFix || (Math.hypot(PARTNER.x - PLAYER.x, PARTNER.z - PLAYER.z) < 3 && !PARTNER.hidden ? head(PARTNER) : null);   // lookFix: a scene wants you looking at something
   // Interaction prompt
-  const it = free ? nearest() : null;
+  // While a line is on screen E advances it, so no prompts then (you can still walk).
+  const it = free && !DLG.cur ? nearest() : null;
   // You look at what you're about to use; she glances at whatever you're doing.
   if (it) PLAYER.lookAt = { x: it.pos[0], z: it.pos[2], headY: it.pos[1] };
   if (PARTNER.gaze) { PARTNER.gaze.t -= dt; if (PARTNER.gaze.t > 0 && !PARTNER.lie && !PARTNER.hidden) PARTNER.lookAt = PARTNER.gaze; else PARTNER.gaze = null; }
@@ -1691,7 +1692,7 @@ function step(dt, t) {
   const together = !!(G.Story && G.Story.together);
   const sittingFree = !!PLAYER.freeSit && !busy() && !PLAYER.rise;
   const ph = PARTNER.lie ? G.headPos(PARTNER) : PARTNER;   // in bed, talk to her face, not her feet
-  const nearP = (free || (sittingFree && together)) && !PARTNER.hidden && (!PARTNER.lie || together) && !PARTNER.script && Math.hypot(ph.x - PLAYER.x, ph.z - PLAYER.z) < (PARTNER.hold ? 1.8 : PARTNER.lie ? 1.5 : 1.4) && (together ? (!G.S || !G.S.flags.noTogether) : PARTNER.sit < 0.2);
+  const nearP = (free || (sittingFree && together)) && !DLG.cur && !PARTNER.hidden && (!PARTNER.lie || together) && !PARTNER.script && Math.hypot(ph.x - PLAYER.x, ph.z - PLAYER.z) < (PARTNER.hold ? 1.8 : PARTNER.lie ? 1.5 : 1.4) && (together ? (!G.S || !G.S.flags.noTogether) : PARTNER.sit < 0.2);
   let html = '';
   const lab = it ? G.fmt(typeof it.label === 'function' ? it.label() : it.label) : '';
   if (it && lab) html += `<span class="key">${G.MOBILE ? 'Use' : G.keyFor('interact')}</span>${lab}`;

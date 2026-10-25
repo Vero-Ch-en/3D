@@ -159,9 +159,9 @@ CH.firstsnow = async () => {
     await P('Good.', K());
     PARTNER.holdPose = null;
   }
-  // The porch bench, in the snow.
+  // The porch bench, in the snow (from inside the porch, high and wide enough for both faces under the hats).
   const B = G.BENCH;
-  await G.cutTo(() => { if (G.MOM) G.MOM.FROST.m.visible = false; PLAYER.lie = PARTNER.lie = false; PARTNER.holdPose = null; G.setDressed(PLAYER, true); G.setDressed(PARTNER, true); for (const [c, dx] of [[PLAYER, 0.38], [PARTNER, -0.38]]) { c.x = B.x + dx; c.z = B.z + 0.02; c.y = c.yFloor = 0; c.yaw = 0; c.seatY = B.seatY; c.sitTarget = 1; c.sit = 1; c.speed = 0; } PARTNER.mode = 'seated'; G.setShot(fixed(V(B.x + 0.2, 1.3, B.z + 0.95), V(B.x, 0.95, B.z), 50, 0.012)); }, 0.6);
+  await G.cutTo(() => { if (G.MOM) G.MOM.FROST.m.visible = false; PLAYER.lie = PARTNER.lie = false; PARTNER.holdPose = null; G.setDressed(PLAYER, true); G.setDressed(PARTNER, true); for (const [c, dx] of [[PLAYER, 0.38], [PARTNER, -0.38]]) { c.x = B.x + dx; c.z = B.z + 0.02; c.y = c.yFloor = 0; c.yaw = 0; c.seatY = B.seatY; c.sitTarget = 1; c.sit = 1; c.speed = 0; } PARTNER.mode = 'seated'; G.setShot(fixed(V(B.x + 1.05, 1.55, B.z + 1.2), V(B.x - 0.05, 0.98, B.z + 0.05), 50, 0.012)); }, 0.6);
   G.WEATHER.hold = 'snow';
   await N('(The porch bench. Two mugs of tea going cold because neither of you wants to move.)', K());
   if (F.mTracks) { G.Audio.paws(7); await N('(Out in the clearing, a line of small, neat tracks, going twice round the stump for no reason at all.)', K()); await P('He’s back. The fox with opinions.', K()); }
@@ -201,7 +201,7 @@ CH.ending_replaced = async () => {
   const ch = G.KITCHEN.chairs;
   G.sitAt(PLAYER, ch.B.x, ch.B.z, ch.B.yaw, ch.B.seatY || 0.49); G.sitAt(PARTNER, ch.A.x, ch.A.z, ch.A.yaw, ch.A.seatY || 0.49); PARTNER.mode = 'seated';
   // From outside, through the window by the table, in the snow.
-  const shot = fixed(V(13.2, 1.55, 6.3), V(13.0, 1.0, 3.2), 34, 0.012);
+  const shot = fixed(V(12.62, 1.8, 6.3), V(12.85, 0.9, 3.2), 32, 0.012);   // through one pane, over the plants on the sill
   G.setShot(shot);
   await wait(0.3); fade(false, 2.2);
   await N('(Breakfast. Two plates. Two mugs, the handles turned the same way.)', { shot });
@@ -914,6 +914,7 @@ G.TICKERS.add(() => { const it = findInter('aSign'); if (it) { const p = SIGN.po
 /* =====================================================================
  * The endings
  * ===================================================================== */
+// Home again. Lying together: close over the foot of the bed (a higher shot caught the bedside lamps).
 function home(lyingBoth) {
   quiet(); STATE.busy = true; STATE.sceneShot = true; MUG3.visible = false; STATE.watchDoor = false;
   if (G.NIGHT && G.NIGHT.swapped) G.swapBodies();
@@ -923,7 +924,7 @@ function home(lyingBoth) {
   G.post.grade.uniforms.uMem.value = 0; STATE.fog = null; STATE.bounds = null;
   houseFor('morning');
   PARTNER.hidden = false; PARTNER.m.visible = true; PARTNER.lidsClosed = false; PARTNER.hold = false;
-  if (lyingBoth) { G.cuddleInBed(PLAYER, PARTNER); PARTNER.mode = 'lying'; G.setShot(fixed(V(G.BED.x + 0.1, 2.45, G.BED.z + 0.2), V(G.BED.x + 0.02, 0.55, G.BED.z - 0.95), 44, 0.01)); }
+  if (lyingBoth) { G.cuddleInBed(PLAYER, PARTNER); PARTNER.mode = 'lying'; G.setShot(fixed(V(G.BED.x + 0.04, 2.1, -1.28), V(G.BED.x + 0.02, 0.76, -1.8), 36, 0.012)); }
 }
 const free = () => { STATE.sceneShot = false; G.releaseCamera(); G.CAM.cut = true; STATE.busy = false; PARTNER.mode = 'follow'; };
 const stand = () => G.cutTo(() => { G.standAt(PLAYER, G.BED.L - 0.6, 0.2, Math.PI / 2); G.standAt(PARTNER, G.BED.R + 0.6, 0.2, -Math.PI / 2); }, 0.4);

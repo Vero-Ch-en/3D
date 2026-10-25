@@ -192,6 +192,13 @@ blinks, dozing, hugs. Hats and the snow on them are handed to the model's own he
 - **Gentle nights:** `SETTINGS.nights` (`G.gentle()`). It skips `hunt()`, the night heartbeat, `slip()`, the obsessive walk-ups and the Act IV glimpses.
 - **Endings dialog:** `#endings` on the title screen. It reads `snowed.endings`, and `showEnd` refreshes the count through `G.syncEndings`.
 
+## Fixes from the scene sheet (build 84)
+
+- Endings and The First Snow in bed: `home(true)` now uses the morning's close shot over the foot of the bed. The old one, 2.45 m up, caught the bedside lamps as big pale blobs in the corners.
+- The First Snow porch bench: the shot moved inside the porch, to the right and higher (50° fov). The old one was 0.95 m away at bench height, showing her hat and his scarf. The first fix sat behind the railing and a post.
+- Replaced: through one pane of the kitchen window and over the plants on the sill, so the window's cross frames the table instead of covering it, and she's visible.
+- Prompts (E / Q) are hidden while a line of dialogue is on screen: E advances the line then, so showing "E Bed" was misleading. Walking during conversation is unchanged.
+
 ## Loading, Memories, the scene sheet (build 83)
 
 - `tools/shrink_textures.py` re-encodes the oversized textures inside the embedded bundles: hair to 1024 px, skin to 1536 px, WebP q86 (alpha q90).
