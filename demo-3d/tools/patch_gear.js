@@ -2,6 +2,7 @@
 // into the game's realistic models: the coat mesh is replaced, and hat_/scarf_/gloves_/boots_<name> are added as
 // skinned meshes on the same skeleton (replaced if they're already there). Old data is dropped from the file.
 // Usage (from demo-3d/): node tools/patch_gear.js <dir with <key>.bin and gear_meta.json>
+// Keys: coat_<name> (replaces the coat), leggings_<name> (replaces the leggings, keeping their material), anything else is added.
 // Per vertex (little endian): 8 x f32 (pos xyz, normal xyz, uv), 3 x u8 rgb, 4 x (u8 joint, f32 weight); then u16
 // indices. Positions/normals are Blender world space at rest; glTF model space is [x - OX, z, -y].
 const fs = require('fs'), vm = require('vm'), path = require('path');
@@ -51,6 +52,8 @@ for (const name of ['partner', 'player']) {
   const target = {};
   for (const key of keys) {
     if (key.startsWith('coat_')) { target[key] = J.meshes[coatMi].primitives[0]; continue; }
+    // leggings_<name>: replaces the leggings in place (his trousers, tools/trousers.py), keeping their own material
+    if (key.startsWith('leggings_')) { const li = J.meshes.findIndex((m) => /^leggings/i.test(m.name)); if (li < 0) throw new Error('no leggings mesh'); target[key] = J.meshes[li].primitives[0]; continue; }
     let mi = J.meshes.findIndex((m) => m.name === key);
     if (mi < 0) {
       J.meshes.push({ name: key, primitives: [{ attributes: {}, material: mat }] }); mi = J.meshes.length - 1;
@@ -77,6 +80,7 @@ for (const name of ['partner', 'player']) {
     const pr = target[key];
     pr.attributes = { POSITION: acc(vb[0], 5126, 'VEC3', d.nv, { min: d.mn, max: d.mx }), NORMAL: acc(vb[1], 5126, 'VEC3', d.nv), TEXCOORD_0: acc(vb[2], 5126, 'VEC2', d.nv),
       COLOR_0: acc(vb[3], 5126, 'VEC3', d.nv), JOINTS_0: acc(vb[4], 5121, 'VEC4', d.nv), WEIGHTS_0: acc(vb[5], 5126, 'VEC4', d.nv) };
+    if (key.startsWith('leggings_')) delete pr.attributes.COLOR_0;   // plain cloth: no vertex colours (as the original)
     pr.indices = acc(vb[6], 5123, 'SCALAR', d.ni); delete pr.targets;
     out[name][key] = d.nv;
   }

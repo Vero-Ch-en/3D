@@ -192,6 +192,15 @@ blinks, dozing, hugs. Hats and the snow on them are handed to the model's own he
 - **Gentle nights:** `SETTINGS.nights` (`G.gentle()`). It skips `hunt()`, the night heartbeat, `slip()`, the obsessive walk-ups and the Act IV glimpses.
 - **Endings dialog:** `#endings` on the title screen. It reads `snowed.endings`, and `showEnd` refreshes the count through `G.syncEndings`.
 
+## His trousers (build 85)
+
+- He no longer wears the same skin-tight leggings as her: `leggings_player` is now straight-leg trousers (`tools/trousers.py`, run in Blender). The result is saved as a new file, `cozy_characters_trousers.blend`, in the CozyCharacters folder; the other .blend files are untouched, and the file keeps a hidden `backup_leggings_player`.
+  - Thigh: the leggings' own shape plus about 1.2 cm of ease.
+  - Below the knee: the original leggings were open at the back of the calf, because knee socks covered it. That part is replaced by a new tube of rings around the middle of his calf, wide enough to clear every point of his body by 9 mm. His body is very sparse under the socks, so a few long faces span knee to ankle; the clearance is checked on faces, not just corners. It tapers slightly to an ankle hem with a turned-under edge, so his socks show below.
+  - New vertices take their skin weights from his body underneath. Tested sitting (hips and knees at about 90°): the trousers bend with the legs and nothing pokes through.
+- In the game: `tools/patch_gear.js` now accepts a `leggings_<name>` key, which replaces the leggings mesh in place, keeping its own material and without vertex colours.
+- `models/real/*.glb` now match the embedded bundles again (the smaller textures from build 83, plus the trousers). The local test server loads the .glb files, while the published page and the zip load the bundles. Build 83's texture comparison had in fact compared the old .glb with itself, so the smaller textures were only properly checked in game from this build on. The full-resolution textures are still in the Blender files and in git history.
+
 ## Fixes from the scene sheet (build 84)
 
 - Endings and The First Snow in bed: `home(true)` now uses the morning's close shot over the foot of the bed. The old one, 2.45 m up, caught the bedside lamps as big pale blobs in the corners.
@@ -203,7 +212,7 @@ blinks, dozing, hugs. Hats and the snow on them are handed to the model's own he
 
 - `tools/shrink_textures.py` re-encodes the oversized textures inside the embedded bundles: hair to 1024 px, skin to 1536 px, WebP q86 (alpha q90).
   - It repacks the GLB binary chunk around the changed image bufferViews and leaves geometry and materials untouched. Run it again after regenerating a bundle.
-  - The original exports in `models/real/` are untouched.
+  - (Build 85: `models/real/` was brought back in line with the bundles; see above.)
   - Result: `models_real.js` 8.3 → 6.1 MB, `models_kids.js` 6.0 → 4.1 MB. No visible difference, even at closer than any in-game shot.
 - `js/memories.js`
   - `G.remember('vig' | 'scrap' | 'photo', …)` is called from `meanwhile()`, `addScrap()` and `keepPhoto()`.
